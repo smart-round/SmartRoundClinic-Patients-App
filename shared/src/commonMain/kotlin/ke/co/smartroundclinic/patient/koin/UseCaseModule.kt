@@ -1,0 +1,110 @@
+package ke.co.smartroundclinic.patient.koin
+
+import ke.co.smartroundclinic.patient.domain.usecase.appointment.BookAppointmentUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.appointment.CancelAppointmentUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetAppointmentUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetMyAppointmentsUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.articles.GetArticleCategoriesUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.articles.GetLiveArticlesUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.auth.GetUserUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.auth.RefreshTokenUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.auth.RemoveProfilePictureUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.auth.RequestPasswordResetUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.auth.ResendAccountUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.auth.ResendPasswordResetOtpUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.auth.SignInUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.auth.SignOutUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.auth.SignUpUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.auth.UpdatePasswordUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.auth.UpdateProfileUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.auth.UploadProfilePictureUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.auth.VerifyAccountUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.availability.GetAvailableSlotsUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.availability.GetCalendarViewUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.datastore.GetKeyUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorArticlesUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorProfileUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorsBySpecializationUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetRecommendedDoctorsUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.servicecategory.GetServiceCategoriesUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.speciality.GetSpecialitiesUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.speciality.GetSpecialityPricingUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.datastore.ObserveKeyUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.datastore.SetKeyUseCase
+import ke.co.smartroundclinic.patient.presentation.auth.ForgotPasswordViewModel
+import ke.co.smartroundclinic.patient.presentation.auth.SignInViewModel
+import ke.co.smartroundclinic.patient.presentation.main.articles.ArticlesViewModel
+import ke.co.smartroundclinic.patient.presentation.main.profile.ProfileViewModel
+import ke.co.smartroundclinic.patient.presentation.main.Services.DoctorsProfileViewModel
+import ke.co.smartroundclinic.patient.presentation.main.Services.ServicesViewModel
+import ke.co.smartroundclinic.patient.presentation.main.home.HomeViewModel
+import ke.co.smartroundclinic.patient.presentation.onboarding.OnboardingScreenViewModel
+import ke.co.smartroundclinic.patient.presentation.signup.AccountVerificationViewModel
+import ke.co.smartroundclinic.patient.presentation.signup.SignUpFilesViewModel
+import ke.co.smartroundclinic.patient.presentation.signup.SignUpFormViewModel
+import ke.co.smartroundclinic.patient.presentation.splash.SplashViewModel
+import org.koin.core.module.dsl.viewModel
+import org.koin.dsl.module
+
+val useCaseModule = module {
+    // Datastore use cases
+    single { ObserveKeyUseCase(get()) }
+    single { SetKeyUseCase(get()) }
+    single { GetKeyUseCase(get()) }
+
+    // Auth use cases
+    single { SignInUseCase(get(), get()) }
+    single { SignUpUseCase(get()) }
+    single { VerifyAccountUseCase(get()) }
+    single { ResendAccountUseCase(get()) }
+    single { RequestPasswordResetUseCase(get()) }
+    single { ResendPasswordResetOtpUseCase(get()) }
+    single { UpdatePasswordUseCase(get()) }
+    single { RefreshTokenUseCase(get(), get()) }
+    single { GetUserUseCase(get(), get()) }
+    single { SignOutUseCase(get(), get(), get()) }
+    single { UpdateProfileUseCase(get(), get()) }
+    single { UploadProfilePictureUseCase(get()) }
+    single { RemoveProfilePictureUseCase(get()) }
+
+    // Availability use cases
+    single { GetAvailableSlotsUseCase(get()) }
+    single { GetCalendarViewUseCase(get()) }
+
+    // Appointment use cases
+    single { BookAppointmentUseCase(get()) }
+    single { GetMyAppointmentsUseCase(get()) }
+    single { GetAppointmentUseCase(get()) }
+    single { CancelAppointmentUseCase(get()) }
+
+    // Speciality use cases
+    single { GetSpecialitiesUseCase(get(), get()) }
+    single { GetSpecialityPricingUseCase(get()) }
+
+    // Doctor use cases
+    single { GetRecommendedDoctorsUseCase(get(), get()) }
+    single { GetDoctorsBySpecializationUseCase(get()) }
+    single { GetDoctorProfileUseCase(get()) }
+    single { GetDoctorArticlesUseCase(get()) }
+
+    // Service category use cases
+    single { GetServiceCategoriesUseCase(get(), get()) }
+
+    // Article use cases
+    single { GetLiveArticlesUseCase(get(), get()) }
+    single { GetArticleCategoriesUseCase(get(), get()) }
+
+    // ViewModels
+    viewModel { SplashViewModel(get(), get()) }
+    viewModel { OnboardingScreenViewModel(get(), get()) }
+    viewModel { SignInViewModel(get(), get(), get(), get()) }
+    viewModel { ForgotPasswordViewModel(get(), get(), get(), get()) }
+    viewModel { AccountVerificationViewModel(get(), get(), get()) }
+    viewModel { SignUpFilesViewModel() }
+    viewModel { SignUpFormViewModel(get(), get()) }
+    viewModel { ArticlesViewModel(get(), get(), get(), get()) }
+    viewModel { HomeViewModel(get(), get(), get(), get()) }
+    viewModel { ProfileViewModel(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { DoctorsProfileViewModel(get(), get(), get()) }
+    viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get()) }
+}
