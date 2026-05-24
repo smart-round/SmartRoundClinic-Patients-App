@@ -44,7 +44,7 @@ import ke.co.smartroundclinic.patient.generated.resources.bottom_bar_layers
 import ke.co.smartroundclinic.patient.generated.resources.bottom_bar_vector
 import ke.co.smartroundclinic.patient.presentation.main.articles.ArticlesRoot
 import ke.co.smartroundclinic.patient.presentation.main.bookings.BookingsRoot
-import androidx.compose.foundation.layout.Box
+import ke.co.smartroundclinic.patient.presentation.main.chat.ChatRoot
 import ke.co.smartroundclinic.patient.presentation.main.destinations.Appointments
 import ke.co.smartroundclinic.patient.presentation.main.destinations.Articles
 import ke.co.smartroundclinic.patient.presentation.main.destinations.Bookings
@@ -109,7 +109,7 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
                         onNavigateToServices = { selectTab(Doctors) },
                     )
                 }
-                entry<Appointments> { Box(modifier = Modifier.fillMaxSize()) }
+                entry<Appointments> { ChatRoot(onAtRootChanged = { isAtRoot = it }) }
                 entry<Doctors> { ServicesRoot(onAtRootChanged = { isAtRoot = it }) }
                 entry<Articles> { ArticlesRoot(onAtRootChanged = { isAtRoot = it }) }
                 entry<Bookings> { BookingsRoot(onAtRootChanged = { isAtRoot = it }) }

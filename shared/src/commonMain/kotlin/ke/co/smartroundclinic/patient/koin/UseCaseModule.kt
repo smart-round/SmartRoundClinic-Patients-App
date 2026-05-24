@@ -1,6 +1,9 @@
 package ke.co.smartroundclinic.patient.koin
 
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.BookAppointmentUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.consultation.GetConsultationMessagesUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.consultation.StartConsultationUseCase
+import ke.co.smartroundclinic.patient.presentation.main.chat.ConsultationViewModel
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.CancelAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetMyAppointmentsUseCase
@@ -71,9 +74,13 @@ val useCaseModule = module {
     single { GetAvailableSlotsUseCase(get()) }
     single { GetCalendarViewUseCase(get()) }
 
+    // Consultation use cases
+    single { StartConsultationUseCase(get()) }
+    single { GetConsultationMessagesUseCase(get()) }
+
     // Appointment use cases
     single { BookAppointmentUseCase(get()) }
-    single { GetMyAppointmentsUseCase(get()) }
+    single { GetMyAppointmentsUseCase(get(), get()) }
     single { GetAppointmentUseCase(get()) }
     single { CancelAppointmentUseCase(get()) }
 
@@ -107,4 +114,5 @@ val useCaseModule = module {
     viewModel { ProfileViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { DoctorsProfileViewModel(get(), get(), get()) }
     viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get()) }
+    viewModel { ConsultationViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
 }

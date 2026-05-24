@@ -1,7 +1,9 @@
 package ke.co.smartroundclinic.patient.koin
 
 import ke.co.smartroundclinic.patient.core.database.AppDatabase
+import ke.co.smartroundclinic.patient.data.repository.AppointmentLocalRepositoryImpl
 import ke.co.smartroundclinic.patient.data.repository.AppointmentRepositoryImpl
+import ke.co.smartroundclinic.patient.data.repository.ConsultationRepositoryImpl
 import ke.co.smartroundclinic.patient.data.repository.ArticleCategoryLocalRepositoryImpl
 import ke.co.smartroundclinic.patient.data.repository.ArticleLocalRepositoryImpl
 import ke.co.smartroundclinic.patient.data.repository.ArticleRepositoryImpl
@@ -15,7 +17,9 @@ import ke.co.smartroundclinic.patient.data.repository.ServiceCategoryRepositoryI
 import ke.co.smartroundclinic.patient.data.repository.SpecialityLocalRepositoryImpl
 import ke.co.smartroundclinic.patient.data.repository.SpecialityRepositoryImpl
 import ke.co.smartroundclinic.patient.data.repository.UserLocalRepositoryImpl
+import ke.co.smartroundclinic.patient.domain.repository.AppointmentLocalRepository
 import ke.co.smartroundclinic.patient.domain.repository.AppointmentRepository
+import ke.co.smartroundclinic.patient.domain.repository.ConsultationRepository
 import ke.co.smartroundclinic.patient.domain.repository.ArticleCategoryLocalRepository
 import ke.co.smartroundclinic.patient.domain.repository.ArticleLocalRepository
 import ke.co.smartroundclinic.patient.domain.repository.ArticleRepository
@@ -37,6 +41,7 @@ val repositoryModule = module {
     single<UserLocalRepository> { UserLocalRepositoryImpl(get<AppDatabase>().userDao) }
     single<AvailabilityRepository> { AvailabilityRepositoryImpl(get()) }
     single<AppointmentRepository> { AppointmentRepositoryImpl(get()) }
+    single<AppointmentLocalRepository> { AppointmentLocalRepositoryImpl(get<AppDatabase>().appointmentDao) }
     single<SpecialityRepository> { SpecialityRepositoryImpl(get()) }
     single<SpecialityLocalRepository> { SpecialityLocalRepositoryImpl(get<AppDatabase>().specialityDao) }
     single<ArticleRepository> { ArticleRepositoryImpl(get()) }
@@ -46,4 +51,5 @@ val repositoryModule = module {
     single<DoctorLocalRepository> { DoctorLocalRepositoryImpl(get<AppDatabase>().doctorDao) }
     single<ServiceCategoryRepository> { ServiceCategoryRepositoryImpl(get()) }
     single<ServiceCategoryLocalRepository> { ServiceCategoryLocalRepositoryImpl(get<AppDatabase>().serviceCategoryDao) }
+    single<ConsultationRepository> { ConsultationRepositoryImpl(get()) }
 }

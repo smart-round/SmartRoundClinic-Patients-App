@@ -10,6 +10,7 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.plugins.observer.ResponseObserver
+import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
@@ -17,6 +18,7 @@ import ke.co.smartroundclinic.patient.common.Constants.BASE_URL
 import kotlinx.serialization.json.Json
 
 internal fun buildHttpClient(engine: HttpClientEngine, tokenProvider: () -> String? = { null }): HttpClient = HttpClient(engine) {
+    install(WebSockets)
     install(ContentNegotiation) {
         json(Json {
             ignoreUnknownKeys = true
