@@ -16,7 +16,9 @@ import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationMessa
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationMessagesResponse
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationSessionResponse
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationWsOutgoing
+import ke.co.smartroundclinic.patient.data.remote.dto.response.JoinCallResponse
 import ke.co.smartroundclinic.patient.data.remote.dto.response.toDomain
+import ke.co.smartroundclinic.patient.domain.model.CallJoinInfo
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
 import ke.co.smartroundclinic.patient.domain.model.ConsultationSession
 import ke.co.smartroundclinic.patient.domain.repository.ConsultationRepository
@@ -69,6 +71,16 @@ class ConsultationRepositoryImpl(private val client: HttpClient) : ConsultationR
             }
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to load messages")
+        }
+    }
+
+    override suspend fun joinCall(sessionId: String): Resource<CallJoinInfo> = withContext(Dispatchers.IO) {
+        try {
+            val res = client.post("consultation/$sessionId/call/join").body<JoinCallResponse>()
+            if (res.status && res.data != null) Resource.Success(res.data.toDomain(), res.message)
+            else Resource.Error(res.message)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to join call")
         }
     }
 

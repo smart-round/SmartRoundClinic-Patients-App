@@ -27,6 +27,9 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_21)
         }
     }
+    
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi::class)
+    applyDefaultHierarchyTemplate()
 
     listOf(
         iosArm64(),
@@ -47,6 +50,11 @@ kotlin {
             implementation(libs.androidx.ui.tooling)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.kotlinx.coroutines.android)
+            // Explicit JVM artifact so the RealtimeKit SDK can resolve ContentNegotiation at runtime
+            implementation(libs.ktor.content.negotiation)
+            implementation(libs.ktor.serialization.json)
+            // Cloudflare RealtimeKit Android UI Kit
+            implementation("com.cloudflare.realtimekit:ui-android:1.1.0")
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
