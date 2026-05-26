@@ -1,6 +1,7 @@
 package ke.co.smartroundclinic.patient.koin
 
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.BookAppointmentUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.notification.RegisterDeviceTokenUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.GetConsultationMessagesUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.JoinConsultationCallUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.StartConsultationUseCase
@@ -75,6 +76,8 @@ val useCaseModule = module {
     single { GetAvailableSlotsUseCase(get()) }
     single { GetCalendarViewUseCase(get()) }
 
+    single { RegisterDeviceTokenUseCase(get()) }
+
     // Consultation use cases
     single { StartConsultationUseCase(get()) }
     single { GetConsultationMessagesUseCase(get()) }
@@ -106,7 +109,7 @@ val useCaseModule = module {
     // ViewModels
     viewModel { SplashViewModel(get(), get()) }
     viewModel { OnboardingScreenViewModel(get(), get()) }
-    viewModel { SignInViewModel(get(), get(), get(), get()) }
+    viewModel { SignInViewModel(get(), get(), get(), get(), get()) }
     viewModel { ForgotPasswordViewModel(get(), get(), get(), get()) }
     viewModel { AccountVerificationViewModel(get(), get(), get()) }
     viewModel { SignUpFilesViewModel() }

@@ -2,11 +2,14 @@ package ke.co.smartroundclinic.patient.presentation.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mmk.kmpnotifier.notification.NotifierManager
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.core.snackbar.SnackbarController
 import ke.co.smartroundclinic.patient.domain.usecase.auth.GetUserUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.auth.SignInUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.auth.SignOutUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.notification.RegisterDeviceTokenUseCase
+import ke.co.smartroundclinic.patient.notificationPlatform
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -16,6 +19,7 @@ class SignInViewModel(
     private val snackbarController: SnackbarController,
     private val signOutUseCase: SignOutUseCase,
     private val getUserUseCase: GetUserUseCase,
+    private val registerDeviceTokenUseCase: RegisterDeviceTokenUseCase,
 ) : ViewModel() {
 
     private val _isSigningIn = MutableStateFlow(false)
@@ -49,6 +53,11 @@ class SignInViewModel(
                         _isSigningIn.value = false
                         _isWrongApp.value = true
                     } else {
+                        launch {
+                            NotifierManager.getPushNotifier().getToken()?.let { token ->
+                                registerDeviceTokenUseCase(token, notificationPlatform)
+                            }
+                        }
                         snackbarController.show(result.message ?: "Welcome back!")
                         _isSigningIn.value = false
                         onSuccess()

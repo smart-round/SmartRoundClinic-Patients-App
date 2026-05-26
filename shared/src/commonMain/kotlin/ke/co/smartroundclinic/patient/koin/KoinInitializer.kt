@@ -1,5 +1,6 @@
 package ke.co.smartroundclinic.patient.koin
 
+import ke.co.smartroundclinic.patient.core.notification.setupNotificationListener
 import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
@@ -11,4 +12,6 @@ fun initKoin(
 ): KoinApplication = startKoin {
     appDeclaration()
     modules(coreModule, repositoryModule, useCaseModule, *extraModules)
+}.also {
+    setupNotificationListener()
 }

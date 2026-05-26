@@ -16,6 +16,8 @@
 	<string>Access Bluetooth to connect to headphones and audio devices during calls.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Access Bluetooth to connect to headphones and audio devices during calls.</string>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

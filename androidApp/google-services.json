@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "356914985146",
+    "project_id": "smart-round-clinic-d70d8",
+    "storage_bucket": "smart-round-clinic-d70d8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:356914985146:android:5e95386f1b10b785176a83",
+        "android_client_info": {
+          "package_name": "ke.co.smartroundclinic.patient"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBn321db3N_zBLRpItk878NUudbK-UnLpM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
