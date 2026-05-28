@@ -36,11 +36,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import ke.co.smartroundclinic.patient.domain.model.Appointment
 import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
@@ -124,15 +127,25 @@ fun AppointmentDetailsScreen(
                                 .background(
                                     Brush.verticalGradient(listOf(GradientStart, GradientEnd)),
                                     RoundedCornerShape(10.dp),
-                                ),
+                                )
+                                .clip(RoundedCornerShape(10.dp)),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Person,
-                                contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.6f),
-                                modifier = Modifier.size(28.dp),
-                            )
+                            if (doctor.profilePicture != null) {
+                                AsyncImage(
+                                    model = doctor.profilePicture,
+                                    contentDescription = doctor.displayName,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Filled.Person,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(28.dp),
+                                )
+                            }
                         }
                         Spacer(Modifier.width(12.dp))
                         Column {

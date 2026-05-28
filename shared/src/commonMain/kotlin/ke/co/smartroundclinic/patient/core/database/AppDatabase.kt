@@ -29,7 +29,7 @@ import ke.co.smartroundclinic.patient.core.database.entity.UserEntity
         ServiceCategoryEntity::class,
         AppointmentEntity::class,
     ],
-    version = 9,
+    version = 11,
     exportSchema = false
 )
 @ConstructedBy(AppDatabaseConstructor::class)
