@@ -24,9 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsNone
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,11 +44,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ke.co.smartroundclinic.patient.domain.model.Notification
-import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
-import ke.co.smartroundclinic.patient.presentation.theme.StatusSuccess
-import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -62,7 +58,8 @@ fun NotificationsScreen(
     val scope = rememberCoroutineScope()
     val hasUnread = vm.unreadCount > 0
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+
         // Gradient header
         Box(
             modifier = Modifier
@@ -88,7 +85,7 @@ fun NotificationsScreen(
                     Text(
                         text = "Mark all read",
                         style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.85f),
+                        color = Color.White.copy(alpha = 0.9f),
                     )
                 }
             }
@@ -111,23 +108,31 @@ fun NotificationsScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.NotificationsNone,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                modifier = Modifier.size(72.dp),
-                            )
-                            Spacer(Modifier.height(16.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(88.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.NotificationsNone,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(44.dp),
+                                )
+                            }
+                            Spacer(Modifier.height(20.dp))
                             Text(
-                                text = "No notifications yet",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                text = "All caught up!",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
-                            Spacer(Modifier.height(4.dp))
+                            Spacer(Modifier.height(6.dp))
                             Text(
-                                text = "We'll let you know when something\nimportant happens.",
+                                text = "You have no notifications yet.\nWe'll let you know when something happens.",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
                             )
                         }
@@ -135,24 +140,41 @@ fun NotificationsScreen(
                 }
                 else -> {
                     LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp),
                         modifier = Modifier.fillMaxSize().navigationBarsPadding(),
                     ) {
                         if (hasUnread) {
                             item {
-                                Text(
-                                    text = "${vm.unreadCount} unread",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(bottom = 4.dp),
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = "${vm.unreadCount} unread",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
                             }
                         }
                         items(vm.notifications, key = { it.id }) { notification ->
                             NotificationCard(
                                 notification = notification,
                                 onTap = { if (notification.isUnread) vm.markRead(notification.id) },
+                            )
+                            HorizontalDivider(
+                                modifier = Modifier.padding(start = 72.dp),
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                             )
                         }
                     }
@@ -164,71 +186,96 @@ fun NotificationsScreen(
 
 @Composable
 private fun NotificationCard(notification: Notification, onTap: () -> Unit) {
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
+            .background(
+                if (notification.isUnread)
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.04f)
+                else
+                    Color.Transparent,
+            )
             .clickable(onClick = onTap),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (notification.isUnread)
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-            else
-                CardBackground,
-        ),
-        elevation = CardDefaults.cardElevation(if (notification.isUnread) 2.dp else 1.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            // Icon circle
+        // Left accent bar — only for unread
+        if (notification.isUnread) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .width(3.dp)
+                    .matchParentSize()
+                    .background(Brush.verticalGradient(listOf(GradientStart, GradientEnd))),
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = if (notification.isUnread) 19.dp else 16.dp,
+                    end = 16.dp,
+                    top = 14.dp,
+                    bottom = 14.dp,
+                ),
+            verticalAlignment = Alignment.Top,
+        ) {
+            // Icon container
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
                     .clip(CircleShape)
                     .background(
                         if (notification.isUnread)
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                            Brush.linearGradient(listOf(GradientStart, GradientEnd))
                         else
-                            MaterialTheme.colorScheme.surfaceVariant,
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                ),
+                            ),
                     ),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = if (notification.isUnread) Icons.Default.Notifications else Icons.Default.NotificationsNone,
                     contentDescription = null,
-                    tint = if (notification.isUnread) MaterialTheme.colorScheme.primary
+                    tint = if (notification.isUnread) Color.White
                            else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(22.dp),
                 )
             }
-            Spacer(Modifier.width(12.dp))
+
+            Spacer(Modifier.width(14.dp))
+
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = notification.title,
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = if (notification.isUnread) FontWeight.Bold else FontWeight.SemiBold,
+                            fontWeight = if (notification.isUnread) FontWeight.Bold else FontWeight.Medium,
                         ),
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.width(8.dp))
                     if (notification.isUnread) {
+                        Spacer(Modifier.width(8.dp))
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(7.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primary),
                         )
                     }
                 }
-                Spacer(Modifier.height(4.dp))
+
+                Spacer(Modifier.height(3.dp))
+
                 Text(
                     text = notification.message,
                     style = MaterialTheme.typography.bodySmall,
@@ -236,11 +283,13 @@ private fun NotificationCard(notification: Notification, onTap: () -> Unit) {
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(6.dp))
+
+                Spacer(Modifier.height(5.dp))
+
                 Text(
                     text = formatNotificationTime(notification.createdAt),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 )
             }
         }
