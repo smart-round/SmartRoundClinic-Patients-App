@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -186,112 +187,67 @@ fun NotificationsScreen(
 
 @Composable
 private fun NotificationCard(notification: Notification, onTap: () -> Unit) {
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                if (notification.isUnread)
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.04f)
-                else
-                    Color.Transparent,
-            )
-            .clickable(onClick = onTap),
+            .clickable(onClick = onTap)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        // Left accent bar — only for unread
-        if (notification.isUnread) {
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .matchParentSize()
-                    .background(Brush.verticalGradient(listOf(GradientStart, GradientEnd))),
+        // Icon circle
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.NotificationsNone,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
             )
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = if (notification.isUnread) 19.dp else 16.dp,
-                    end = 16.dp,
-                    top = 14.dp,
-                    bottom = 14.dp,
+        Spacer(Modifier.width(14.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = notification.title,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = if (notification.isUnread) FontWeight.Bold else FontWeight.Normal,
                 ),
-            verticalAlignment = Alignment.Top,
-        ) {
-            // Icon container
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                text = notification.message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(5.dp))
+            Text(
+                text = formatNotificationTime(notification.createdAt),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
+        }
+
+        // Red dot for unread
+        if (notification.isUnread) {
+            Spacer(Modifier.width(8.dp))
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .padding(top = 4.dp)
+                    .size(8.dp)
                     .clip(CircleShape)
-                    .background(
-                        if (notification.isUnread)
-                            Brush.linearGradient(listOf(GradientStart, GradientEnd))
-                        else
-                            Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                ),
-                            ),
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = if (notification.isUnread) Icons.Default.Notifications else Icons.Default.NotificationsNone,
-                    contentDescription = null,
-                    tint = if (notification.isUnread) Color.White
-                           else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-
-            Spacer(Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = notification.title,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = if (notification.isUnread) FontWeight.Bold else FontWeight.Medium,
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (notification.isUnread) {
-                        Spacer(Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary),
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(3.dp))
-
-                Text(
-                    text = notification.message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-
-                Spacer(Modifier.height(5.dp))
-
-                Text(
-                    text = formatNotificationTime(notification.createdAt),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                )
-            }
+                    .background(StatusSuspended),
+            )
         }
     }
 }
