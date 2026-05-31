@@ -11,11 +11,13 @@ import ke.co.smartroundclinic.patient.domain.model.Article
 import ke.co.smartroundclinic.patient.domain.model.CalendarView
 import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.domain.model.Speciality
+import ke.co.smartroundclinic.patient.data.remote.dto.response.PreBookAppointmentData
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.BookAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.availability.GetAvailableSlotsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.availability.GetCalendarViewUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorsBySpecializationUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.payments.PreBookAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.speciality.GetSpecialitiesUseCase
 import kotlinx.coroutines.launch
 
@@ -26,6 +28,7 @@ class ServicesViewModel(
     private val getAvailableSlotsUseCase: GetAvailableSlotsUseCase,
     private val bookAppointmentUseCase: BookAppointmentUseCase,
     private val getAppointmentUseCase: GetAppointmentUseCase,
+    private val preBookAppointmentUseCase: PreBookAppointmentUseCase,
 ) : ViewModel() {
 
     var selectedArticle by mutableStateOf<Article?>(null)
@@ -52,6 +55,21 @@ class ServicesViewModel(
 
     var isLoadingSlots by mutableStateOf(false)
         private set
+
+    // Pre-booking (IntaSend checkout)
+    var isPreBooking by mutableStateOf(false)
+        private set
+
+    var preBookData by mutableStateOf<PreBookAppointmentData?>(null)
+        private set
+
+    var preBookError by mutableStateOf<String?>(null)
+        private set
+
+    // Held while the checkout sheet is open; consumed when booking is confirmed
+    private var pendingDoctorId: String? = null
+    private var pendingDate: String? = null
+    private var pendingSlot: String? = null
 
     var isBooking by mutableStateOf(false)
         private set
@@ -109,18 +127,56 @@ class ServicesViewModel(
         }
     }
 
-    fun bookAppointment(doctorId: String, date: String, slotStart: String) {
+    fun preBookAppointment(
+        doctorId: String,
+        date: String,
+        slotStart: String,
+        isRebooking: Boolean = false,
+        previousAppointmentId: String? = null,
+    ) {
+        viewModelScope.launch {
+            isPreBooking = true
+            preBookData = null
+            preBookError = null
+            when (val result = preBookAppointmentUseCase(doctorId, isRebooking, previousAppointmentId)) {
+                is Resource.Success -> {
+                    pendingDoctorId = doctorId
+                    pendingDate = date
+                    pendingSlot = slotStart
+                    preBookData = result.data?.data
+                }
+                is Resource.Error -> preBookError = result.message ?: "Could not initiate payment"
+                else -> {}
+            }
+            isPreBooking = false
+        }
+    }
+
+    fun confirmBookingAfterPayment() {
+        val doctorId = pendingDoctorId ?: return
+        val date = pendingDate ?: return
+        val slot = pendingSlot ?: return
+        val transactionRef = preBookData?.id
+        preBookData = null
         viewModelScope.launch {
             isBooking = true
             bookedAppointment = null
             bookingError = null
-            when (val result = bookAppointmentUseCase(doctorId, date, slotStart)) {
+            when (val result = bookAppointmentUseCase(doctorId, date, slot, transactionRef = transactionRef)) {
                 is Resource.Success -> bookedAppointment = result.data
                 is Resource.Error -> bookingError = result.message ?: "Booking failed"
                 else -> {}
             }
             isBooking = false
         }
+    }
+
+    fun dismissCheckout() {
+        preBookData = null
+        preBookError = null
+        pendingDoctorId = null
+        pendingDate = null
+        pendingSlot = null
     }
 
     fun clearBookingState() {

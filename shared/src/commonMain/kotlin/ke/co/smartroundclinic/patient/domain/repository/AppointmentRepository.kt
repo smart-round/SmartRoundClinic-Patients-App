@@ -9,6 +9,7 @@ interface AppointmentRepository {
         date: String,
         slotStart: String,
         notes: String?,
+        transactionRef: String? = null,
     ): Resource<Appointment>
     suspend fun getMyAppointments(): Resource<List<Appointment>>
     suspend fun getAppointment(id: String): Resource<Appointment>

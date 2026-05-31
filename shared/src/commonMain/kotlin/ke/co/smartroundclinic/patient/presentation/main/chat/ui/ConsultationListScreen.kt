@@ -53,6 +53,7 @@ import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 import ke.co.smartroundclinic.patient.presentation.theme.Primary90
 import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
 import ke.co.smartroundclinic.patient.presentation.theme.StatusPending
+import ke.co.smartroundclinic.patient.presentation.theme.StatusSuccess
 
 @Composable
 internal fun ConsultationListScreen(
@@ -165,11 +166,14 @@ private fun ConsultationCard(
                     Text(text = appointment.date, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            val isCompleted = appointment.status.equals("COMPLETED", ignoreCase = true)
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 StatusBadge(status = appointment.status)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(imageVector = Icons.Filled.VideoCall, contentDescription = null, tint = StatusConfirmed, modifier = Modifier.size(16.dp))
-                    Text(text = "Join", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = StatusConfirmed)
+                if (!isCompleted) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(imageVector = Icons.Filled.VideoCall, contentDescription = null, tint = StatusConfirmed, modifier = Modifier.size(16.dp))
+                        Text(text = "Join", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = StatusConfirmed)
+                    }
                 }
             }
         }
@@ -204,7 +208,7 @@ internal fun DoctorAvatar(picture: String?, size: Int, modifier: Modifier = Modi
 private fun StatusBadge(status: String) {
     val (bg, fg) = when (status.lowercase()) {
         "confirmed" -> StatusConfirmed.copy(alpha = 0.15f) to StatusConfirmed
-        "completed" -> Color(0xFF4CAF50).copy(alpha = 0.15f) to Color(0xFF4CAF50)
+        "completed" -> StatusSuccess.copy(alpha = 0.15f) to StatusSuccess
         else -> StatusPending.copy(alpha = 0.15f) to StatusPending
     }
     Box(

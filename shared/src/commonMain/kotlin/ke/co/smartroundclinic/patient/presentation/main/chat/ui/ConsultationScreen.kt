@@ -91,6 +91,7 @@ import ke.co.smartroundclinic.patient.presentation.main.chat.PendingFile
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 import ke.co.smartroundclinic.patient.presentation.theme.ShapePill
 import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
+import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
 import ke.co.smartroundclinic.patient.presentation.theme.Tertiary40
 import kotlinx.coroutines.launch
 
@@ -105,6 +106,7 @@ internal fun ConsultationScreen(
     isStartingSession: Boolean,
     isConnected: Boolean,
     isUploadingFile: Boolean,
+    isCompleted: Boolean = false,
     currentUserId: String,
     onBack: () -> Unit,
     onVoiceCall: () -> Unit,
@@ -184,7 +186,7 @@ internal fun ConsultationScreen(
                     }
                 },
                 actions = {
-                    if (session != null) {
+                    if (session != null && !isCompleted) {
                         IconButton(onClick = onVoiceCall) {
                             Icon(imageVector = Icons.Filled.Phone, contentDescription = "Voice call", tint = Primary40)
                         }
@@ -452,7 +454,7 @@ private fun FileViewerSheet(
                         Icon(
                             imageVector = if (isPdf) Icons.Filled.PictureAsPdf else Icons.AutoMirrored.Filled.InsertDriveFile,
                             contentDescription = null,
-                            tint = if (isPdf) Color(0xFFE53935) else Primary40,
+                            tint = if (isPdf) StatusSuspended else Primary40,
                             modifier = Modifier.size(48.dp),
                         )
                     }
@@ -640,7 +642,7 @@ private fun FileBubble(
                     Icon(
                         imageVector = if (isPdf) Icons.Filled.PictureAsPdf else Icons.AutoMirrored.Filled.InsertDriveFile,
                         contentDescription = null,
-                        tint = if (isPdf) Color(0xFFE53935) else if (fromMe) Color.White else Primary40,
+                        tint = if (isPdf) StatusSuspended else if (fromMe) Color.White else Primary40,
                         modifier = Modifier.size(28.dp),
                     )
                 }

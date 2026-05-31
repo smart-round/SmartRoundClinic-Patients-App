@@ -8,4 +8,5 @@ data class BookAppointmentReq(
     val date: String,
     val slotStart: String,
     val notes: String? = null,
+    val transactionRef: String? = null,
 )

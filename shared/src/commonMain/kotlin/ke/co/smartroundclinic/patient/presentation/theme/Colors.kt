@@ -43,8 +43,8 @@ val Neutral99 = Color(0xFFFFFBFF)
 val Neutral100 = Color(0xFFFFFFFF)
 
 val Error10  = Color(0xFF410002)
-val Error40  = Color(0xFFB3261E)
-val Error90  = Color(0xFFFCE8E6)
+val Error40  = Color(0xFFDD2013)
+val Error90  = Color(0xFFFFE8E6)
 
 val Primary            = Primary40
 val OnPrimary          = Neutral100
@@ -84,8 +84,9 @@ val TopAppBarGradientEnd = Color(0XFF91291C)
 
 val CardAccent = Primary40
 
-val StatusPublished = Color(0xFF0E9800)
-val StatusSuspended = Color(0xFFEA1D25)
+val StatusSuccess   = Color(0xFF0CBC2C)
+val StatusPublished = StatusSuccess
+val StatusSuspended = Color(0xFFDD2013)
 val StatusPending   = Primary40
 val StatusConfirmed = Tertiary40
 

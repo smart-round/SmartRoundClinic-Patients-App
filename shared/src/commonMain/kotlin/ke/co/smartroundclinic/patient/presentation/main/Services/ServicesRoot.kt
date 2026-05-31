@@ -99,17 +99,40 @@ fun ServicesRoot(
             }
 
             entry<BookAppointment> { dest ->
+                // Auto-navigate to appointment details once booking is confirmed
+                LaunchedEffect(vm.bookedAppointment) {
+                    val id = vm.bookedAppointment?.id ?: return@LaunchedEffect
+                    vm.clearBookingState()
+                    backStack.removeLastOrNull() // pop BookAppointment
+                    backStack.add(AppointmentDetails(id))
+                }
+
                 BookAppointmentScreen(
                     doctor = vm.doctorById(dest.doctorId) ?: return@entry,
                     calendarView = vm.calendarView,
                     availableSlots = vm.availableSlots,
                     isLoadingSlots = vm.isLoadingSlots,
+                    isPreBooking = vm.isPreBooking,
                     isBooking = vm.isBooking,
+                    preBookData = vm.preBookData,
+                    preBookError = vm.preBookError,
                     bookedAppointmentId = vm.bookedAppointment?.id,
                     bookingError = vm.bookingError,
                     onLoadCalendar = { yearMonth -> vm.loadCalendarView(dest.doctorId, yearMonth) },
                     onLoadSlots = { date -> vm.loadSlots(dest.doctorId, date) },
-                    onBook = { date, slotStart -> vm.bookAppointment(dest.doctorId, date, slotStart) },
+                    isRebooking = dest.previousAppointmentId != null,
+                    previousAppointmentId = dest.previousAppointmentId,
+                    onPayNow = { date, slotStart ->
+                        vm.preBookAppointment(
+                            doctorId = dest.doctorId,
+                            date = date,
+                            slotStart = slotStart,
+                            isRebooking = dest.previousAppointmentId != null,
+                            previousAppointmentId = dest.previousAppointmentId,
+                        )
+                    },
+                    onPaymentDone = { vm.confirmBookingAfterPayment() },
+                    onDismissCheckout = { vm.dismissCheckout() },
                     onViewBooking = { appointmentId ->
                         vm.clearBookingState()
                         backStack.add(AppointmentDetails(appointmentId))
@@ -126,6 +149,10 @@ fun ServicesRoot(
                     doctor = vm.appointmentDetail?.let { vm.doctorById(it.doctorId) },
                     onLoad = { id -> vm.loadAppointmentDetail(id) },
                     onBack = { backStack.removeLastOrNull() },
+                    onRebook = { doctor, previousAppointmentId ->
+                        vm.cacheDoctor(doctor)
+                        backStack.add(BookAppointment(doctor.id, previousAppointmentId))
+                    },
                 )
             }
         },

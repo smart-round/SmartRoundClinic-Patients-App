@@ -50,6 +50,7 @@ import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
 import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
+import ke.co.smartroundclinic.patient.presentation.theme.StatusSuccess
 import ke.co.smartroundclinic.patient.presentation.theme.StatusPending
 import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
 
@@ -60,6 +61,7 @@ fun AppointmentDetailsScreen(
     doctor: Doctor?,
     onLoad: (String) -> Unit,
     onBack: () -> Unit,
+    onRebook: ((doctor: Doctor, previousAppointmentId: String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(appointmentId) { onLoad(appointmentId) }
@@ -206,6 +208,41 @@ fun AppointmentDetailsScreen(
                 }
             }
 
+            // Rebook button — only for COMPLETED appointments
+            if (appointment.status.lowercase() == "completed" && onRebook != null) {
+                Spacer(Modifier.height(8.dp))
+                // Use the loaded doctor if available, otherwise build a minimal stub from appointment fields
+                val rebookDoctor = doctor ?: Doctor(
+                    id = appointment.doctorId,
+                    profileId = "",
+                    name = appointment.doctorName ?: "Doctor",
+                    profilePicture = appointment.doctorProfilePicture,
+                    specialization = appointment.doctorSpeciality,
+                    specializationId = null,
+                    facilityName = null,
+                    averageRating = 0.0,
+                    totalReviews = 0,
+                    totalBookings = 0,
+                    yearsOfExperience = null,
+                )
+                Button(
+                    onClick = { onRebook(rebookDoctor, appointment.id) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                    ),
+                ) {
+                    Text(
+                        text = "Rebook Follow-Up",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    )
+                }
+            }
+
             Spacer(Modifier.height(8.dp))
         }
     }
@@ -216,7 +253,7 @@ private fun StatusPill(status: String) {
     val (bg, text, label) = when (status.lowercase()) {
         "confirmed" -> Triple(StatusConfirmed.copy(alpha = 0.15f), StatusConfirmed, "Confirmed")
         "cancelled" -> Triple(StatusSuspended.copy(alpha = 0.15f), StatusSuspended, "Cancelled")
-        "completed" -> Triple(Color(0xFF4CAF50).copy(alpha = 0.15f), Color(0xFF4CAF50), "Completed")
+        "completed" -> Triple(StatusSuccess.copy(alpha = 0.15f), StatusSuccess, "Completed")
         else -> Triple(StatusPending.copy(alpha = 0.15f), StatusPending, status.replaceFirstChar { it.uppercase() })
     }
     Box(

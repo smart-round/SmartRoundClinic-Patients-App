@@ -38,6 +38,7 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "Shared"
             isStatic = true
+            export(libs.kmpnotifier)
         }
     }
 
@@ -55,6 +56,8 @@ kotlin {
             implementation(libs.ktor.serialization.json)
             // Cloudflare RealtimeKit Android UI Kit
             implementation("com.cloudflare.realtimekit:ui-android:1.1.0")
+            // Chrome Custom Tabs for in-app browser (payment checkout)
+            implementation("androidx.browser:browser:1.8.0")
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -92,6 +95,7 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.richeditor.compose)
             implementation(libs.coil.svg)
+            api(libs.kmpnotifier)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

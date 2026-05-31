@@ -5,3 +5,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object BookingsList : NavKey
 @Serializable data class BookingAppointmentDetail(val appointmentId: String) : NavKey
+@Serializable data class PaymentHistoryDetail(val paymentId: String) : NavKey
+@Serializable data class RebookFromBookings(val doctorId: String, val previousAppointmentId: String) : NavKey

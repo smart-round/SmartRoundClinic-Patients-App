@@ -32,6 +32,9 @@ import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorProfileUseC
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorsBySpecializationUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetRecommendedDoctorsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.servicecategory.GetServiceCategoriesUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.payments.GetPaymentHistoryByIdUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.payments.GetPaymentHistoryUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.payments.PreBookAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.speciality.GetSpecialitiesUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.speciality.GetSpecialityPricingUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.datastore.ObserveKeyUseCase
@@ -83,6 +86,11 @@ val useCaseModule = module {
     single { GetConsultationMessagesUseCase(get()) }
     single { JoinConsultationCallUseCase(get()) }
 
+    // Payment use cases
+    single { PreBookAppointmentUseCase(get()) }
+    single { GetPaymentHistoryUseCase(get()) }
+    single { GetPaymentHistoryByIdUseCase(get()) }
+
     // Appointment use cases
     single { BookAppointmentUseCase(get()) }
     single { GetMyAppointmentsUseCase(get(), get()) }
@@ -118,6 +126,6 @@ val useCaseModule = module {
     viewModel { HomeViewModel(get(), get(), get(), get()) }
     viewModel { ProfileViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { DoctorsProfileViewModel(get(), get(), get()) }
-    viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get()) }
+    viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ConsultationViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 }

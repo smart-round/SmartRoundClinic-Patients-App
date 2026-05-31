@@ -34,6 +34,8 @@ import ke.co.smartroundclinic.patient.domain.repository.ServiceCategoryLocalRepo
 import ke.co.smartroundclinic.patient.domain.repository.ServiceCategoryRepository
 import ke.co.smartroundclinic.patient.domain.repository.SpecialityLocalRepository
 import ke.co.smartroundclinic.patient.domain.repository.SpecialityRepository
+import ke.co.smartroundclinic.patient.data.repository.PaymentsRepositoryImpl
+import ke.co.smartroundclinic.patient.domain.repository.PaymentsRepository
 import ke.co.smartroundclinic.patient.domain.repository.UserLocalRepository
 import org.koin.dsl.module
 
@@ -55,4 +57,5 @@ val repositoryModule = module {
     single<ServiceCategoryLocalRepository> { ServiceCategoryLocalRepositoryImpl(get<AppDatabase>().serviceCategoryDao) }
     single<ConsultationRepository> { ConsultationRepositoryImpl(get()) }
     single<NotificationRepository> { NotificationRepositoryImpl(get()) }
+    single<PaymentsRepository> { PaymentsRepositoryImpl(get()) }
 }

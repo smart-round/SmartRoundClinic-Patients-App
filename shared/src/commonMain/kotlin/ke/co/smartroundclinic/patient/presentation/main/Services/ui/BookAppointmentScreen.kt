@@ -28,6 +28,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -61,11 +64,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import ke.co.smartroundclinic.patient.data.remote.dto.response.PreBookAppointmentData
 import ke.co.smartroundclinic.patient.domain.model.CalendarDay
 import ke.co.smartroundclinic.patient.domain.model.CalendarView
 import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
+import ke.co.smartroundclinic.patient.presentation.theme.StatusSuccess
 import ke.co.smartroundclinic.patient.common.todayLocalDate
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.number
@@ -77,24 +82,35 @@ private val MONTHS = listOf(
 )
 private val DAY_LABELS = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun BookAppointmentScreen(
     doctor: Doctor,
     calendarView: CalendarView?,
     availableSlots: List<String>,
     isLoadingSlots: Boolean,
+    isPreBooking: Boolean,
     isBooking: Boolean,
+    preBookData: PreBookAppointmentData?,
+    preBookError: String?,
     bookedAppointmentId: String?,
     bookingError: String?,
     onLoadCalendar: (yearMonth: String) -> Unit,
     onLoadSlots: (date: String) -> Unit,
-    onBook: (date: String, slotStart: String) -> Unit,
+    isRebooking: Boolean = false,
+    previousAppointmentId: String? = null,
+    onPayNow: (date: String, slotStart: String) -> Unit,
+    onPaymentDone: () -> Unit,
+    onDismissCheckout: () -> Unit,
     onViewBooking: (appointmentId: String) -> Unit,
     onDismissResult: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val checkoutSheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { it != SheetValue.Hidden },
+    )
     val today = todayLocalDate()
     var displayYear by remember { mutableStateOf(today.year) }
     var displayMonth by remember { mutableStateOf(today.month.number) }
@@ -130,7 +146,7 @@ fun BookAppointmentScreen(
                     )
                 }
                 Text(
-                    text = "Pick a Date/Time",
+                    text = if (isRebooking) "Pick a New Date/Time" else "Pick a Date/Time",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                     modifier = Modifier.align(Alignment.Center).padding(vertical = 16.dp),
@@ -257,9 +273,9 @@ fun BookAppointmentScreen(
             onClick = {
                 val date = selectedDate ?: return@Button
                 val slot = selectedSlot ?: return@Button
-                onBook(date, slot)
+                onPayNow(date, slot)
             },
-            enabled = selectedDate != null && selectedSlot != null && !isBooking,
+            enabled = selectedDate != null && selectedSlot != null && !isPreBooking && !isBooking,
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
@@ -271,7 +287,7 @@ fun BookAppointmentScreen(
                 containerColor = MaterialTheme.colorScheme.primary,
             ),
         ) {
-            if (isBooking) {
+            if (isPreBooking || isBooking) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     color = Color.White,
@@ -279,7 +295,7 @@ fun BookAppointmentScreen(
                 )
             } else {
                 Text(
-                    text = "Pay Now",
+                    text = if (isRebooking) "Pay Follow-Up Fee" else "Pay Now",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                 )
             }
@@ -313,6 +329,31 @@ fun BookAppointmentScreen(
                 )
             }
         }
+
+        AnimatedVisibility(
+            visible = preBookError != null,
+            enter = fadeIn() + scaleIn(),
+            exit = fadeOut() + scaleOut(),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            if (preBookError != null) {
+                PaymentFailedDialog(
+                    message = preBookError,
+                    onTryAgain = onDismissCheckout,
+                )
+            }
+        }
+    }
+
+    // Checkout bottom sheet — shown after successful pre-booking
+    if (preBookData != null) {
+        PaymentCheckoutSheet(
+            sheetState = checkoutSheetState,
+            title = preBookData.title,
+            url = preBookData.url,
+            onDismiss = onDismissCheckout,
+            onPaymentDone = onPaymentDone,
+        )
     }
 }
 
@@ -517,7 +558,7 @@ private fun BookingSuccessDialog(
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = null,
-                    tint = Color(0xFF4CAF50),
+                    tint = StatusSuccess,
                     modifier = Modifier.size(72.dp),
                 )
                 Spacer(Modifier.height(16.dp))

@@ -9,5 +9,5 @@ import kotlinx.serialization.Serializable
 @Serializable data class HomeDoctorsBySpeciality(val specialityId: String, val specialityName: String) : NavKey
 @Serializable data class HomeDoctorProfile(val doctorId: String) : NavKey
 @Serializable data object HomeDoctorArticleDetail : NavKey
-@Serializable data class HomeBookAppointment(val doctorId: String) : NavKey
+@Serializable data class HomeBookAppointment(val doctorId: String, val previousAppointmentId: String? = null) : NavKey
 @Serializable data class HomeAppointmentDetails(val appointmentId: String) : NavKey
