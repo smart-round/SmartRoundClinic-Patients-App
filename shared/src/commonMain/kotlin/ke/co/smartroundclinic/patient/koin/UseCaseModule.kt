@@ -1,7 +1,10 @@
 package ke.co.smartroundclinic.patient.koin
 
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.BookAppointmentUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.notification.GetMyNotificationsUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.notification.MarkNotificationReadUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.notification.RegisterDeviceTokenUseCase
+import ke.co.smartroundclinic.patient.presentation.main.notifications.NotificationsViewModel
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.GetConsultationMessagesUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.JoinConsultationCallUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.StartConsultationUseCase
@@ -80,6 +83,8 @@ val useCaseModule = module {
     single { GetCalendarViewUseCase(get()) }
 
     single { RegisterDeviceTokenUseCase(get()) }
+    single { GetMyNotificationsUseCase(get()) }
+    single { MarkNotificationReadUseCase(get()) }
 
     // Consultation use cases
     single { StartConsultationUseCase(get()) }
@@ -128,4 +133,5 @@ val useCaseModule = module {
     viewModel { DoctorsProfileViewModel(get(), get(), get()) }
     viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ConsultationViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { NotificationsViewModel(get(), get()) }
 }

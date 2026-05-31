@@ -63,14 +63,18 @@ import coil3.compose.AsyncImage
 import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.domain.model.Speciality
 import ke.co.smartroundclinic.patient.domain.model.User
+import ke.co.smartroundclinic.patient.generated.resources.Res
+import ke.co.smartroundclinic.patient.generated.resources.notification
 import ke.co.smartroundclinic.patient.presentation.main.home.HomeViewModel
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
 import ke.co.smartroundclinic.patient.presentation.theme.SearchBarOverlay
+import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
 import ke.co.smartroundclinic.patient.presentation.theme.Secondary40
 import ke.co.smartroundclinic.patient.presentation.theme.Secondary90
 import ke.co.smartroundclinic.patient.presentation.theme.ServiceTileColors
+import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.viewmodel.koinViewModel
 
 
@@ -80,8 +84,10 @@ fun HomeScreen(
     onSeeMoreServices: () -> Unit = {},
     onSeeAllDoctors: () -> Unit = {},
     onProfileClick: () -> Unit = {},
+    onNotificationClick: () -> Unit = {},
     onDoctorClick: (Doctor) -> Unit = {},
     onSpecialityClick: (Speciality) -> Unit = {},
+    unreadNotificationCount: Int = 0,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = koinViewModel(),
 ) {
@@ -105,7 +111,12 @@ fun HomeScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState()),
             ) {
-                HomeHeader(user = user, onProfileClick = onProfileClick)
+                HomeHeader(
+                    user = user,
+                    onProfileClick = onProfileClick,
+                    onNotificationClick = onNotificationClick,
+                    unreadCount = unreadNotificationCount,
+                )
                 Spacer(Modifier.height(20.dp))
                 ConsultDoctorSection(doctors = doctors, onSeeAll = onSeeAllDoctors, onDoctorClick = onDoctorClick)
                 Spacer(Modifier.height(20.dp))
@@ -121,7 +132,13 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeHeader(user: User?, onProfileClick: () -> Unit = {}, modifier: Modifier = Modifier) {
+private fun HomeHeader(
+    user: User?,
+    onProfileClick: () -> Unit = {},
+    onNotificationClick: () -> Unit = {},
+    unreadCount: Int = 0,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -167,21 +184,26 @@ private fun HomeHeader(user: User?, onProfileClick: () -> Unit = {}, modifier: M
                     color = Color.White,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = {}) {
-                    Icon(
-                        imageVector = Icons.Outlined.ChatBubbleOutline,
-                        contentDescription = "Chat",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-                IconButton(onClick = {}) {
-                    Icon(
-                        imageVector = Icons.Outlined.NotificationsNone,
-                        contentDescription = "Notifications",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp),
-                    )
+
+                Box {
+                    IconButton(onClick = onNotificationClick) {
+                        Icon(
+                            painter = painterResource(Res.drawable.notification),
+                            contentDescription = "Notifications",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                    if (unreadCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .align(Alignment.TopEnd)
+                                .padding(top = 2.dp, end = 2.dp)
+                                .clip(CircleShape)
+                                .background(StatusSuspended),
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(8.dp))

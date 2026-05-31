@@ -1,9 +1,16 @@
 package ke.co.smartroundclinic.patient.data.repository
 
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.client.request.parameter
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import ke.co.smartroundclinic.patient.common.Resource
+import ke.co.smartroundclinic.patient.data.remote.dto.response.GetNotificationsRes
+import ke.co.smartroundclinic.patient.data.remote.dto.response.toDomain
+import ke.co.smartroundclinic.patient.domain.model.Notification
 import ke.co.smartroundclinic.patient.domain.repository.NotificationRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -14,6 +21,7 @@ import kotlinx.serialization.Serializable
 private data class RegisterDeviceTokenRequest(val deviceToken: String, val platform: String)
 
 class NotificationRepositoryImpl(private val client: HttpClient) : NotificationRepository {
+
     override suspend fun registerDeviceToken(token: String, platform: String): Resource<Unit> =
         withContext(Dispatchers.IO) {
             try {
@@ -23,6 +31,30 @@ class NotificationRepositoryImpl(private val client: HttpClient) : NotificationR
                 Resource.Success(Unit)
             } catch (e: Exception) {
                 Resource.Error(e.message ?: "Failed to register device token")
+            }
+        }
+
+    override suspend fun getMyNotifications(page: Int, size: Int): Resource<List<Notification>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val res = client.get("notification/my") {
+                    parameter("page", page)
+                    parameter("size", size)
+                }.body<GetNotificationsRes>()
+                if (res.status) Resource.Success(res.data.items.map { it.toDomain() }, res.message)
+                else Resource.Error(res.message)
+            } catch (e: Exception) {
+                Resource.Error(e.message ?: "Failed to load notifications")
+            }
+        }
+
+    override suspend fun markAsRead(id: String): Resource<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                client.patch("notification/read") { parameter("id", id) }
+                Resource.Success(Unit)
+            } catch (e: Exception) {
+                Resource.Error(e.message ?: "Failed to mark notification as read")
             }
         }
 }

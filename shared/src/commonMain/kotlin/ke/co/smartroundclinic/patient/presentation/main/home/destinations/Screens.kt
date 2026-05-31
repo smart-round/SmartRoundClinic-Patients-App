@@ -4,6 +4,7 @@ import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
 @Serializable data object HomeScreen : NavKey
+@Serializable data object Notifications : NavKey
 @Serializable data object UserProfile : NavKey
 @Serializable data object AllDoctors : NavKey
 @Serializable data class HomeDoctorsBySpeciality(val specialityId: String, val specialityName: String) : NavKey

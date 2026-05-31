@@ -22,9 +22,12 @@ import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeDo
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeDoctorProfile
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeDoctorsBySpeciality
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeScreen
+import ke.co.smartroundclinic.patient.presentation.main.home.destinations.Notifications
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.UserProfile
 import ke.co.smartroundclinic.patient.presentation.main.home.ui.AllDoctorsScreen
 import ke.co.smartroundclinic.patient.presentation.main.home.ui.HomeScreen
+import ke.co.smartroundclinic.patient.presentation.main.notifications.NotificationsScreen
+import ke.co.smartroundclinic.patient.presentation.main.notifications.NotificationsViewModel
 import ke.co.smartroundclinic.patient.presentation.main.profile.ProfileRoot
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -39,6 +42,7 @@ fun HomeRoot(
     val isAtRoot = backStack.size == 1
     val servicesVm: ServicesViewModel = koinViewModel()
     val homeVm: HomeViewModel = koinViewModel()
+    val notificationsVm: NotificationsViewModel = koinViewModel()
 
     SideEffect { onAtRootChanged(isAtRoot) }
 
@@ -52,6 +56,7 @@ fun HomeRoot(
                     onSeeAllDoctors = { backStack.add(AllDoctors) },
                     onSeeMoreServices = onNavigateToServices,
                     onProfileClick = { backStack.add(UserProfile) },
+                    onNotificationClick = { backStack.add(Notifications) },
                     onDoctorClick = { doctor ->
                         servicesVm.cacheDoctor(doctor)
                         backStack.add(HomeDoctorProfile(doctor.id))
@@ -59,7 +64,11 @@ fun HomeRoot(
                     onSpecialityClick = { speciality ->
                         backStack.add(HomeDoctorsBySpeciality(speciality.id, speciality.title))
                     },
+                    unreadNotificationCount = notificationsVm.unreadCount,
                 )
+            }
+            entry<Notifications> {
+                NotificationsScreen(onBack = { backStack.removeLastOrNull() })
             }
             entry<UserProfile> {
                 ProfileRoot(
