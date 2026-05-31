@@ -21,6 +21,7 @@ import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeBo
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeDoctorArticleDetail
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeDoctorProfile
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeDoctorsBySpeciality
+import ke.co.smartroundclinic.patient.core.notification.NotificationDeepLink
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeScreen
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.Notifications
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.UserProfile
@@ -45,6 +46,18 @@ fun HomeRoot(
     val notificationsVm: NotificationsViewModel = koinViewModel()
 
     SideEffect { onAtRootChanged(isAtRoot) }
+
+    // Navigate to Notifications when a push notification is tapped
+    LaunchedEffect(Unit) {
+        NotificationDeepLink.pending.collect { pending ->
+            if (pending) {
+                NotificationDeepLink.consume()
+                if (!backStack.contains(Notifications)) {
+                    backStack.add(Notifications)
+                }
+            }
+        }
+    }
 
     NavDisplay(
         modifier = modifier,

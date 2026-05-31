@@ -27,6 +27,11 @@ fun setupNotificationListener() {
                 Napier.d(tag = TAG, message = "Token registration result (onNewToken): $result")
             }
         }
+
+        override fun onNotificationClicked(data: Map<String, Any?>) {
+            Napier.d(tag = TAG, message = "Notification tapped — signalling deep-link to notifications screen")
+            NotificationDeepLink.signal()
+        }
     })
 
     // onNewToken only fires when the token changes. Fetch the current token immediately
