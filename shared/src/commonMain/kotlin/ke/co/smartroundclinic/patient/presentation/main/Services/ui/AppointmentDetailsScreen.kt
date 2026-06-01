@@ -53,6 +53,7 @@ import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
 import ke.co.smartroundclinic.patient.presentation.theme.StatusSuccess
 import ke.co.smartroundclinic.patient.presentation.theme.StatusPending
 import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
+import ke.co.smartroundclinic.patient.common.todayLocalDate
 
 @Composable
 fun AppointmentDetailsScreen(
@@ -208,8 +209,11 @@ fun AppointmentDetailsScreen(
                 }
             }
 
-            // Rebook button — only for COMPLETED appointments
-            if (appointment.status.lowercase() == "completed" && onRebook != null) {
+            // Rebook button — only for COMPLETED appointments within the same calendar month
+            val canRebook = appointment.status.lowercase() == "completed" &&
+                onRebook != null &&
+                isSameMonthAsToday(appointment.date)
+            if (canRebook) {
                 Spacer(Modifier.height(8.dp))
                 // Use the loaded doctor if available, otherwise build a minimal stub from appointment fields
                 val rebookDoctor = doctor ?: Doctor(
@@ -331,6 +335,15 @@ private fun formatTimeRange(start: String, end: String): String {
     } catch (e: Exception) { t }
     return "${fmt(start)} – ${fmt(end)}"
 }
+
+// Backend rule: rebooking is only allowed within the same calendar month as the appointment
+private fun isSameMonthAsToday(appointmentDate: String): Boolean = try {
+    val today = todayLocalDate()
+    val parts = appointmentDate.substringBefore("T").split("-")
+    val year = parts[0].toInt()
+    val month = parts[1].toInt()
+    year == today.year && month == today.month.number
+} catch (e: Exception) { false }
 
 private val Doctor.displayName: String
     get() {

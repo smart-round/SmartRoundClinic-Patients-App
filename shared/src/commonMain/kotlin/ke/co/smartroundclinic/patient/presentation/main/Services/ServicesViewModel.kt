@@ -17,6 +17,7 @@ import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetAppointmentU
 import ke.co.smartroundclinic.patient.domain.usecase.availability.GetAvailableSlotsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.availability.GetCalendarViewUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorsBySpecializationUseCase
+import ke.co.smartroundclinic.patient.core.snackbar.SnackbarController
 import ke.co.smartroundclinic.patient.domain.usecase.payments.PreBookAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.speciality.GetSpecialitiesUseCase
 import kotlinx.coroutines.launch
@@ -29,6 +30,7 @@ class ServicesViewModel(
     private val bookAppointmentUseCase: BookAppointmentUseCase,
     private val getAppointmentUseCase: GetAppointmentUseCase,
     private val preBookAppointmentUseCase: PreBookAppointmentUseCase,
+    private val snackbarController: SnackbarController,
 ) : ViewModel() {
 
     var selectedArticle by mutableStateOf<Article?>(null)
@@ -145,7 +147,11 @@ class ServicesViewModel(
                     pendingSlot = slotStart
                     preBookData = result.data?.data
                 }
-                is Resource.Error -> preBookError = result.message ?: "Could not initiate payment"
+                is Resource.Error -> {
+                    val msg = result.message ?: "Could not initiate payment"
+                    preBookError = msg
+                    snackbarController.show(msg, isError = true)
+                }
                 else -> {}
             }
             isPreBooking = false
@@ -164,7 +170,11 @@ class ServicesViewModel(
             bookingError = null
             when (val result = bookAppointmentUseCase(doctorId, date, slot, transactionRef = transactionRef)) {
                 is Resource.Success -> bookedAppointment = result.data
-                is Resource.Error -> bookingError = result.message ?: "Booking failed"
+                is Resource.Error -> {
+                    val msg = result.message ?: "Booking failed"
+                    bookingError = msg
+                    snackbarController.show(msg, isError = true)
+                }
                 else -> {}
             }
             isBooking = false
