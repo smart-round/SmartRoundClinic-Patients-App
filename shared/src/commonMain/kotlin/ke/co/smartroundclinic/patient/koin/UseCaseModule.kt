@@ -1,6 +1,12 @@
 package ke.co.smartroundclinic.patient.koin
 
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.BookAppointmentUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.support.CreateSupportTicketUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.support.GetIssueCategoriesUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.support.GetMyTicketsUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.support.UploadChatFileUseCase
+import ke.co.smartroundclinic.patient.presentation.main.support.SupportChatViewModel
+import ke.co.smartroundclinic.patient.presentation.main.support.SupportViewModel
 import ke.co.smartroundclinic.patient.domain.usecase.notification.GetMyNotificationsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.notification.MarkNotificationReadUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.notification.RegisterDeviceTokenUseCase
@@ -134,4 +140,12 @@ val useCaseModule = module {
     viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ConsultationViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get()) }
+
+    // Support use cases + ViewModels
+    single { GetIssueCategoriesUseCase(get()) }
+    single { CreateSupportTicketUseCase(get()) }
+    single { GetMyTicketsUseCase(get()) }
+    single { UploadChatFileUseCase(get()) }
+    viewModel { SupportViewModel(get(), get(), get(), get()) }
+    viewModel { (ticketId: String) -> SupportChatViewModel(ticketId, get(), get(), get(), get()) }
 }
