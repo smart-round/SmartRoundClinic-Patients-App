@@ -9,18 +9,12 @@
 /* Begin PBXBuildFile section */
 		C08C834E2BDBE76C7437A752 /* RealtimeKit in Frameworks */ = {isa = PBXBuildFile; productRef = C08C834C2BDBE76C7437A752 /* RealtimeKit */; };
 		C08C834F2BDBE76C7437A752 /* RealtimeKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = C08C834D2BDBE76C7437A752 /* RealtimeKitUI */; };
+		FB00000000000000000000B3 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = FB00000000000000000000B2 /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		E5FAA8F66851B0D5F157B6F0 /* SmartRoundClinicPatinet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SmartRoundClinicPatinet.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E5FAA8F66851B0D5F157B6F0 /* Smartround clinic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Smartround clinic.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
-
-/* Begin XCLocalSwiftPackageReference section */
-		C08C834B2BDBE76C7437A752 /* RealtimeKitUI */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = LocalPackages/RealtimeKitUI;
-		};
-/* End XCLocalSwiftPackageReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		DB3D697B56CB3A0BD83EEAF5 /* Exceptions for "iosApp" folder in "iosApp" target */ = {
@@ -33,17 +27,17 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		B6C9F032E47007B8975426C2 /* Configuration */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Configuration;
+			sourceTree = "<group>";
+		};
 		C0EC992768E1D91D497F45DF /* iosApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				DB3D697B56CB3A0BD83EEAF5 /* Exceptions for "iosApp" folder in "iosApp" target */,
 			);
 			path = iosApp;
-			sourceTree = "<group>";
-		};
-		B6C9F032E47007B8975426C2 /* Configuration */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Configuration;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -55,12 +49,21 @@
 			files = (
 				C08C834E2BDBE76C7437A752 /* RealtimeKit in Frameworks */,
 				C08C834F2BDBE76C7437A752 /* RealtimeKitUI in Frameworks */,
+				FB00000000000000000000B3 /* FirebaseMessaging in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		1C0B50D5EF1504EC1C6CF5FC /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E5FAA8F66851B0D5F157B6F0 /* Smartround clinic.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
 		480269CB385A937D0090635F = {
 			isa = PBXGroup;
 			children = (
@@ -68,14 +71,6 @@
 				C0EC992768E1D91D497F45DF /* iosApp */,
 				1C0B50D5EF1504EC1C6CF5FC /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		1C0B50D5EF1504EC1C6CF5FC /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				E5FAA8F66851B0D5F157B6F0 /* SmartRoundClinicPatinet.app */,
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -101,9 +96,10 @@
 			packageProductDependencies = (
 				C08C834C2BDBE76C7437A752 /* RealtimeKit */,
 				C08C834D2BDBE76C7437A752 /* RealtimeKitUI */,
+				FB00000000000000000000B2 /* FirebaseMessaging */,
 			);
 			productName = iosApp;
-			productReference = E5FAA8F66851B0D5F157B6F0 /* SmartRoundClinicPatinet.app */;
+			productReference = E5FAA8F66851B0D5F157B6F0 /* Smartround clinic.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -130,13 +126,14 @@
 			);
 			mainGroup = 480269CB385A937D0090635F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C08C834B2BDBE76C7437A752 /* XCLocalSwiftPackageReference "LocalPackages/RealtimeKitUI" */,
+				C08C834B2BDBE76C7437A753 /* XCRemoteSwiftPackageReference "realtimekit-ios-core" */,
+				FB00000000000000000000B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1C0B50D5EF1504EC1C6CF5FC /* Products */;
 			projectDirPath = "";
-			packageReferences = (
-				C08C834B2BDBE76C7437A752 /* RealtimeKitUI */,
-				C08C834B2BDBE76C7437A753 /* XCRemoteSwiftPackageReference "RealtimeKitCore" */,
-			);
 			projectRoot = "";
 			targets = (
 				C08C834AEBDBE76C7437A752 /* iosApp */,
@@ -153,17 +150,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXRemoteSwiftPackageReference section */
-		C08C834B2BDBE76C7437A753 /* XCRemoteSwiftPackageReference "RealtimeKitCore" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/cloudflare/realtimekit-ios-core.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.1.0;
-			};
-		};
-/* End PBXRemoteSwiftPackageReference section */
 
 /* Begin PBXShellScriptBuildPhase section */
 		1158C69DA2BBA2E06F50BE16 /* Compile Kotlin Framework */ = {
@@ -197,20 +183,78 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
-/* Begin XCSwiftPackageProductDependency section */
-		C08C834C2BDBE76C7437A752 /* RealtimeKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C08C834B2BDBE76C7437A753 /* XCRemoteSwiftPackageReference "RealtimeKitCore" */;
-			productName = RealtimeKit;
-		};
-		C08C834D2BDBE76C7437A752 /* RealtimeKitUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C08C834B2BDBE76C7437A752 /* RealtimeKitUI */;
-			productName = RealtimeKitUI;
-		};
-/* End XCSwiftPackageProductDependency section */
-
 /* Begin XCBuildConfiguration section */
+		3B6153644F1B84D5B9F6088A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
+				DEVELOPMENT_TEAM = 65X556349W;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = iosApp/Info.plist;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Access Bluetooth to connect to headphones and audio devices during calls.";
+				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Access Bluetooth to connect to headphones and audio devices during calls.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Access camera to enable video during consultations.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Access microphone to enable audio during consultations.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save consultation photos to your library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Access photos to share images during consultations.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		5C81DFED2E431AFB57EC5399 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
+				DEVELOPMENT_TEAM = 65X556349W;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = iosApp/Info.plist;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Access Bluetooth to connect to headphones and audio devices during calls.";
+				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Access Bluetooth to connect to headphones and audio devices during calls.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Access camera to enable video during consultations.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Access microphone to enable audio during consultations.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Save consultation photos to your library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Access photos to share images during consultations.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ke.co.smartroundclinic.patientapp;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		69CE9C6953D578D41A8B9BDE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReferenceAnchor = B6C9F032E47007B8975426C2 /* Configuration */;
@@ -334,74 +378,9 @@
 			};
 			name = Release;
 		};
-		5C81DFED2E431AFB57EC5399 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ARCHS = arm64;
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
-				DEVELOPMENT_TEAM = "${TEAM_ID}";
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = iosApp/Info.plist;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		3B6153644F1B84D5B9F6088A /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ARCHS = arm64;
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
-				DEVELOPMENT_TEAM = "${TEAM_ID}";
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = iosApp/Info.plist;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		725A093A5017879089B33847 /* Build configuration list for PBXProject "iosApp" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				69CE9C6953D578D41A8B9BDE /* Debug */,
-				DC3EB111DFBA7C206ED2F19C /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		4E40D2CDF95CD11BA42B7B38 /* Build configuration list for PBXNativeTarget "iosApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -411,7 +390,60 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		725A093A5017879089B33847 /* Build configuration list for PBXProject "iosApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				69CE9C6953D578D41A8B9BDE /* Debug */,
+				DC3EB111DFBA7C206ED2F19C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		C08C834B2BDBE76C7437A752 /* XCLocalSwiftPackageReference "LocalPackages/RealtimeKitUI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = LocalPackages/RealtimeKitUI;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C08C834B2BDBE76C7437A753 /* XCRemoteSwiftPackageReference "realtimekit-ios-core" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/cloudflare/realtimekit-ios-core.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.1.0;
+			};
+		};
+		FB00000000000000000000B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C08C834C2BDBE76C7437A752 /* RealtimeKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C08C834B2BDBE76C7437A753 /* XCRemoteSwiftPackageReference "realtimekit-ios-core" */;
+			productName = RealtimeKit;
+		};
+		C08C834D2BDBE76C7437A752 /* RealtimeKitUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C08C834B2BDBE76C7437A752 /* XCLocalSwiftPackageReference "LocalPackages/RealtimeKitUI" */;
+			productName = RealtimeKitUI;
+		};
+		FB00000000000000000000B2 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FB00000000000000000000B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 882DB4EF767BC8ECD5E4D86D /* Project object */;
 }

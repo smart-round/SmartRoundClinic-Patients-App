@@ -50,6 +50,7 @@ fun ChatRoot(
                     vm.startConsultation(dest.appointmentId)
                 }
                 val appointment = vm.appointments.firstOrNull { it.id == dest.appointmentId }
+                val isCompleted = appointment?.status?.equals("COMPLETED", ignoreCase = true) == true
                 ConsultationScreen(
                     doctorName = dest.doctorName,
                     doctorPicture = appointment?.let { vm.doctorPicture(it.doctorId) },
@@ -58,6 +59,7 @@ fun ChatRoot(
                     isStartingSession = vm.isStartingSession,
                     isConnected = vm.isConnected,
                     isUploadingFile = vm.isUploadingFile,
+                    isCompleted = isCompleted,
                     pendingFiles = vm.pendingFiles,
                     currentUserId = vm.currentUserId,
                     onBack = {

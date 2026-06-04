@@ -45,6 +45,7 @@ import ke.co.smartroundclinic.patient.presentation.theme.ShapeInput
 internal fun SupportScreen(
     onBack: () -> Unit,
     onTerms: () -> Unit = {},
+    onContactSupport: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var message by remember { mutableStateOf("") }
@@ -90,6 +91,16 @@ internal fun SupportScreen(
                     .padding(horizontal = 20.dp, vertical = 24.dp)
                     .navigationBarsPadding(),
             ) {
+                PrimaryButton(onClick = onContactSupport) {
+                    Text(
+                        "Chat with our support team",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                        modifier = Modifier.padding(vertical = 14.dp),
+                    )
+                }
+                Spacer(Modifier.height(20.dp))
+
                 if (submitted) {
                     Text(
                         text = "Thank you! Your message has been sent. Our team will get back to you shortly.",

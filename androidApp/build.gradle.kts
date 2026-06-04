@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.kotlinAndroid)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.googleServices)
 }
 
 android {
@@ -12,7 +13,7 @@ android {
         applicationId = "ke.co.smartroundclinic.patient"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
+        versionCode = 4
         versionName = "1.0"
     }
     packaging {
@@ -37,5 +38,6 @@ dependencies {
     implementation(project(":shared"))
     implementation(libs.androidx.activity.compose)
     implementation(libs.koin.android)
+    implementation("com.google.android.play:app-update-ktx:2.1.0")
     debugImplementation(libs.compose.uiTooling)
 }

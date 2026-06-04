@@ -1,7 +1,7 @@
-TEAM_ID=
+TEAM_ID=65X556349W
 
 PRODUCT_NAME=Smartround clinic
-PRODUCT_BUNDLE_IDENTIFIER=ke.co.smartroundclinic.patient
+PRODUCT_BUNDLE_IDENTIFIER=ke.co.smartroundclinic.patientapp
 
 CURRENT_PROJECT_VERSION=1
 MARKETING_VERSION=1.0

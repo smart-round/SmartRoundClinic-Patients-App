@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.graphics.graphicsLayer
@@ -185,23 +186,26 @@ private fun HomeHeader(
                     modifier = Modifier.weight(1f),
                 )
 
-                Box {
-                    IconButton(onClick = onNotificationClick) {
-                        Icon(
-                            painter = painterResource(Res.drawable.notification),
-                            contentDescription = "Notifications",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
+                Box(
+                    modifier = Modifier.clickable(
+                        enabled = true,
+                        onClick = onNotificationClick
+                    )
+                ) {
+                    Icon(
+                        painter = painterResource(Res.drawable.notification),
+                        contentDescription = "Notifications",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
                     if (unreadCount > 0) {
                         Box(
                             modifier = Modifier
                                 .size(10.dp)
-                                .align(Alignment.TopEnd)
-                                .padding(top = 2.dp, end = 2.dp)
                                 .clip(CircleShape)
-                                .background(StatusSuspended),
+                                .background(Color.Red)
+                                .align(Alignment.TopEnd)
+                                .offset(x=4.dp, y = (-14).dp)
                         )
                     }
                 }

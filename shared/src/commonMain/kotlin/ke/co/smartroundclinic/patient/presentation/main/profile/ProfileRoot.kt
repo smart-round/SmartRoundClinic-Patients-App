@@ -9,13 +9,13 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import ke.co.smartroundclinic.patient.presentation.auth.ForgotPasswordViewModel
+import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.ContactSupport
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.CreateNewPassword
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.Faqs
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.PasswordChanged
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.PersonalInfo
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.ProfileList
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.ResetPassword
-import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.Support
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.TermsAndConditions
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.VerifyEmailSecurity
 import ke.co.smartroundclinic.patient.presentation.main.profile.ui.CreateNewPasswordScreen
@@ -24,9 +24,11 @@ import ke.co.smartroundclinic.patient.presentation.main.profile.ui.PasswordChang
 import ke.co.smartroundclinic.patient.presentation.main.profile.ui.PersonalInfoScreen
 import ke.co.smartroundclinic.patient.presentation.main.profile.ui.ProfileScreen
 import ke.co.smartroundclinic.patient.presentation.main.profile.ui.ResetPasswordScreen
-import ke.co.smartroundclinic.patient.presentation.main.profile.ui.SupportScreen
 import ke.co.smartroundclinic.patient.presentation.main.profile.ui.TermsAndConditionsScreen
 import ke.co.smartroundclinic.patient.presentation.main.profile.ui.VerifyEmailSecurityScreen
+import ke.co.smartroundclinic.patient.presentation.main.support.SupportRoot
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -39,6 +41,8 @@ fun ProfileRoot(
     val backStack = retain { mutableStateListOf<NavKey>(ProfileList) }
     val isAtRoot = backStack.size == 1
     val forgotPasswordViewModel: ForgotPasswordViewModel = koinViewModel()
+    val profileViewModel: ProfileViewModel = koinViewModel()
+    val user by profileViewModel.user.collectAsState()
 
     SideEffect { onAtRootChanged(isAtRoot) }
 
@@ -54,7 +58,7 @@ fun ProfileRoot(
                 ProfileScreen(
                     onPersonalInfo = { backStack.add(PersonalInfo) },
                     onSecuritySettings = { backStack.add(ResetPassword) },
-                    onSupport = { backStack.add(Support) },
+                    onSupport = { backStack.add(ContactSupport) },
                     onFaqs = { backStack.add(Faqs) },
                     onTerms = { backStack.add(TermsAndConditions) },
                     onSignOut = onSignOut,
@@ -93,10 +97,10 @@ fun ProfileRoot(
                     onOk = { backStack.removeAll { it is PasswordChanged } },
                 )
             }
-            entry<Support> {
-                SupportScreen(
+            entry<ContactSupport> {
+                SupportRoot(
+                    user = user,
                     onBack = { backStack.removeLastOrNull() },
-                    onTerms = { backStack.add(TermsAndConditions) },
                 )
             }
             entry<Faqs> {

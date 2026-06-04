@@ -26,7 +26,16 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.cloudflare.realtimekit.models.RtkMeetingInfo
 import com.cloudflare.realtimekit.ui.RealtimeKitUIBuilder
 import com.cloudflare.realtimekit.ui.RealtimeKitUIInfo
+import com.cloudflare.realtimekit.ui.token.BackgroundColor
+import com.cloudflare.realtimekit.ui.token.BrandColor
+import com.cloudflare.realtimekit.ui.token.RtkBorderRadiusToken
+import com.cloudflare.realtimekit.ui.token.RtkBorderWidthToken
+import com.cloudflare.realtimekit.ui.token.RtkColorTokens
+import com.cloudflare.realtimekit.ui.token.RtkDesignTokens
+import com.cloudflare.realtimekit.ui.token.StatusColor
+import com.cloudflare.realtimekit.ui.token.TextColor
 import io.github.aakira.napier.Napier
+import android.graphics.Color as AndroidColor
 
 /**
  * Android actual — launches the Cloudflare RealtimeKit UI Kit `MeetingActivity`
@@ -60,7 +69,11 @@ actual fun RealtimeMeetingView(
         try {
             Napier.i(tag = "RealtimeKit", message = "Launching meeting (video=$enableVideo, token=${authToken.take(16)}…)")
             val meetingInfo = RtkMeetingInfo(authToken = authToken)
-            val uiKitInfo = RealtimeKitUIInfo(activity = activity, rtkMeetingInfo = meetingInfo)
+            val uiKitInfo = RealtimeKitUIInfo(
+                activity = activity,
+                rtkMeetingInfo = meetingInfo,
+                designTokens = smartRoundDesignTokens(),
+            )
             val rtkUIKit = RealtimeKitUIBuilder.build(uiKitInfo)
             rtkUIKit.startMeeting()
         } catch (e: Throwable) {
@@ -101,3 +114,46 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
+
+private fun smartRoundDesignTokens() = RtkDesignTokens(
+    colors = RtkColorTokens(
+        brand = BrandColor(
+            shade300 = AndroidColor.parseColor("#FF8A65"),  // Primary70
+            shade400 = AndroidColor.parseColor("#F36C40"),
+            shade500 = AndroidColor.parseColor("#E84E1C"),  // Primary40 — brand orange
+            shade600 = AndroidColor.parseColor("#B83200"),  // Primary30
+            shade700 = AndroidColor.parseColor("#7A1F00"),  // Primary20
+        ),
+        background = BackgroundColor(
+            shade600 = AndroidColor.parseColor("#939190"),  // Neutral60
+            shade700 = AndroidColor.parseColor("#5C5A59"),  // Neutral40
+            shade800 = AndroidColor.parseColor("#393938"),  // Neutral20
+            shade900 = AndroidColor.parseColor("#1C1B1B"),  // Neutral10
+            shade1000 = AndroidColor.parseColor("#0D0D0D"),
+        ),
+        text = TextColor(
+            onBrand = TextColor.TextColorOnBrand(
+                shade600 = AndroidColor.parseColor("#85FFFFFF"),
+                shade700 = AndroidColor.parseColor("#A3FFFFFF"),
+                shade800 = AndroidColor.parseColor("#C2FFFFFF"),
+                shade900 = AndroidColor.parseColor("#E0FFFFFF"),
+                shade1000 = AndroidColor.parseColor("#FFFFFFFF"),
+            ),
+            onBackground = TextColor.TextColorOnBackground(
+                shade600 = AndroidColor.parseColor("#85FFFFFF"),
+                shade700 = AndroidColor.parseColor("#A3FFFFFF"),
+                shade800 = AndroidColor.parseColor("#C2FFFFFF"),
+                shade900 = AndroidColor.parseColor("#E0FFFFFF"),
+                shade1000 = AndroidColor.parseColor("#FFFFFFFF"),
+            ),
+        ),
+        status = StatusColor(
+            success = AndroidColor.parseColor("#16A34A"),  // Green40
+            warning = AndroidColor.parseColor("#FFCD07"),
+            danger = AndroidColor.parseColor("#B3261E"),   // Error40
+        ),
+        videoBackground = AndroidColor.parseColor("#1C1B1B"),
+    ),
+    borderRadius = RtkBorderRadiusToken.Rounded,
+    borderWidth = RtkBorderWidthToken.Thin,
+)

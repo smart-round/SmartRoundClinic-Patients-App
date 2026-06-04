@@ -11,13 +11,16 @@ import RealtimeKitUI
 /// is released before the user taps "Join", the meeting room VC is never shown.
 private var activeMeeting: RealtimeKitUI?
 
-class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        UNUserNotificationCenter.current().delegate = self
+        // Do NOT set UNUserNotificationCenter.current().delegate here.
+        // NotifierManager.initialize() sets itself as the UNUserNotificationCenterDelegate
+        // so it can fire onNotificationClicked and show foreground banners.
+        // Overriding that delegate here would break kmpnotifier's handling.
         application.registerForRemoteNotifications()
         return true
     }
@@ -41,15 +44,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         Messaging.messaging().appDidReceiveMessage(userInfo)
         completionHandler(.newData)
     }
-
-    // Show banner + sound when a notification arrives while the app is in the foreground
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        completionHandler([.banner, .sound, .badge])
-    }
 }
 
 @main
@@ -57,6 +51,10 @@ struct iOSApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     init() {
+        // Firebase and NotifierManager must be initialised before doInitKoin() because
+        // initKoin() calls setupNotificationListener(), which immediately launches a
+        // coroutine that calls NotifierManager.getPushNotifier(). If the factory is not
+        // ready by then the app crashes with IllegalStateException.
         FirebaseApp.configure()
         NotifierManager.shared.initialize(
             configuration: NotificationPlatformConfigurationIos(

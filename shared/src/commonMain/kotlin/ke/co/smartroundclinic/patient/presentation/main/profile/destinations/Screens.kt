@@ -12,3 +12,4 @@ import kotlinx.serialization.Serializable
 @Serializable data object Support : NavKey
 @Serializable data object Faqs : NavKey
 @Serializable data object TermsAndConditions : NavKey
+@Serializable data object ContactSupport : NavKey

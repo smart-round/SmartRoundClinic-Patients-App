@@ -48,7 +48,7 @@ fun NavigationRoot(
             entry<OnBoardingRoot> {
                 OnboardingRoot(
                     onFinished = {
-                        backStack.add(SignUpRoot)
+                        backStack.add(AuthRoot)
                         backStack.remove(OnBoardingRoot)
                     }
                 )

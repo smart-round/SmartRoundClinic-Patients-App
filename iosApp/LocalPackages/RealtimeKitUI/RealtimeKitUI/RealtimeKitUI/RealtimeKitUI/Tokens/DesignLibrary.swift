@@ -74,14 +74,14 @@ public protocol DesignLibraryConfiguratorProtocol {
 }
 
 class DesignLibraryConfigurator: DesignLibraryConfiguratorProtocol {
-    let colorBackgroundBase: BackgroundColorToken.Shade = .init(hex: "#050505")!
-    let colorBrandBase: BrandColorToken.Shade = .init(hex: "#0246FD")!
+    let colorBackgroundBase: BackgroundColorToken.Shade = .init(hex: "#1C1B1B")!  // Neutral10
+    let colorBrandBase: BrandColorToken.Shade = .init(hex: "#E84E1C")!            // Primary40
 
     let textColorBackgroundBase: TextColorToken.Background.Shade = .init(hex: "#FFFFFF")!
-    let textColorBrandBase: TextColorToken.Brand.Shade = .init(hex: "#111111")!
+    let textColorBrandBase: TextColorToken.Brand.Shade = .init(hex: "#FFFFFF")!   // white on orange
 
-    let statusDangerColor: StatusColor.Shade = .init(hex: "#FF2D2D")!
-    let statusSuccessColor: StatusColor.Shade = .init(hex: "#83D017")!
+    let statusDangerColor: StatusColor.Shade = .init(hex: "#B3261E")!   // Error40
+    let statusSuccessColor: StatusColor.Shade = .init(hex: "#16A34A")!  // Green40
     let statusWarningColor: StatusColor.Shade = .init(hex: "#FFCD07")!
 
     let cornerRadiusRoundFactor: CGFloat = 4.0

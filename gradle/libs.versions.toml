@@ -29,8 +29,8 @@ material3-extended-icons = "1.7.3"
 filekit = "0.14.0"
 napier = "2.7.1"
 kotlinx-datetime = "0.6.2"
-
-
+google-services = "4.4.2"
+kmpnotifier = "1.6.1"
 
 [libraries]
 coil-svg = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil" }
@@ -93,7 +93,7 @@ filekit-coil = { module = "io.github.vinceglb:filekit-coil", version.ref = "file
 napier = { module = "io.github.aakira:napier", version.ref = "napier"}
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 richeditor-compose = { module = "com.mohamedrejeb.richeditor:richeditor-compose", version.ref = "richeditorCompose" }
-
+kmpnotifier = { module = "io.github.mirzemehdi:kmpnotifier", version.ref = "kmpnotifier" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
@@ -106,3 +106,4 @@ kotlinAndroid = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 androidx-room = { id = "androidx.room", version.ref = "room" }
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin"}
+googleServices = { id = "com.google.gms.google-services", version.ref = "google-services" }

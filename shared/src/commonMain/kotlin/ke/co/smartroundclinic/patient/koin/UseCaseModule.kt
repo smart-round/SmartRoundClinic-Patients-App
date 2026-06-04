@@ -4,6 +4,7 @@ import ke.co.smartroundclinic.patient.domain.usecase.appointment.BookAppointment
 import ke.co.smartroundclinic.patient.domain.usecase.support.CreateSupportTicketUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.support.GetIssueCategoriesUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.support.GetMyTicketsUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.support.GetSupportChatHistoryUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.support.UploadChatFileUseCase
 import ke.co.smartroundclinic.patient.presentation.main.support.SupportChatViewModel
 import ke.co.smartroundclinic.patient.presentation.main.support.SupportViewModel
@@ -146,6 +147,7 @@ val useCaseModule = module {
     single { CreateSupportTicketUseCase(get()) }
     single { GetMyTicketsUseCase(get()) }
     single { UploadChatFileUseCase(get()) }
+    single { GetSupportChatHistoryUseCase(get()) }
     viewModel { SupportViewModel(get(), get(), get(), get()) }
-    viewModel { (ticketId: String) -> SupportChatViewModel(ticketId, get(), get(), get(), get()) }
+    viewModel { (ticketId: String) -> SupportChatViewModel(ticketId, get(), get(), get(), get(), get()) }
 }

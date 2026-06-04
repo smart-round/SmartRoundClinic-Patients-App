@@ -10,6 +10,8 @@ class AndroidPlatform : Platform {
 
 actual fun getPlatform(): Platform = AndroidPlatform()
 
+actual val notificationPlatform: String = "android"
+
 fun logging() {
     Napier.base(DebugAntilog())
 }
