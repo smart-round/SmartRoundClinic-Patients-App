@@ -9,8 +9,6 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.data.remote.dto.response.GetNotificationsRes
-import ke.co.smartroundclinic.patient.data.remote.dto.response.toDomain
-import ke.co.smartroundclinic.patient.domain.model.Notification
 import ke.co.smartroundclinic.patient.domain.repository.NotificationRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -34,14 +32,14 @@ class NotificationRepositoryImpl(private val client: HttpClient) : NotificationR
             }
         }
 
-    override suspend fun getMyNotifications(page: Int, size: Int): Resource<List<Notification>> =
+    override suspend fun getMyNotifications(page: Int, size: Int): Resource<GetNotificationsRes> =
         withContext(Dispatchers.IO) {
             try {
                 val res = client.get("notification/my") {
                     parameter("page", page)
                     parameter("size", size)
                 }.body<GetNotificationsRes>()
-                if (res.status) Resource.Success(res.data.items.map { it.toDomain() }, res.message)
+                if (res.status) Resource.Success(res, res.message)
                 else Resource.Error(res.message)
             } catch (e: Exception) {
                 Resource.Error(e.message ?: "Failed to load notifications")

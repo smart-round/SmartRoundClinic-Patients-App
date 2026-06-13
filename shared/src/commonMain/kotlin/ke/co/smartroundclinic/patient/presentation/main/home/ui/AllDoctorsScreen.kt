@@ -42,6 +42,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -221,7 +222,7 @@ fun AllDoctorsScreen(
                         DropdownMenu(
                             expanded = dropdownExpanded,
                             onDismissRequest = { dropdownExpanded = false },
-                            containerColor = Color.White,
+                            containerColor = MaterialTheme.colorScheme.background,
                             modifier = Modifier
                                 .width(220.dp)
                                 .clip(RoundedCornerShape(14.dp)),
@@ -234,6 +235,7 @@ fun AllDoctorsScreen(
                             )
                             HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                             DropdownMenuItem(
+                                colors = MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.onBackground),
                                 text = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text("All Specialities", style = MaterialTheme.typography.bodyMedium)
@@ -257,6 +259,7 @@ fun AllDoctorsScreen(
                             specialities.forEach { speciality ->
                                 val isSelected = selectedSpecialityId == speciality.id
                                 DropdownMenuItem(
+                                    colors = MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.onBackground),
                                     text = {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(

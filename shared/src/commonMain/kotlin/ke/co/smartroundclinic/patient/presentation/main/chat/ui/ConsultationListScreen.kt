@@ -63,6 +63,7 @@ internal fun ConsultationListScreen(
     onRefresh: () -> Unit,
     doctorName: (String) -> String,
     doctorPicture: (String) -> String?,
+    canJoin: (Appointment) -> Boolean = { false },
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -124,6 +125,7 @@ internal fun ConsultationListScreen(
                             appointment = appointment,
                             doctorName = doctorName(appointment.doctorId),
                             doctorPicture = doctorPicture(appointment.doctorId),
+                            canJoin = canJoin(appointment),
                             onClick = { onAppointmentClick(appointment) },
                         )
                     }
@@ -138,6 +140,7 @@ private fun ConsultationCard(
     appointment: Appointment,
     doctorName: String,
     doctorPicture: String?,
+    canJoin: Boolean,
     onClick: () -> Unit,
 ) {
     Card(
@@ -169,7 +172,7 @@ private fun ConsultationCard(
             val isCompleted = appointment.status.equals("COMPLETED", ignoreCase = true)
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 StatusBadge(status = appointment.status)
-                if (!isCompleted) {
+                if (!isCompleted && canJoin) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Icon(imageVector = Icons.Filled.VideoCall, contentDescription = null, tint = StatusConfirmed, modifier = Modifier.size(16.dp))
                         Text(text = "Join", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = StatusConfirmed)

@@ -27,6 +27,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -214,9 +215,14 @@ internal fun PersonalInfoScreen(
                         shape = ShapeInput,
                         modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                     )
-                    ExposedDropdownMenu(expanded = genderExpanded, onDismissRequest = { genderExpanded = false }) {
+                    ExposedDropdownMenu(
+                        expanded = genderExpanded,
+                        onDismissRequest = { genderExpanded = false },
+                        containerColor = MaterialTheme.colorScheme.background,
+                    ) {
                         genderOptions.forEach { option ->
                             DropdownMenuItem(
+                                colors = MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.onBackground),
                                 text = { Text(option) },
                                 onClick = { selectedGender = option; genderExpanded = false },
                             )

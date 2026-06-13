@@ -16,6 +16,7 @@ interface AuthRepository {
         gender: String,
         phoneNumber: String,
         dateOfBirth: String,
+        profilePictureBytes: ByteArray? = null,
     ): Resource<SuccessRes>
     suspend fun verifyAccount(email: String, otpCode: String): Resource<SuccessRes>
     suspend fun resendAccount(email: String): Resource<SuccessRes>

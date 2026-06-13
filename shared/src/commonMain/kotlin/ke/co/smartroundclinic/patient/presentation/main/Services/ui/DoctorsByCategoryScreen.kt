@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,6 +53,9 @@ fun DoctorsByCategoryScreen(
     categoryName: String,
     doctors: List<Doctor>,
     isLoading: Boolean = false,
+    currentPage: Int = 1,
+    totalPages: Int = 1,
+    onLoadPage: (Int) -> Unit = {},
     onDoctorClick: (Doctor) -> Unit,
     onBookNow: (Doctor) -> Unit,
     onBack: () -> Unit,
@@ -105,7 +109,7 @@ fun DoctorsByCategoryScreen(
                     .fillMaxSize()
                     .navigationBarsPadding(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                contentPadding = PaddingValues(16.dp),
             ) {
                 items(doctors) { doctor ->
                     DoctorListCard(
@@ -113,6 +117,54 @@ fun DoctorsByCategoryScreen(
                         onCardClick = { onDoctorClick(doctor) },
                         onBookNow = { onBookNow(doctor) },
                     )
+                }
+                if (totalPages > 1) {
+                    item(key = "pagination") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp, bottom = 4.dp),
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            repeat(totalPages) { index ->
+                                val page = index + 1
+                                val isSelected = page == currentPage
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 4.dp)
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (isSelected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.surfaceVariant,
+                                        )
+                                        .then(
+                                            if (!isSelected && !isLoading)
+                                                Modifier.clickable { onLoadPage(page) }
+                                            else Modifier,
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (isLoading && isSelected) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp,
+                                            color = Color.White,
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "$page",
+                                            style = MaterialTheme.typography.labelMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                            ),
+                                            color = if (isSelected) Color.White
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

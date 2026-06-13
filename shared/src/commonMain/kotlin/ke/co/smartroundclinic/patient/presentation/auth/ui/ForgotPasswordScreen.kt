@@ -61,13 +61,13 @@ fun ForgotPasswordScreen(
                     )
                 )
         ) {
-            Column(modifier = modifier.padding(vertical = 8.dp, horizontal = 16.dp)) {
+            Column(modifier = modifier.padding(top = 32.dp, bottom = 40.dp, start = 16.dp, end = 16.dp)) {
                 Text(
                     text = "Forgot Password",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
                 Text(
                     text = "Provide your registered email to reset your password securely",
                     style = MaterialTheme.typography.bodySmall,
@@ -75,8 +75,6 @@ fun ForgotPasswordScreen(
                 )
             }
         }
-
-        Spacer(Modifier.height(32.dp))
 
         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp)) {
             OutlinedTextField(

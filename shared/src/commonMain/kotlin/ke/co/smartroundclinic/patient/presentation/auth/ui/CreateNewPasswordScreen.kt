@@ -68,13 +68,13 @@ fun CreateNewPasswordScreen(
                     )
                 )
         ) {
-            Column(modifier = modifier.padding(vertical = 8.dp, horizontal = 16.dp)) {
+            Column(modifier = modifier.padding(top = 32.dp, bottom = 40.dp, start = 16.dp, end = 16.dp)) {
                 Text(
                     text = "Create A New Password",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
                 Text(
                     text = "Set a secure password to complete the reset process",
                     style = MaterialTheme.typography.bodySmall,
@@ -83,9 +83,7 @@ fun CreateNewPasswordScreen(
             }
         }
 
-        Spacer(Modifier.height(32.dp))
-
-        Column(modifier = modifier.padding(horizontal = 24.dp, vertical = 24.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp)) {
             Column {
                 OutlinedTextField(
                     value = newPassword,

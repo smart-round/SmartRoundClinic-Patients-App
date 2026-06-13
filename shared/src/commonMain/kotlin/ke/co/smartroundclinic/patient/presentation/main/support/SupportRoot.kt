@@ -38,10 +38,13 @@ fun SupportRoot(
                 SupportTicketListScreen(
                     tickets = vm.tickets,
                     isLoading = vm.isLoading,
+                    currentPage = vm.currentPage,
+                    totalPages = vm.totalPages,
                     onBack = onBack,
                     onCreateTicket = { backStack.add(CreateSupportTicket) },
                     onTicketClick = { ticket -> backStack.add(SupportChat(ticket.id, ticket.ticketNumber)) },
                     onRefresh = { vm.load() },
+                    onLoadPage = { vm.loadTicketsPage(it) },
                 )
             }
             entry<CreateSupportTicket> {

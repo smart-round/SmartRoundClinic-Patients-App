@@ -29,11 +29,16 @@ class ForgotPasswordViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             when (val result = requestPasswordResetUseCase(email)) {
-                is Resource.Success -> onSuccess()
-                is Resource.Error -> snackbarController.show(result.message ?: "Failed to send reset code", isError = true)
+                is Resource.Success -> {
+                    _isLoading.value = false
+                    onSuccess()
+                }
+                is Resource.Error -> {
+                    snackbarController.show(result.message ?: "Failed to send reset code", isError = true)
+                    _isLoading.value = false
+                }
                 is Resource.Loading -> Unit
             }
-            _isLoading.value = false
         }
     }
 
@@ -57,11 +62,16 @@ class ForgotPasswordViewModel(
         viewModelScope.launch {
             _isLoading.value = true
             when (val result = updatePasswordUseCase(email, newPassword, otp)) {
-                is Resource.Success -> onSuccess()
-                is Resource.Error -> snackbarController.show(result.message ?: "Failed to update password", isError = true)
+                is Resource.Success -> {
+                    _isLoading.value = false
+                    onSuccess()
+                }
+                is Resource.Error -> {
+                    snackbarController.show(result.message ?: "Failed to update password", isError = true)
+                    _isLoading.value = false
+                }
                 is Resource.Loading -> Unit
             }
-            _isLoading.value = false
         }
     }
 

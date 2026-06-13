@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.core.snackbar.SnackbarController
+import ke.co.smartroundclinic.patient.data.remote.dto.response.toDomain
 import ke.co.smartroundclinic.patient.domain.model.IssueCategory
 import ke.co.smartroundclinic.patient.domain.model.SupportTicket
 import ke.co.smartroundclinic.patient.domain.usecase.support.CreateSupportTicketUseCase
@@ -33,18 +34,37 @@ class SupportViewModel(
     var isCreating by mutableStateOf(false)
         private set
 
+    var currentPage by mutableStateOf(1)
+        private set
+
+    var totalPages by mutableStateOf(1)
+        private set
+
     init {
         load()
     }
 
     fun load() {
+        loadTicketsPage(currentPage)
+        viewModelScope.launch {
+            val categoriesResult = getIssueCategoriesUseCase()
+            if (categoriesResult is Resource.Success) categories = categoriesResult.data ?: emptyList()
+        }
+    }
+
+    fun loadTicketsPage(page: Int) {
         viewModelScope.launch {
             isLoading = true
-            val ticketsResult = getMyTicketsUseCase()
-            val categoriesResult = getIssueCategoriesUseCase()
+            when (val result = getMyTicketsUseCase(page)) {
+                is Resource.Success -> {
+                    val data = result.data?.data ?: return@launch
+                    tickets = data.items.map { it.toDomain() }
+                    currentPage = data.page
+                    totalPages = data.pages.toInt().coerceAtLeast(1)
+                }
+                else -> {}
+            }
             isLoading = false
-            if (ticketsResult is Resource.Success) tickets = ticketsResult.data ?: emptyList()
-            if (categoriesResult is Resource.Success) categories = categoriesResult.data ?: emptyList()
         }
     }
 

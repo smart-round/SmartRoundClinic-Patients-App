@@ -76,13 +76,13 @@ fun VerifyEmailScreen(
                     )
                 )
         ) {
-            Column(modifier = modifier.padding(vertical = 8.dp, horizontal = 16.dp)) {
+            Column(modifier = modifier.padding(top = 32.dp, bottom = 40.dp, start = 16.dp, end = 16.dp)) {
                 Text(
                     text = "Verify Email",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
                 Text(
                     text = "Enter the verification code sent to your email to proceed with resetting your password",
                     style = MaterialTheme.typography.bodySmall,
@@ -90,8 +90,6 @@ fun VerifyEmailScreen(
                 )
             }
         }
-
-        Spacer(Modifier.height(32.dp))
 
         Column(modifier = modifier.padding(horizontal = 24.dp, vertical = 24.dp)) {
             BasicTextField(

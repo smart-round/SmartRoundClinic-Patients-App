@@ -2,7 +2,6 @@ package ke.co.smartroundclinic.patient.presentation.main.notifications
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,13 +17,13 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,6 +32,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,16 +43,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ke.co.smartroundclinic.patient.domain.model.Notification
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
+import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationsScreen(
     onBack: () -> Unit,
@@ -58,10 +62,23 @@ fun NotificationsScreen(
 ) {
     val scope = rememberCoroutineScope()
     val hasUnread = vm.unreadCount > 0
+    val listState = rememberLazyListState()
+
+    // Fire loadMore when the last visible item is within 3 rows of the end
+    val nearBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
+            lastVisible >= info.totalItemsCount - 3
+        }
+    }
+
+    LaunchedEffect(nearBottom) {
+        if (nearBottom && vm.hasMore) vm.loadMore()
+    }
 
     Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
 
-        // Gradient header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -141,6 +158,7 @@ fun NotificationsScreen(
                 }
                 else -> {
                     LazyColumn(
+                        state = listState,
                         contentPadding = PaddingValues(bottom = 24.dp),
                         modifier = Modifier.fillMaxSize().navigationBarsPadding(),
                     ) {
@@ -167,6 +185,7 @@ fun NotificationsScreen(
                                 }
                             }
                         }
+
                         items(vm.notifications, key = { it.id }) { notification ->
                             NotificationCard(
                                 notification = notification,
@@ -177,6 +196,28 @@ fun NotificationsScreen(
                                 thickness = 0.5.dp,
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                             )
+                        }
+
+                        when {
+                            vm.isLoadingMore -> item(key = "loading_more") {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                }
+                            }
+                            !vm.hasMore -> item(key = "end_of_list") {
+                                Text(
+                                    text = "· You're all caught up ·",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 20.dp),
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
                         }
                     }
                 }
@@ -194,7 +235,6 @@ private fun NotificationCard(notification: Notification, onTap: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        // Icon circle
         Box(
             modifier = Modifier
                 .size(44.dp)
@@ -238,7 +278,6 @@ private fun NotificationCard(notification: Notification, onTap: () -> Unit) {
             )
         }
 
-        // Red dot for unread
         if (notification.isUnread) {
             Spacer(Modifier.width(8.dp))
             Box(

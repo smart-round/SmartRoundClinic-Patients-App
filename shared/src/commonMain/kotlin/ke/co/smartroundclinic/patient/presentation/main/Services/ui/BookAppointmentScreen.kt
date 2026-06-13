@@ -35,7 +35,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -64,13 +63,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import ke.co.smartroundclinic.patient.data.remote.dto.response.PreBookAppointmentData
 import ke.co.smartroundclinic.patient.domain.model.CalendarDay
 import ke.co.smartroundclinic.patient.domain.model.CalendarView
 import ke.co.smartroundclinic.patient.domain.model.Doctor
+import ke.co.smartroundclinic.patient.presentation.main.Services.StkPushResult
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
-import ke.co.smartroundclinic.patient.presentation.theme.StatusSuccess
 import ke.co.smartroundclinic.patient.common.todayLocalDate
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.number
@@ -89,25 +87,25 @@ fun BookAppointmentScreen(
     calendarView: CalendarView?,
     availableSlots: List<String>,
     isLoadingSlots: Boolean,
-    isPreBooking: Boolean,
+    isStkInitiating: Boolean,
     isBooking: Boolean,
-    preBookData: PreBookAppointmentData?,
-    preBookError: String?,
+    stkPushData: StkPushResult?,
+    stkPollState: String?,
+    stkError: String?,
     bookedAppointmentId: String?,
     bookingError: String?,
     onLoadCalendar: (yearMonth: String) -> Unit,
     onLoadSlots: (date: String) -> Unit,
     isRebooking: Boolean = false,
     previousAppointmentId: String? = null,
-    onPayNow: (date: String, slotStart: String) -> Unit,
-    onPaymentDone: () -> Unit,
-    onDismissCheckout: () -> Unit,
+    onInitiateStkPush: (date: String, slotStart: String, phoneNumber: String) -> Unit,
+    onDismissStkPush: () -> Unit,
     onViewBooking: (appointmentId: String) -> Unit,
     onDismissResult: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val checkoutSheetState = rememberModalBottomSheetState(
+    val stkSheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
         confirmValueChange = { it != SheetValue.Hidden },
     )
@@ -116,6 +114,7 @@ fun BookAppointmentScreen(
     var displayMonth by remember { mutableStateOf(today.month.number) }
     var selectedDate by remember { mutableStateOf<String?>(null) }
     var selectedSlot by remember { mutableStateOf<String?>(null) }
+    var showStkSheet by remember { mutableStateOf(false) }
 
     val yearMonthStr = "$displayYear-${displayMonth.toString().padStart(2, '0')}"
 
@@ -127,6 +126,8 @@ fun BookAppointmentScreen(
         selectedDate?.let { onLoadSlots(it) }
         selectedSlot = null
     }
+
+    // Keep showStkSheet true so the success state is visible inside the sheet
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -271,11 +272,9 @@ fun BookAppointmentScreen(
         // Pay Now button
         Button(
             onClick = {
-                val date = selectedDate ?: return@Button
-                val slot = selectedSlot ?: return@Button
-                onPayNow(date, slot)
+                if (selectedDate != null && selectedSlot != null) showStkSheet = true
             },
-            enabled = selectedDate != null && selectedSlot != null && !isPreBooking && !isBooking,
+            enabled = selectedDate != null && selectedSlot != null && !isStkInitiating && !isBooking,
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
@@ -287,7 +286,7 @@ fun BookAppointmentScreen(
                 containerColor = MaterialTheme.colorScheme.primary,
             ),
         ) {
-            if (isPreBooking || isBooking) {
+            if (isBooking) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     color = Color.White,
@@ -297,21 +296,6 @@ fun BookAppointmentScreen(
                 Text(
                     text = if (isRebooking) "Pay Follow-Up Fee" else "Pay Now",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                )
-            }
-        }
-
-        // Result dialogs
-        AnimatedVisibility(
-            visible = bookedAppointmentId != null,
-            enter = fadeIn() + scaleIn(),
-            exit = fadeOut() + scaleOut(),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            if (bookedAppointmentId != null) {
-                BookingSuccessDialog(
-                    onViewBooking = { onViewBooking(bookedAppointmentId) },
-                    onDismiss = onDismissResult,
                 )
             }
         }
@@ -329,30 +313,32 @@ fun BookAppointmentScreen(
                 )
             }
         }
-
-        AnimatedVisibility(
-            visible = preBookError != null,
-            enter = fadeIn() + scaleIn(),
-            exit = fadeOut() + scaleOut(),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            if (preBookError != null) {
-                PaymentFailedDialog(
-                    message = preBookError,
-                    onTryAgain = onDismissCheckout,
-                )
-            }
-        }
     }
 
-    // Checkout bottom sheet — shown after successful pre-booking
-    if (preBookData != null) {
-        PaymentCheckoutSheet(
-            sheetState = checkoutSheetState,
-            title = preBookData.title,
-            url = preBookData.url,
-            onDismiss = onDismissCheckout,
-            onPaymentDone = onPaymentDone,
+    // STK push bottom sheet
+    if (showStkSheet || bookedAppointmentId != null || stkPushData != null ||
+        stkPollState == "FAILED" || (!isStkInitiating && stkPushData == null && stkError != null)
+    ) {
+        StkPushSheet(
+            sheetState = stkSheetState,
+            isStkInitiating = isStkInitiating,
+            stkPushData = stkPushData,
+            stkPollState = stkPollState,
+            stkError = stkError,
+            bookedAppointmentId = bookedAppointmentId,
+            onSendStkPush = { phoneNumber ->
+                val date = selectedDate ?: return@StkPushSheet
+                val slot = selectedSlot ?: return@StkPushSheet
+                onInitiateStkPush(date, slot, phoneNumber)
+            },
+            onViewAppointment = {
+                if (bookedAppointmentId != null) onViewBooking(bookedAppointmentId)
+            },
+            onDismiss = {
+                showStkSheet = false
+                onDismissResult()
+                onDismissStkPush()
+            },
         )
     }
 }
@@ -376,8 +362,6 @@ private fun CalendarGrid(
     }
     val firstDayOfWeek = (firstDay.dayOfWeek.ordinal + 1) % 7
 
-    // null = still loading. Non-null = loaded (may be empty if no slots this month).
-    // A date is available only if the doctor has it marked working AND has ≥1 AVAILABLE slot.
     val availableDates: Set<String>? = calendarView?.days
         ?.filter { day ->
             day.isWorkingDay && day.slots.any { it.status.equals("AVAILABLE", ignoreCase = true) }
@@ -415,7 +399,6 @@ private fun CalendarGrid(
                                 val dateStr = "$year-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}"
                                 val localDate = LocalDate(year, month, day)
                                 val isPast = localDate < today
-                                // Enabled only when loaded AND the date is in the available set
                                 val isEnabled = !isPast && availableDates?.contains(dateStr) == true
                                 val isSelected = selectedDate == dateStr
                                 val isToday = localDate == today
@@ -435,7 +418,6 @@ private fun CalendarGrid(
                 }
             }
 
-            // Translucent overlay + spinner while calendarView is loading
             if (calendarView == null) {
                 Box(
                     modifier = Modifier
@@ -460,8 +442,7 @@ private fun DayCell(
     modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier
-            .height(40.dp),
+        modifier = modifier.height(40.dp),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -534,64 +515,6 @@ private fun formatSlotTime(slot: String): String {
         "$h:$minute $ampm"
     } catch (e: Exception) {
         slot
-    }
-}
-
-@Composable
-private fun BookingSuccessDialog(
-    onViewBooking: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(dismissOnClickOutside = true),
-    ) {
-        Card(
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(8.dp),
-        ) {
-            Column(
-                modifier = Modifier.padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.CheckCircle,
-                    contentDescription = null,
-                    tint = StatusSuccess,
-                    modifier = Modifier.size(72.dp),
-                )
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    text = "Booking Successful!",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "Your appointment has been successfully booked. You will receive a confirmation shortly.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(24.dp))
-                Button(
-                    onClick = onViewBooking,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    Text("View Booking")
-                }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    Text("Back to Home")
-                }
-            }
-        }
     }
 }
 

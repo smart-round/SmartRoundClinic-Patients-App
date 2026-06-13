@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class SignInRes(
-    val data: SignInData,
+    val data: SignInData? = null,
     val httpStatusCode: Int,
     val message: String,
     val status: Boolean,
@@ -23,8 +23,8 @@ data class SignInData(
 )
 
 fun SignInRes.toDomain() = AuthTokens(
-    accessToken = data.accessToken,
-    refreshToken = data.refreshToken,
-    accountStatus = data.accountStatus,
-    verificationStatus = data.verificationStatus,
+    accessToken = data?.accessToken,
+    refreshToken = data?.refreshToken,
+    accountStatus = data?.accountStatus,
+    verificationStatus = data?.verificationStatus,
 )

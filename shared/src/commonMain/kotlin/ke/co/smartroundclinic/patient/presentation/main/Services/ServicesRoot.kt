@@ -67,6 +67,9 @@ fun ServicesRoot(
                     categoryName = dest.categoryName,
                     doctors = vm.specialityDoctors,
                     isLoading = vm.isLoadingDoctors,
+                    currentPage = vm.doctorsCurrentPage,
+                    totalPages = vm.doctorsTotalPages,
+                    onLoadPage = { vm.loadDoctorsPage(dest.categoryId, it) },
                     onDoctorClick = { doctor -> backStack.add(DoctorProfile(doctor.id)) },
                     onBookNow = { doctor -> backStack.add(DoctorProfile(doctor.id)) },
                     onBack = { backStack.removeLastOrNull() },
@@ -99,42 +102,36 @@ fun ServicesRoot(
             }
 
             entry<BookAppointment> { dest ->
-                // Auto-navigate to appointment details once booking is confirmed
-                LaunchedEffect(vm.bookedAppointment) {
-                    val id = vm.bookedAppointment?.id ?: return@LaunchedEffect
-                    vm.clearBookingState()
-                    backStack.removeLastOrNull() // pop BookAppointment
-                    backStack.add(AppointmentDetails(id))
-                }
-
                 BookAppointmentScreen(
                     doctor = vm.doctorById(dest.doctorId) ?: return@entry,
                     calendarView = vm.calendarView,
                     availableSlots = vm.availableSlots,
                     isLoadingSlots = vm.isLoadingSlots,
-                    isPreBooking = vm.isPreBooking,
+                    isStkInitiating = vm.isStkInitiating,
                     isBooking = vm.isBooking,
-                    preBookData = vm.preBookData,
-                    preBookError = vm.preBookError,
+                    stkPushData = vm.stkPushData,
+                    stkPollState = vm.stkPollState,
+                    stkError = vm.stkError,
                     bookedAppointmentId = vm.bookedAppointment?.id,
                     bookingError = vm.bookingError,
-                    onLoadCalendar = { yearMonth -> vm.loadCalendarView(dest.doctorId, yearMonth) },
-                    onLoadSlots = { date -> vm.loadSlots(dest.doctorId, date) },
                     isRebooking = dest.previousAppointmentId != null,
                     previousAppointmentId = dest.previousAppointmentId,
-                    onPayNow = { date, slotStart ->
-                        vm.preBookAppointment(
+                    onLoadCalendar = { yearMonth -> vm.loadCalendarView(dest.doctorId, yearMonth) },
+                    onLoadSlots = { date -> vm.loadSlots(dest.doctorId, date) },
+                    onInitiateStkPush = { date, slotStart, phoneNumber ->
+                        vm.initiateStkPush(
                             doctorId = dest.doctorId,
                             date = date,
                             slotStart = slotStart,
+                            phoneNumber = phoneNumber,
                             isRebooking = dest.previousAppointmentId != null,
                             previousAppointmentId = dest.previousAppointmentId,
                         )
                     },
-                    onPaymentDone = { vm.confirmBookingAfterPayment() },
-                    onDismissCheckout = { vm.dismissCheckout() },
+                    onDismissStkPush = { vm.dismissStkPush() },
                     onViewBooking = { appointmentId ->
                         vm.clearBookingState()
+                        backStack.removeLastOrNull()
                         backStack.add(AppointmentDetails(appointmentId))
                     },
                     onDismissResult = { vm.clearBookingState() },

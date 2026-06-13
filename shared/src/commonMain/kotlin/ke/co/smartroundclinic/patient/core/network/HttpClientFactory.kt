@@ -12,6 +12,7 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.plugins.observer.ResponseObserver
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import ke.co.smartroundclinic.patient.common.Constants.BASE_URL
@@ -47,7 +48,13 @@ internal fun buildHttpClient(engine: HttpClientEngine, tokenProvider: () -> Stri
     }
 
     install(HttpRequestRetry) {
-        retryOnExceptionOrServerErrors(maxRetries = 3)
+        maxRetries = 3
+        retryIf { request, response ->
+            request.method == HttpMethod.Get && response.status.value in 500..599
+        }
+        retryOnExceptionIf { request, _ ->
+            request.method == HttpMethod.Get
+        }
         exponentialDelay(
             base = 2.0,
             maxDelayMs = 15_000L,

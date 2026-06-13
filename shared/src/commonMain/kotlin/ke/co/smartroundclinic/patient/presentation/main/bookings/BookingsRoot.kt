@@ -1,6 +1,7 @@
 package ke.co.smartroundclinic.patient.presentation.main.bookings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +18,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
@@ -126,40 +129,36 @@ fun BookingsRoot(
                 )
             }
             entry<RebookFromBookings> { dest ->
-                LaunchedEffect(servicesVm.bookedAppointment) {
-                    val id = servicesVm.bookedAppointment?.id ?: return@LaunchedEffect
-                    servicesVm.clearBookingState()
-                    backStack.removeLastOrNull()
-                    backStack.add(BookingAppointmentDetail(id))
-                }
                 BookAppointmentScreen(
                     doctor = servicesVm.doctorById(dest.doctorId) ?: return@entry,
                     calendarView = servicesVm.calendarView,
                     availableSlots = servicesVm.availableSlots,
                     isLoadingSlots = servicesVm.isLoadingSlots,
-                    isPreBooking = servicesVm.isPreBooking,
+                    isStkInitiating = servicesVm.isStkInitiating,
                     isBooking = servicesVm.isBooking,
-                    preBookData = servicesVm.preBookData,
-                    preBookError = servicesVm.preBookError,
+                    stkPushData = servicesVm.stkPushData,
+                    stkPollState = servicesVm.stkPollState,
+                    stkError = servicesVm.stkError,
                     bookedAppointmentId = servicesVm.bookedAppointment?.id,
                     bookingError = servicesVm.bookingError,
                     isRebooking = true,
                     previousAppointmentId = dest.previousAppointmentId,
                     onLoadCalendar = { yearMonth -> servicesVm.loadCalendarView(dest.doctorId, yearMonth) },
                     onLoadSlots = { date -> servicesVm.loadSlots(dest.doctorId, date) },
-                    onPayNow = { date, slotStart ->
-                        servicesVm.preBookAppointment(
+                    onInitiateStkPush = { date, slotStart, phoneNumber ->
+                        servicesVm.initiateStkPush(
                             doctorId = dest.doctorId,
                             date = date,
                             slotStart = slotStart,
+                            phoneNumber = phoneNumber,
                             isRebooking = true,
                             previousAppointmentId = dest.previousAppointmentId,
                         )
                     },
-                    onPaymentDone = { servicesVm.confirmBookingAfterPayment() },
-                    onDismissCheckout = { servicesVm.dismissCheckout() },
+                    onDismissStkPush = { servicesVm.dismissStkPush() },
                     onViewBooking = { appointmentId ->
                         servicesVm.clearBookingState()
+                        backStack.removeLastOrNull()
                         backStack.add(BookingAppointmentDetail(appointmentId))
                     },
                     onDismissResult = { servicesVm.clearBookingState() },
@@ -296,22 +295,73 @@ private fun PaymentsTab(onPaymentClick: (String) -> Unit) {
     val getHistory: GetPaymentHistoryUseCase = koinInject()
     var payments by remember { mutableStateOf<List<GetPaymentHistoryItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
+    var isLoadingMore by remember { mutableStateOf(false) }
+    var hasMore by remember { mutableStateOf(false) }
+    var nextPageToFetch by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
 
-    suspend fun load() {
+    val nearBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
+            lastVisible >= info.totalItemsCount - 3
+        }
+    }
+
+    LaunchedEffect(nearBottom) {
+        if (nearBottom && hasMore && !isLoadingMore) {
+            isLoadingMore = true
+            when (val result = getHistory(page = nextPageToFetch)) {
+                is Resource.Success -> {
+                    val items = result.data?.data?.items ?: emptyList()
+                    payments = (payments + items).sortedByDescending { it.createdAt }
+                    nextPageToFetch--
+                    hasMore = nextPageToFetch > 1
+                }
+                else -> {}
+            }
+            isLoadingMore = false
+        }
+    }
+
+    suspend fun loadInitial() {
         isLoading = true
-        when (val result = getHistory()) {
-            is Resource.Success -> payments = result.data?.data?.items ?: emptyList()
+        payments = emptyList()
+        hasMore = false
+        nextPageToFetch = 0
+
+        when (val discovery = getHistory(page = 1)) {
+            is Resource.Success -> {
+                val data = discovery.data?.data ?: run { isLoading = false; return }
+                val total = data.pages.coerceAtLeast(1)
+                val page1Items = data.items
+
+                if (total == 1) {
+                    payments = page1Items.sortedByDescending { it.createdAt }
+                } else {
+                    // Load newest page before revealing content — avoids flash of oldest payments
+                    when (val newest = getHistory(page = total)) {
+                        is Resource.Success -> {
+                            val newestItems = newest.data?.data?.items ?: emptyList()
+                            payments = (page1Items + newestItems).sortedByDescending { it.createdAt }
+                            nextPageToFetch = total - 1
+                            hasMore = nextPageToFetch > 1
+                        }
+                        else -> payments = page1Items.sortedByDescending { it.createdAt }
+                    }
+                }
+            }
             else -> {}
         }
         isLoading = false
     }
 
-    LaunchedEffect(Unit) { load() }
+    LaunchedEffect(Unit) { loadInitial() }
 
     PullToRefreshBox(
         isRefreshing = isLoading,
-        onRefresh = { scope.launch { load() } },
+        onRefresh = { scope.launch { loadInitial() } },
         modifier = Modifier.fillMaxSize(),
     ) {
         if (isLoading && payments.isEmpty()) {
@@ -326,15 +376,37 @@ private fun PaymentsTab(onPaymentClick: (String) -> Unit) {
             )
         } else {
             LazyColumn(
+                state = listState,
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize().navigationBarsPadding(),
             ) {
-                items(payments.sortedByDescending { it.createdAt }, key = { it.id }) { payment ->
+                items(payments, key = { it.id }) { payment ->
                     PaymentCard(
                         payment = payment,
                         onClick = { onPaymentClick(payment.id) },
                     )
+                }
+                when {
+                    isLoadingMore -> item(key = "loading_more") {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        }
+                    }
+                    !hasMore -> item(key = "end_of_list") {
+                        Text(
+                            text = "· All payments loaded ·",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 20.dp),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
             }
         }

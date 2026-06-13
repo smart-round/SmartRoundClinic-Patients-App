@@ -30,11 +30,10 @@ class SignUpFormViewModel(
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
-    fun signUp(onSuccess: (email: String) -> Unit) {
+    fun signUp(profilePictureBytes: ByteArray?, onSuccess: (email: String) -> Unit) {
         viewModelScope.launch {
             _isLoading.value = true
             val rawDob = dob
-            // Convert DDMMYYYY (raw 8-digit input) to YYYY-MM-DD (API format)
             val formattedDob = if (rawDob.length == 8) {
                 "${rawDob.substring(4, 8)}-${rawDob.substring(2, 4)}-${rawDob.substring(0, 2)}"
             } else rawDob
@@ -45,6 +44,7 @@ class SignUpFormViewModel(
                 gender = gender.uppercase(),
                 phoneNumber = "$countryDialCode$phoneNumber",
                 dateOfBirth = formattedDob,
+                profilePictureBytes = profilePictureBytes,
             )) {
                 is Resource.Success -> {
                     snackbarController.show(result.message ?: "Account created! Please verify your email.")

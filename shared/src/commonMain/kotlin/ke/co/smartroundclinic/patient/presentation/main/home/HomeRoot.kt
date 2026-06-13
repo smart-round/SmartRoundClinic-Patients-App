@@ -97,6 +97,9 @@ fun HomeRoot(
                     categoryName = dest.specialityName,
                     doctors = servicesVm.specialityDoctors,
                     isLoading = servicesVm.isLoadingDoctors,
+                    currentPage = servicesVm.doctorsCurrentPage,
+                    totalPages = servicesVm.doctorsTotalPages,
+                    onLoadPage = { servicesVm.loadDoctorsPage(dest.specialityId, it) },
                     onDoctorClick = { doctor ->
                         servicesVm.cacheDoctor(doctor)
                         backStack.add(HomeDoctorProfile(doctor.id))
@@ -148,43 +151,37 @@ fun HomeRoot(
                 }
             }
             entry<HomeBookAppointment> { dest ->
-                // Auto-navigate to appointment details once booking is confirmed
-                LaunchedEffect(servicesVm.bookedAppointment) {
-                    val id = servicesVm.bookedAppointment?.id ?: return@LaunchedEffect
-                    servicesVm.clearBookingState()
-                    backStack.removeLastOrNull() // pop HomeBookAppointment
-                    backStack.add(HomeAppointmentDetails(id))
-                }
-
                 val doctor = servicesVm.doctorById(dest.doctorId) ?: return@entry
                 BookAppointmentScreen(
                     doctor = doctor,
                     calendarView = servicesVm.calendarView,
                     availableSlots = servicesVm.availableSlots,
                     isLoadingSlots = servicesVm.isLoadingSlots,
-                    isPreBooking = servicesVm.isPreBooking,
+                    isStkInitiating = servicesVm.isStkInitiating,
                     isBooking = servicesVm.isBooking,
-                    preBookData = servicesVm.preBookData,
-                    preBookError = servicesVm.preBookError,
+                    stkPushData = servicesVm.stkPushData,
+                    stkPollState = servicesVm.stkPollState,
+                    stkError = servicesVm.stkError,
                     bookedAppointmentId = servicesVm.bookedAppointment?.id,
                     bookingError = servicesVm.bookingError,
                     onLoadCalendar = { yearMonth -> servicesVm.loadCalendarView(dest.doctorId, yearMonth) },
                     onLoadSlots = { date -> servicesVm.loadSlots(dest.doctorId, date) },
                     isRebooking = dest.previousAppointmentId != null,
                     previousAppointmentId = dest.previousAppointmentId,
-                    onPayNow = { date, slotStart ->
-                        servicesVm.preBookAppointment(
+                    onInitiateStkPush = { date, slotStart, phoneNumber ->
+                        servicesVm.initiateStkPush(
                             doctorId = dest.doctorId,
                             date = date,
                             slotStart = slotStart,
+                            phoneNumber = phoneNumber,
                             isRebooking = dest.previousAppointmentId != null,
                             previousAppointmentId = dest.previousAppointmentId,
                         )
                     },
-                    onPaymentDone = { servicesVm.confirmBookingAfterPayment() },
-                    onDismissCheckout = { servicesVm.dismissCheckout() },
+                    onDismissStkPush = { servicesVm.dismissStkPush() },
                     onViewBooking = { appointmentId ->
                         servicesVm.clearBookingState()
+                        backStack.removeLastOrNull()
                         backStack.add(HomeAppointmentDetails(appointmentId))
                     },
                     onDismissResult = { servicesVm.clearBookingState() },

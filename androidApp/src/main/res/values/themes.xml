@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SmartRoundClinic" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Suppress the yellow autofill highlight from Google Password Manager -->
+        <item name="android:autofilledHighlight">@null</item>
+    </style>
+</resources>

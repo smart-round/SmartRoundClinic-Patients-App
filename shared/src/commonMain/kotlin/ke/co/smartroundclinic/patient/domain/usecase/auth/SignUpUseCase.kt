@@ -12,6 +12,7 @@ class SignUpUseCase(private val repository: AuthRepository) {
         gender: String,
         phoneNumber: String,
         dateOfBirth: String,
+        profilePictureBytes: ByteArray? = null,
     ): Resource<SuccessRes> = repository.signUp(
         fullName = fullName,
         email = email,
@@ -19,5 +20,6 @@ class SignUpUseCase(private val repository: AuthRepository) {
         gender = gender,
         phoneNumber = phoneNumber,
         dateOfBirth = dateOfBirth,
+        profilePictureBytes = profilePictureBytes,
     )
 }

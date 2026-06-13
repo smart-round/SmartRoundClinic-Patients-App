@@ -61,14 +61,14 @@ class SupportRepositoryImpl(private val client: HttpClient) : SupportRepository 
             }
         }
 
-    override suspend fun getMyTickets(page: Int, size: Int): Resource<List<SupportTicket>> =
+    override suspend fun getMyTickets(page: Int, size: Int): Resource<GetMyTicketsRes> =
         withContext(Dispatchers.IO) {
             try {
                 val res = client.get("support/tickets/mine") {
                     parameter("page", page)
                     parameter("size", size)
                 }.body<GetMyTicketsRes>()
-                if (res.status) Resource.Success(res.data?.items?.map { it.toDomain() } ?: emptyList(), res.message)
+                if (res.status) Resource.Success(res, res.message)
                 else Resource.Error(res.message)
             } catch (e: Exception) {
                 Resource.Error(e.message ?: "Failed to load tickets")

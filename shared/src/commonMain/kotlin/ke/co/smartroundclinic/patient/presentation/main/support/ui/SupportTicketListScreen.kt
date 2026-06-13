@@ -1,6 +1,7 @@
 package ke.co.smartroundclinic.patient.presentation.main.support.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,6 +59,9 @@ import ke.co.smartroundclinic.patient.presentation.theme.Error40
 @Composable
 internal fun SupportTicketListScreen(
     tickets: List<SupportTicket>,
+    currentPage: Int = 1,
+    totalPages: Int = 1,
+    onLoadPage: (Int) -> Unit = {},
     isLoading: Boolean,
     onBack: () -> Unit,
     onCreateTicket: () -> Unit,
@@ -127,6 +131,54 @@ internal fun SupportTicketListScreen(
                     ) {
                         items(tickets, key = { it.id }) { ticket ->
                             TicketCard(ticket = ticket, onClick = { onTicketClick(ticket) })
+                        }
+                        if (totalPages > 1) {
+                            item(key = "pagination") {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 4.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                ) {
+                                    repeat(totalPages) { index ->
+                                        val page = index + 1
+                                        val isSelected = page == currentPage
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(horizontal = 4.dp)
+                                                .size(36.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (isSelected) Primary40
+                                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                                )
+                                                .then(
+                                                    if (!isSelected && !isLoading)
+                                                        Modifier.clickable { onLoadPage(page) }
+                                                    else Modifier,
+                                                ),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            if (isLoading && isSelected) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(18.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = Color.White,
+                                                )
+                                            } else {
+                                                Text(
+                                                    text = "$page",
+                                                    style = MaterialTheme.typography.labelMedium.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                    ),
+                                                    color = if (isSelected) Color.White
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

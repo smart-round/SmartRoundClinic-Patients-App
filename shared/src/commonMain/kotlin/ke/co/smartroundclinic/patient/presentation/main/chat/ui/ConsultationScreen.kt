@@ -42,7 +42,6 @@ import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Videocam
@@ -107,9 +106,9 @@ internal fun ConsultationScreen(
     isConnected: Boolean,
     isUploadingFile: Boolean,
     isCompleted: Boolean = false,
+    canJoinCall: Boolean = false,
     currentUserId: String,
     onBack: () -> Unit,
-    onVoiceCall: () -> Unit,
     onVideoCall: () -> Unit,
     onSendText: (String) -> Unit,
     onSendFile: (String, String, ByteArray) -> Unit,
@@ -186,10 +185,7 @@ internal fun ConsultationScreen(
                     }
                 },
                 actions = {
-                    if (session != null && !isCompleted) {
-                        IconButton(onClick = onVoiceCall) {
-                            Icon(imageVector = Icons.Filled.Phone, contentDescription = "Voice call", tint = Primary40)
-                        }
+                    if (session != null && !isCompleted && canJoinCall) {
                         IconButton(onClick = onVideoCall) {
                             Icon(imageVector = Icons.Filled.Videocam, contentDescription = "Video call", tint = Primary40)
                         }
