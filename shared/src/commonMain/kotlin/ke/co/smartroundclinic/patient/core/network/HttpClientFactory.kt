@@ -4,6 +4,7 @@ import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.HttpRequestRetry
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
@@ -20,6 +21,11 @@ import kotlinx.serialization.json.Json
 
 internal fun buildHttpClient(engine: HttpClientEngine, tokenProvider: () -> String? = { null }): HttpClient = HttpClient(engine) {
     install(WebSockets)
+    install(HttpTimeout) {
+        requestTimeoutMillis = 120_000L
+        connectTimeoutMillis = 120_000L
+        socketTimeoutMillis = 120_000L
+    }
     install(ContentNegotiation) {
         json(Json {
             ignoreUnknownKeys = true

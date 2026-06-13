@@ -35,6 +35,9 @@ class ArticlesViewModel(
     var hasLoaded by mutableStateOf(false)
         private set
 
+    var isRefreshing by mutableStateOf(false)
+        private set
+
     init {
         refresh()
         viewModelScope.launch { getArticleCategoriesUseCase() }
@@ -46,6 +49,14 @@ class ArticlesViewModel(
             getLiveArticlesUseCase()
             isLoading = false
             hasLoaded = true
+        }
+    }
+
+    fun pullRefresh() {
+        viewModelScope.launch {
+            isRefreshing = true
+            getLiveArticlesUseCase(forceRefresh = true)
+            isRefreshing = false
         }
     }
 }

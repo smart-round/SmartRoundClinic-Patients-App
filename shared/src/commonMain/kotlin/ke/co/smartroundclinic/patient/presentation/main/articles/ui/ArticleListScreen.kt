@@ -29,6 +29,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -52,6 +55,8 @@ internal fun ArticleListScreen(
     articles: List<Article>,
     isLoading: Boolean,
     hasLoaded: Boolean,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
     onArticleClick: (Article) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -72,7 +77,21 @@ internal fun ArticleListScreen(
                 EmptyView(modifier = Modifier.fillMaxSize().padding(paddingValues))
             }
             else -> {
-                Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+                val pullState = rememberPullToRefreshState()
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = onRefresh,
+                    state = pullState,
+                    modifier = Modifier.fillMaxSize().padding(paddingValues),
+                    indicator = {
+                        PullToRefreshDefaults.Indicator(
+                            state = pullState,
+                            isRefreshing = isRefreshing,
+                            color = Primary40,
+                            modifier = Modifier.align(Alignment.TopCenter),
+                        )
+                    },
+                ) {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -82,7 +101,7 @@ internal fun ArticleListScreen(
                             ArticleCard(article = article, onClick = { onArticleClick(article) })
                         }
                     }
-                    if (isLoading) {
+                    if (isLoading && !isRefreshing) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                             CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp), color = Primary40)
                         }

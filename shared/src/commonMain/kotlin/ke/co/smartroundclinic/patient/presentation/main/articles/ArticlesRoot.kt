@@ -39,6 +39,8 @@ fun ArticlesRoot(
                     articles = liveArticles,
                     isLoading = viewModel.isLoading,
                     hasLoaded = viewModel.hasLoaded,
+                    isRefreshing = viewModel.isRefreshing,
+                    onRefresh = { viewModel.pullRefresh() },
                     onArticleClick = { article -> backStack.add(ArticleDetail(article.id)) },
                 )
             }
