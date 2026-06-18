@@ -97,10 +97,20 @@ import org.koin.compose.viewmodel.koinViewModel
 fun BookingsRoot(
     modifier: Modifier = Modifier,
     onAtRootChanged: (Boolean) -> Unit = {},
+    pendingAppointmentId: String? = null,
+    onPendingNavigated: () -> Unit = {},
 ) {
     val backStack = retain { mutableStateListOf<NavKey>(BookingsList) }
     val isAtRoot = backStack.size == 1
     SideEffect { onAtRootChanged(isAtRoot) }
+
+    LaunchedEffect(pendingAppointmentId) {
+        if (!pendingAppointmentId.isNullOrBlank()) {
+            backStack.removeAll { it is BookingAppointmentDetail }
+            backStack.add(BookingAppointmentDetail(pendingAppointmentId))
+            onPendingNavigated()
+        }
+    }
 
     val servicesVm: ServicesViewModel = koinViewModel()
 
@@ -126,6 +136,8 @@ fun BookingsRoot(
                         servicesVm.cacheDoctor(doctor)
                         backStack.add(RebookFromBookings(doctor.id, previousAppointmentId))
                     },
+                    onCancel = { id, reason -> servicesVm.cancelAppointment(id, reason) },
+                    isCancelling = servicesVm.isCancelling,
                 )
             }
             entry<RebookFromBookings> { dest ->

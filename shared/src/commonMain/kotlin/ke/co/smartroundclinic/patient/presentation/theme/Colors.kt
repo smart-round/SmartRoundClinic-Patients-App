@@ -86,6 +86,9 @@ val CardAccent = Primary40
 
 val StatusSuccess   = Color(0xFF0CBC2C)
 val StatusPublished = StatusSuccess
+
+val SnackbarSuccess = Color(0xFF0E9800)
+val SnackbarError   = Color(0xFFFF0000)
 val StatusSuspended = Color(0xFFDD2013)
 val StatusPending   = Primary40
 val StatusConfirmed = Tertiary40

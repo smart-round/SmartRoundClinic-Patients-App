@@ -54,7 +54,14 @@ fun ServicesRoot(
                 ServiceCategoriesScreen(
                     specialities = vm.specialities,
                     onSpecialityClick = { speciality ->
-                        backStack.add(DoctorsByCategory(speciality.id, speciality.title))
+                        backStack.add(
+                            DoctorsByCategory(
+                                categoryId = speciality.id,
+                                categoryName = speciality.title,
+                                categoryDescription = speciality.description,
+                                categoryIconUrl = speciality.iconUrl,
+                            ),
+                        )
                     },
                 )
             }
@@ -65,6 +72,8 @@ fun ServicesRoot(
                 }
                 DoctorsByCategoryScreen(
                     categoryName = dest.categoryName,
+                    categoryDescription = dest.categoryDescription,
+                    categoryIconUrl = dest.categoryIconUrl,
                     doctors = vm.specialityDoctors,
                     isLoading = vm.isLoadingDoctors,
                     currentPage = vm.doctorsCurrentPage,
@@ -150,6 +159,8 @@ fun ServicesRoot(
                         vm.cacheDoctor(doctor)
                         backStack.add(BookAppointment(doctor.id, previousAppointmentId))
                     },
+                    onCancel = { id, reason -> vm.cancelAppointment(id, reason) },
+                    isCancelling = vm.isCancelling,
                 )
             }
         },

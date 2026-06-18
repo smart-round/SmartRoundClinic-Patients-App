@@ -17,7 +17,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -35,10 +34,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ke.co.smartroundclinic.patient.presentation.auth.SignInViewModel
 import ke.co.smartroundclinic.patient.presentation.common.composables.PrimaryButton
+import ke.co.smartroundclinic.patient.presentation.theme.ShapeCard
 import ke.co.smartroundclinic.patient.presentation.theme.ShapeInput
 import ke.co.smartroundclinic.patient.presentation.theme.smartRoundColors
 import org.koin.compose.viewmodel.koinViewModel
@@ -62,16 +64,32 @@ fun SignInScreen(
     if (isWrongApp) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissWrongApp() },
-            title = { Text("Wrong App") },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = ShapeCard,
+            title = {
+                Text(
+                    text = "Wrong App",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                )
+            },
             text = {
                 Text(
-                    "This account is registered as a doctor. Please use the SmartRound Clinic Doctor app to sign in.",
+                    text = "This account is registered as a doctor. Please use the SmartRound Clinic Doctor app to sign in.",
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
             confirmButton = {
-                Button(onClick = { viewModel.dismissWrongApp() }) {
-                    Text("OK")
+                PrimaryButton(
+                    onClick = { viewModel.dismissWrongApp() },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = "OK",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White,
+                        modifier = Modifier.padding(vertical = 10.dp),
+                    )
                 }
             },
         )

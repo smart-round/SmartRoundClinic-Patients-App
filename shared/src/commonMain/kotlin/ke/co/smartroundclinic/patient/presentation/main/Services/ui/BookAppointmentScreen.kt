@@ -66,9 +66,12 @@ import androidx.compose.ui.window.DialogProperties
 import ke.co.smartroundclinic.patient.domain.model.CalendarDay
 import ke.co.smartroundclinic.patient.domain.model.CalendarView
 import ke.co.smartroundclinic.patient.domain.model.Doctor
+import ke.co.smartroundclinic.patient.presentation.common.composables.PrimaryButton
 import ke.co.smartroundclinic.patient.presentation.main.Services.StkPushResult
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
+import ke.co.smartroundclinic.patient.presentation.theme.ShapeButton
+import ke.co.smartroundclinic.patient.presentation.theme.ShapeCard
 import ke.co.smartroundclinic.patient.common.todayLocalDate
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.number
@@ -528,17 +531,17 @@ private fun PaymentFailedDialog(
         properties = DialogProperties(dismissOnClickOutside = true),
     ) {
         Card(
-            shape = RoundedCornerShape(24.dp),
+            shape = ShapeCard,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(8.dp),
+            elevation = CardDefaults.cardElevation(0.dp),
         ) {
             Column(
-                modifier = Modifier.padding(32.dp),
+                modifier = Modifier.padding(28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(64.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.errorContainer),
                     contentAlignment = Alignment.Center,
@@ -547,13 +550,13 @@ private fun PaymentFailedDialog(
                         imageVector = Icons.Filled.Close,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(32.dp),
                     )
                 }
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = "Payment Failed",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -564,15 +567,16 @@ private fun PaymentFailedDialog(
                     textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(24.dp))
-                Button(
+                PrimaryButton(
                     onClick = onTryAgain,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                    ),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = ShapeButton,
                 ) {
-                    Text("Try Again")
+                    Text(
+                        text = "Try Again",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White,
+                    )
                 }
             }
         }

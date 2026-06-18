@@ -13,6 +13,7 @@ import ke.co.smartroundclinic.patient.domain.model.CalendarView
 import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.domain.model.Speciality
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.BookAppointmentUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.appointment.CancelAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.availability.GetAvailableSlotsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.availability.GetCalendarViewUseCase
@@ -38,6 +39,7 @@ class ServicesViewModel(
     private val getCalendarViewUseCase: GetCalendarViewUseCase,
     private val getAvailableSlotsUseCase: GetAvailableSlotsUseCase,
     private val bookAppointmentUseCase: BookAppointmentUseCase,
+    private val cancelAppointmentUseCase: CancelAppointmentUseCase,
     private val getAppointmentUseCase: GetAppointmentUseCase,
     private val stkPushPreBookingUseCase: StkPushPreBookingUseCase,
     private val getStkPushStatusUseCase: GetStkPushStatusUseCase,
@@ -105,6 +107,9 @@ class ServicesViewModel(
         private set
 
     var appointmentDetail by mutableStateOf<Appointment?>(null)
+        private set
+
+    var isCancelling by mutableStateOf(false)
         private set
 
     init {
@@ -297,6 +302,21 @@ class ServicesViewModel(
     fun clearBookingState() {
         bookedAppointment = null
         bookingError = null
+    }
+
+    fun cancelAppointment(id: String, reason: String?) {
+        viewModelScope.launch {
+            isCancelling = true
+            when (val result = cancelAppointmentUseCase(id, reason)) {
+                is Resource.Success -> {
+                    appointmentDetail = result.data
+                    snackbarController.show("Appointment cancelled")
+                }
+                is Resource.Error -> snackbarController.show(result.message ?: "Failed to cancel appointment", isError = true)
+                else -> {}
+            }
+            isCancelling = false
+        }
     }
 
     fun loadAppointmentDetail(id: String) {

@@ -1,6 +1,7 @@
 package ke.co.smartroundclinic.patient.presentation.main.Services.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,13 +28,22 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,18 +56,23 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import ke.co.smartroundclinic.patient.domain.model.Appointment
 import ke.co.smartroundclinic.patient.domain.model.Doctor
+import ke.co.smartroundclinic.patient.presentation.common.composables.PrimaryButton
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
+import ke.co.smartroundclinic.patient.presentation.theme.ShapeButton
+import ke.co.smartroundclinic.patient.presentation.theme.ShapeCard
 import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
 import ke.co.smartroundclinic.patient.presentation.theme.StatusSuccess
 import ke.co.smartroundclinic.patient.presentation.theme.StatusPending
+import ke.co.smartroundclinic.patient.presentation.theme.SnackbarError
 import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
 import ke.co.smartroundclinic.patient.common.todayLocalDate
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.until
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppointmentDetailsScreen(
     appointmentId: String,
@@ -66,9 +81,90 @@ fun AppointmentDetailsScreen(
     onLoad: (String) -> Unit,
     onBack: () -> Unit,
     onRebook: ((doctor: Doctor, previousAppointmentId: String) -> Unit)? = null,
+    onCancel: ((id: String, reason: String?) -> Unit)? = null,
+    isCancelling: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(appointmentId) { onLoad(appointmentId) }
+
+    var showCancelSheet by remember { mutableStateOf(false) }
+    var cancelReason by remember { mutableStateOf("") }
+    val cancelSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    if (showCancelSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { if (!isCancelling) showCancelSheet = false },
+            sheetState = cancelSheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 8.dp)
+                    .navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    text = "Cancel Appointment",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                )
+                Text(
+                    text = "Are you sure you want to cancel this appointment? This action cannot be undone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = cancelReason,
+                    onValueChange = { cancelReason = it },
+                    label = { Text("Reason (optional)") },
+                    placeholder = { Text("Enter a reason…") },
+                    minLines = 3,
+                    maxLines = 5,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = ShapeCard,
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .clip(ShapeButton)
+                        .background(SnackbarError)
+                        .then(
+                            if (!isCancelling)
+                                Modifier.clickable {
+                                    onCancel?.invoke(appointmentId, cancelReason.ifBlank { null })
+                                    showCancelSheet = false
+                                }
+                            else Modifier,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isCancelling) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(
+                            text = "Yes, Cancel",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = Color.White,
+                        )
+                    }
+                }
+                TextButton(
+                    onClick = { showCancelSheet = false },
+                    enabled = !isCancelling,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = "Keep Appointment",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         // Header
@@ -247,6 +343,30 @@ fun AppointmentDetailsScreen(
                         text = "Rebook Follow-Up",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     )
+                }
+            }
+
+            // Cancel button — hide for terminal statuses and past appointments
+            val appointmentDate = runCatching { LocalDate.parse(appointment.date.take(10)) }.getOrNull()
+            val canCancel = onCancel != null &&
+                appointment.status.lowercase() !in setOf("no_show", "completed", "cancelled") &&
+                appointmentDate != null && appointmentDate >= todayLocalDate()
+            if (canCancel) {
+                Button(
+                    onClick = { showCancelSheet = true },
+                    enabled = !isCancelling,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SnackbarError),
+                ) {
+                    if (isCancelling) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(
+                            text = "Cancel Appointment",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        )
+                    }
                 }
             }
 

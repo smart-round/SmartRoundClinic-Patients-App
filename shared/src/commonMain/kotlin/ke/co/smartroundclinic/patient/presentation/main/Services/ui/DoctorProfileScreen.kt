@@ -26,8 +26,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.WorkHistory
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -123,20 +121,22 @@ fun DoctorProfileScreen(
             }
         }
 
-        Button(
-            onClick = onBookNow,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
-                .height(52.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                .height(52.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Brush.horizontalGradient(listOf(GradientStart, GradientEnd)))
+                .clickable(onClick = onBookNow),
+            contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = "Book Now",
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = Color.White,
             )
         }
     }
@@ -154,6 +154,7 @@ private fun DoctorProfileHeader(doctor: Doctor, onBack: () -> Unit) {
                 model = doctor.profilePicture,
                 contentDescription = doctor.name,
                 contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {

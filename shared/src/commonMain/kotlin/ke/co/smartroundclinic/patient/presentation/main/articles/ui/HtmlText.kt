@@ -141,3 +141,11 @@ private fun String.decodeHtmlEntities() = replace("&amp;", "&")
     .replace("&apos;", "'")
     .replace("&nbsp;", " ")
     .replace("&#39;", "'")
+    .replace("&period;", ".")
+    .replace("&comma;", ",")
+    .replace("&colon;", ":")
+    .replace("&semi;", ";")
+    .replace("&excl;", "!")
+    .replace("&quest;", "?")
+    .replace(Regex("&#(\\d+);")) { it.groupValues[1].toIntOrNull()?.toChar()?.toString() ?: it.value }
+    .replace(Regex("&#x([0-9a-fA-F]+);")) { it.groupValues[1].toIntOrNull(16)?.toChar()?.toString() ?: it.value }
