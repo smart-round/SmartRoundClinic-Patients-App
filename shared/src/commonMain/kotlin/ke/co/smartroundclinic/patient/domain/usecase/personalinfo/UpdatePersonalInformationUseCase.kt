@@ -8,9 +8,9 @@ import ke.co.smartroundclinic.patient.domain.repository.PersonalInformationRepos
 class UpdatePersonalInformationUseCase(private val repository: PersonalInformationRepository) {
     suspend operator fun invoke(
         weight: Double? = null,
-        weightUnit: String? = null,
+        weightIn: String? = null,
         height: Double? = null,
-        heightUnit: String? = null,
+        heightIn: String? = null,
         bloodGroup: String? = null,
         maritalStatus: String? = null,
         allergies: List<String>? = null,
@@ -19,9 +19,9 @@ class UpdatePersonalInformationUseCase(private val repository: PersonalInformati
     ): Resource<PersonalInformation?> =
         when (val result = repository.update(
             weight = weight,
-            weightUnit = weightUnit,
+            weightIn = weightIn,
             height = height,
-            heightUnit = heightUnit,
+            heightIn = heightIn,
             bloodGroup = bloodGroup,
             maritalStatus = maritalStatus,
             allergies = allergies,

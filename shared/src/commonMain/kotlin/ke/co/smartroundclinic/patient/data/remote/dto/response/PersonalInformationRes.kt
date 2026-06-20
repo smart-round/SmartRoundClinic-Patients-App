@@ -6,9 +6,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class PersonalInformationData(
     val weight: Double? = null,
-    val weightUnit: String? = null,
+    val weightIn: String? = null,
     val height: Double? = null,
-    val heightUnit: String? = null,
+    val heightIn: String? = null,
     val bloodGroup: String? = null,
     val maritalStatus: String? = null,
     val allergies: List<String> = emptyList(),
@@ -26,9 +26,9 @@ data class PersonalInformationResponse(
 
 fun PersonalInformationData.toDomain() = PersonalInformation(
     weight = weight,
-    weightUnit = weightUnit,
+    weightIn = weightIn,
     height = height,
-    heightUnit = heightUnit,
+    heightIn = heightIn,
     bloodGroup = bloodGroup,
     maritalStatus = maritalStatus,
     allergies = allergies,

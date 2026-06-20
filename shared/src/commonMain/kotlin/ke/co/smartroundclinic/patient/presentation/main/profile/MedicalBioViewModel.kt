@@ -19,9 +19,9 @@ class MedicalBioViewModel(
 ) : ViewModel() {
 
     var weight by mutableStateOf("")
-    var weightUnit by mutableStateOf("KG")
+    var weightIn by mutableStateOf("KG")
     var height by mutableStateOf("")
-    var heightUnit by mutableStateOf("CM")
+    var heightIn by mutableStateOf("CM")
     var bloodGroup by mutableStateOf("")
     var maritalStatus by mutableStateOf("")
 
@@ -48,9 +48,9 @@ class MedicalBioViewModel(
                     val data = result.data
                     if (data != null) {
                         weight = data.weight?.toString() ?: ""
-                        weightUnit = data.weightUnit ?: "KG"
+                        weightIn = data.weightIn ?: "KG"
                         height = data.height?.toString() ?: ""
-                        heightUnit = data.heightUnit ?: "CM"
+                        heightIn = data.heightIn ?: "CM"
                         bloodGroup = data.bloodGroup ?: ""
                         maritalStatus = data.maritalStatus ?: ""
                         allergies.clear()
@@ -95,9 +95,9 @@ class MedicalBioViewModel(
             saveSuccess = false
             when (val result = updatePersonalInformationUseCase(
                 weight = weight.toDoubleOrNull(),
-                weightUnit = weightUnit.ifBlank { null },
+                weightIn = weightIn.ifBlank { null },
                 height = height.toDoubleOrNull(),
-                heightUnit = heightUnit.ifBlank { null },
+                heightIn = heightIn.ifBlank { null },
                 bloodGroup = bloodGroup.ifBlank { null },
                 maritalStatus = maritalStatus.ifBlank { null },
                 allergies = allergies.toList(),

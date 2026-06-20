@@ -5,9 +5,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class UpdatePersonalInformationReq(
     val weight: Double? = null,
-    val weightUnit: String? = null,
+    val weightIn: String? = null,
     val height: Double? = null,
-    val heightUnit: String? = null,
+    val heightIn: String? = null,
     val bloodGroup: String? = null,
     val maritalStatus: String? = null,
     val allergies: List<String>? = null,

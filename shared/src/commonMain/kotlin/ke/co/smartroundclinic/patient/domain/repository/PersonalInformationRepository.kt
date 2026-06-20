@@ -7,9 +7,9 @@ interface PersonalInformationRepository {
     suspend fun get(): Resource<PersonalInformationResponse>
     suspend fun update(
         weight: Double? = null,
-        weightUnit: String? = null,
+        weightIn: String? = null,
         height: Double? = null,
-        heightUnit: String? = null,
+        heightIn: String? = null,
         bloodGroup: String? = null,
         maritalStatus: String? = null,
         allergies: List<String>? = null,

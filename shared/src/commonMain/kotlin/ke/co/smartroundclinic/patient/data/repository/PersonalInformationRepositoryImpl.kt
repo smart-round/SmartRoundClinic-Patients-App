@@ -28,9 +28,9 @@ class PersonalInformationRepositoryImpl(private val client: HttpClient) : Person
 
     override suspend fun update(
         weight: Double?,
-        weightUnit: String?,
+        weightIn: String?,
         height: Double?,
-        heightUnit: String?,
+        heightIn: String?,
         bloodGroup: String?,
         maritalStatus: String?,
         allergies: List<String>?,
@@ -43,9 +43,9 @@ class PersonalInformationRepositoryImpl(private val client: HttpClient) : Person
                     setBody(
                         UpdatePersonalInformationReq(
                             weight = weight,
-                            weightUnit = weightUnit,
+                            weightIn = weightIn,
                             height = height,
-                            heightUnit = heightUnit,
+                            heightIn = heightIn,
                             bloodGroup = bloodGroup,
                             maritalStatus = maritalStatus,
                             allergies = allergies,
