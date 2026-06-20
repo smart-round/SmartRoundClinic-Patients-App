@@ -12,6 +12,7 @@ import ke.co.smartroundclinic.patient.domain.model.Article
 import ke.co.smartroundclinic.patient.domain.model.CalendarView
 import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.domain.model.Speciality
+import ke.co.smartroundclinic.patient.domain.model.MedicalRecord
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.BookAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.CancelAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetAppointmentUseCase
@@ -19,6 +20,7 @@ import ke.co.smartroundclinic.patient.domain.usecase.availability.GetAvailableSl
 import ke.co.smartroundclinic.patient.domain.usecase.availability.GetCalendarViewUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorsBySpecializationUseCase
 import ke.co.smartroundclinic.patient.core.snackbar.SnackbarController
+import ke.co.smartroundclinic.patient.domain.usecase.medicalrecord.GetMedicalRecordUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.payments.GetStkPushStatusUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.payments.StkPushPreBookingUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.speciality.GetSpecialitiesUseCase
@@ -43,6 +45,7 @@ class ServicesViewModel(
     private val getAppointmentUseCase: GetAppointmentUseCase,
     private val stkPushPreBookingUseCase: StkPushPreBookingUseCase,
     private val getStkPushStatusUseCase: GetStkPushStatusUseCase,
+    private val getMedicalRecordUseCase: GetMedicalRecordUseCase,
     private val snackbarController: SnackbarController,
 ) : ViewModel() {
 
@@ -110,6 +113,11 @@ class ServicesViewModel(
         private set
 
     var isCancelling by mutableStateOf(false)
+        private set
+
+    var medicalRecord by mutableStateOf<MedicalRecord?>(null)
+        private set
+    var isLoadingMedicalRecord by mutableStateOf(false)
         private set
 
     init {
@@ -325,6 +333,19 @@ class ServicesViewModel(
                 is Resource.Success -> appointmentDetail = result.data
                 else -> {}
             }
+        }
+        loadMedicalRecord(id)
+    }
+
+    private fun loadMedicalRecord(appointmentId: String) {
+        viewModelScope.launch {
+            isLoadingMedicalRecord = true
+            medicalRecord = null
+            when (val result = getMedicalRecordUseCase(appointmentId)) {
+                is Resource.Success -> medicalRecord = result.data
+                else -> {}
+            }
+            isLoadingMedicalRecord = false
         }
     }
 

@@ -13,3 +13,5 @@ import kotlinx.serialization.Serializable
 @Serializable data object Faqs : NavKey
 @Serializable data object TermsAndConditions : NavKey
 @Serializable data object ContactSupport : NavKey
+@Serializable data object MedicalBio : NavKey
+@Serializable data object MedicalHistory : NavKey

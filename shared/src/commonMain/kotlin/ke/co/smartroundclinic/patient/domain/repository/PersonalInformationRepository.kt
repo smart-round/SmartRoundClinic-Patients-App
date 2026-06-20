@@ -1,0 +1,19 @@
+package ke.co.smartroundclinic.patient.domain.repository
+
+import ke.co.smartroundclinic.patient.common.Resource
+import ke.co.smartroundclinic.patient.data.remote.dto.response.PersonalInformationResponse
+
+interface PersonalInformationRepository {
+    suspend fun get(): Resource<PersonalInformationResponse>
+    suspend fun update(
+        weight: Double? = null,
+        weightUnit: String? = null,
+        height: Double? = null,
+        heightUnit: String? = null,
+        bloodGroup: String? = null,
+        maritalStatus: String? = null,
+        allergies: List<String>? = null,
+        chronicConditions: List<String>? = null,
+        currentMedications: List<String>? = null,
+    ): Resource<PersonalInformationResponse>
+}

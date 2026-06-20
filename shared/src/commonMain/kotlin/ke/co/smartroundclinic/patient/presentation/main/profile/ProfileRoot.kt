@@ -1,6 +1,7 @@
 package ke.co.smartroundclinic.patient.presentation.main.profile
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.retain.retain
@@ -8,10 +9,13 @@ import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import androidx.compose.material3.ExperimentalMaterial3Api
 import ke.co.smartroundclinic.patient.presentation.auth.ForgotPasswordViewModel
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.ContactSupport
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.CreateNewPassword
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.Faqs
+import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.MedicalBio
+import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.MedicalHistory
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.PasswordChanged
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.PersonalInfo
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.ProfileList
@@ -20,6 +24,8 @@ import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.Ter
 import ke.co.smartroundclinic.patient.presentation.main.profile.destinations.VerifyEmailSecurity
 import ke.co.smartroundclinic.patient.presentation.main.profile.ui.CreateNewPasswordScreen
 import ke.co.smartroundclinic.patient.presentation.main.profile.ui.FaqsScreen
+import ke.co.smartroundclinic.patient.presentation.main.profile.ui.MedicalBioScreen
+import ke.co.smartroundclinic.patient.presentation.main.profile.ui.MedicalHistoryScreen
 import ke.co.smartroundclinic.patient.presentation.main.profile.ui.PasswordChangedScreen
 import ke.co.smartroundclinic.patient.presentation.main.profile.ui.PersonalInfoScreen
 import ke.co.smartroundclinic.patient.presentation.main.profile.ui.ProfileScreen
@@ -31,12 +37,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import org.koin.compose.viewmodel.koinViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileRoot(
     modifier: Modifier = Modifier,
     onAtRootChanged: (Boolean) -> Unit = {},
     onSignOut: () -> Unit = {},
     onExitProfile: (() -> Unit)? = null,
+    pendingSupportTicketId: String? = null,
+    onPendingSupportTicketNavigated: () -> Unit = {},
 ) {
     val backStack = retain { mutableStateListOf<NavKey>(ProfileList) }
     val isAtRoot = backStack.size == 1
@@ -45,6 +54,12 @@ fun ProfileRoot(
     val user by profileViewModel.user.collectAsState()
 
     SideEffect { onAtRootChanged(isAtRoot) }
+
+    LaunchedEffect(pendingSupportTicketId) {
+        if (!pendingSupportTicketId.isNullOrBlank()) {
+            if (backStack.none { it is ContactSupport }) backStack.add(ContactSupport)
+        }
+    }
 
     NavDisplay(
         modifier = modifier,
@@ -57,6 +72,8 @@ fun ProfileRoot(
             entry<ProfileList> {
                 ProfileScreen(
                     onPersonalInfo = { backStack.add(PersonalInfo) },
+                    onMedicalInfo = { backStack.add(MedicalBio) },
+                    onMedicalHistory = { backStack.add(MedicalHistory) },
                     onSecuritySettings = { backStack.add(ResetPassword) },
                     onSupport = { backStack.add(ContactSupport) },
                     onFaqs = { backStack.add(Faqs) },
@@ -101,6 +118,8 @@ fun ProfileRoot(
                 SupportRoot(
                     user = user,
                     onBack = { backStack.removeLastOrNull() },
+                    pendingTicketId = pendingSupportTicketId,
+                    onPendingNavigated = onPendingSupportTicketNavigated,
                 )
             }
             entry<Faqs> {
@@ -108,6 +127,21 @@ fun ProfileRoot(
             }
             entry<TermsAndConditions> {
                 TermsAndConditionsScreen(onBack = { backStack.removeLastOrNull() })
+            }
+            entry<MedicalBio> {
+                val medicalBioViewModel: MedicalBioViewModel = koinViewModel()
+                MedicalBioScreen(
+                    viewModel = medicalBioViewModel,
+                    onBack = { backStack.removeLastOrNull() },
+                )
+            }
+            entry<MedicalHistory> {
+                val medicalHistoryViewModel: MedicalHistoryViewModel = koinViewModel()
+                MedicalHistoryScreen(
+                    records = medicalHistoryViewModel.records,
+                    isLoading = medicalHistoryViewModel.isLoading,
+                    onBack = { backStack.removeLastOrNull() },
+                )
             }
         },
     )

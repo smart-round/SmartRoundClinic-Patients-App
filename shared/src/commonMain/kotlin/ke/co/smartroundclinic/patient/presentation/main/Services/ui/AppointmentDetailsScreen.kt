@@ -56,8 +56,13 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import ke.co.smartroundclinic.patient.domain.model.Appointment
 import ke.co.smartroundclinic.patient.domain.model.Doctor
+import ke.co.smartroundclinic.patient.domain.model.MedicalRecord
+import ke.co.smartroundclinic.patient.domain.model.PrescriptionItem
 import ke.co.smartroundclinic.patient.presentation.common.composables.PrimaryButton
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
+import ke.co.smartroundclinic.patient.presentation.theme.Primary40
+import ke.co.smartroundclinic.patient.presentation.theme.Primary90
+import ke.co.smartroundclinic.patient.presentation.theme.Tertiary40
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
 import ke.co.smartroundclinic.patient.presentation.theme.ShapeButton
@@ -78,6 +83,8 @@ fun AppointmentDetailsScreen(
     appointmentId: String,
     appointment: Appointment?,
     doctor: Doctor?,
+    medicalRecord: MedicalRecord? = null,
+    isLoadingMedicalRecord: Boolean = false,
     onLoad: (String) -> Unit,
     onBack: () -> Unit,
     onRebook: ((doctor: Doctor, previousAppointmentId: String) -> Unit)? = null,
@@ -308,6 +315,12 @@ fun AppointmentDetailsScreen(
                 }
             }
 
+            // Prescription & Notes
+            PrescriptionSection(
+                medicalRecord = medicalRecord,
+                isLoading = isLoadingMedicalRecord,
+            )
+
             // Rebook button — only for COMPLETED appointments within the same calendar month
             val canRebook = appointment.status.lowercase() == "completed" &&
                 onRebook != null &&
@@ -371,6 +384,162 @@ fun AppointmentDetailsScreen(
             }
 
             Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun PrescriptionSection(
+    medicalRecord: MedicalRecord?,
+    isLoading: Boolean,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        elevation = CardDefaults.cardElevation(2.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Prescription & Notes",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(10.dp))
+
+            when {
+                isLoading -> {
+                    Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Primary40, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    }
+                }
+                medicalRecord == null -> {
+                    Text(
+                        text = "No prescription added yet",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                else -> {
+                    if (!medicalRecord.diagnosis.isNullOrBlank()) {
+                        Text(
+                            text = "Diagnosis",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = medicalRecord.diagnosis,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                    }
+
+                    if (medicalRecord.prescription.isNotEmpty()) {
+                        Text(
+                            text = "Prescription",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = Primary40,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        medicalRecord.prescription.forEach { item ->
+                            PrescriptionItemRow(item)
+                            Spacer(Modifier.height(6.dp))
+                        }
+                    }
+
+                    if (!medicalRecord.summary.isNullOrBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Summary",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = medicalRecord.summary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+
+                    if (!medicalRecord.referralNote.isNullOrBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "Referral",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = medicalRecord.referralNote,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+
+                    if (!medicalRecord.additionalNotes.isNullOrBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "Additional Notes",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = medicalRecord.additionalNotes,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+
+                    if (medicalRecord.labRequests.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "Lab Requests",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        medicalRecord.labRequests.forEach { lab ->
+                            Text(
+                                text = "• $lab",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrescriptionItemRow(item: PrescriptionItem) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Primary90, RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = item.drug,
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = "${item.dosage} • ${item.frequency} • ${item.duration}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!item.instructions.isNullOrBlank()) {
+            Text(
+                text = item.instructions,
+                style = MaterialTheme.typography.labelSmall,
+                color = Tertiary40,
+            )
         }
     }
 }

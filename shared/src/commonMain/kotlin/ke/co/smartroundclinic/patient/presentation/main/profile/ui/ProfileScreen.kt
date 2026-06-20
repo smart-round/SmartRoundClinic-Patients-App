@@ -24,6 +24,8 @@ import androidx.compose.material.icons.automirrored.outlined.ExitToApp
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Gavel
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.LocalHospital
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.QuestionAnswer
@@ -58,6 +60,8 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun ProfileScreen(
     onPersonalInfo: () -> Unit = {},
+    onMedicalInfo: () -> Unit = {},
+    onMedicalHistory: () -> Unit = {},
     onSecuritySettings: () -> Unit = {},
     onSupport: () -> Unit = {},
     onFaqs: () -> Unit = {},
@@ -157,6 +161,18 @@ fun ProfileScreen(
                     icon = Icons.Outlined.Person,
                     label = "Personal Information",
                     onClick = onPersonalInfo,
+                )
+                MenuDivider()
+                ProfileMenuItem(
+                    icon = Icons.Outlined.LocalHospital,
+                    label = "Medical Information",
+                    onClick = onMedicalInfo,
+                )
+                MenuDivider()
+                ProfileMenuItem(
+                    icon = Icons.Outlined.History,
+                    label = "Medical History",
+                    onClick = onMedicalHistory,
                 )
                 MenuDivider()
                 ProfileMenuItem(

@@ -50,9 +50,15 @@ import ke.co.smartroundclinic.patient.domain.usecase.speciality.GetSpecialitiesU
 import ke.co.smartroundclinic.patient.domain.usecase.speciality.GetSpecialityPricingUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.datastore.ObserveKeyUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.datastore.SetKeyUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.medicalrecord.GetMedicalRecordUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.medicalrecord.GetMyMedicalHistoryUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.personalinfo.GetPersonalInformationUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.personalinfo.UpdatePersonalInformationUseCase
 import ke.co.smartroundclinic.patient.presentation.auth.ForgotPasswordViewModel
 import ke.co.smartroundclinic.patient.presentation.auth.SignInViewModel
 import ke.co.smartroundclinic.patient.presentation.main.articles.ArticlesViewModel
+import ke.co.smartroundclinic.patient.presentation.main.profile.MedicalBioViewModel
+import ke.co.smartroundclinic.patient.presentation.main.profile.MedicalHistoryViewModel
 import ke.co.smartroundclinic.patient.presentation.main.profile.ProfileViewModel
 import ke.co.smartroundclinic.patient.presentation.main.Services.DoctorsProfileViewModel
 import ke.co.smartroundclinic.patient.presentation.main.Services.ServicesViewModel
@@ -140,9 +146,19 @@ val useCaseModule = module {
     viewModel { HomeViewModel(get(), get(), get(), get()) }
     viewModel { ProfileViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { DoctorsProfileViewModel(get(), get(), get()) }
-    viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ConsultationViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get()) }
+    viewModel { MedicalBioViewModel(get(), get(), get()) }
+    viewModel { MedicalHistoryViewModel(get()) }
+
+    // Medical record use cases
+    single { GetMedicalRecordUseCase(get()) }
+    single { GetMyMedicalHistoryUseCase(get()) }
+
+    // Personal information use cases
+    single { GetPersonalInformationUseCase(get()) }
+    single { UpdatePersonalInformationUseCase(get()) }
 
     // Support use cases + ViewModels
     single { GetIssueCategoriesUseCase(get()) }
