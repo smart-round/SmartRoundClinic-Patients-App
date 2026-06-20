@@ -123,7 +123,7 @@ fun MedicalBioScreen(
                 ) {
                     OutlinedTextField(
                         value = viewModel.weight,
-                        onValueChange = { viewModel.setWeight(it) },
+                        onValueChange = { viewModel.weight = it },
                         label = { Text("Weight", style = MaterialTheme.typography.bodySmall) },
                         shape = ShapeInput,
                         singleLine = true,
@@ -133,7 +133,7 @@ fun MedicalBioScreen(
                     UnitToggle(
                         options = weightUnits,
                         selected = viewModel.weightUnit,
-                        onSelect = { viewModel.setWeightUnit(it) },
+                        onSelect = { viewModel.weightUnit = it },
                     )
                 }
                 Spacer(Modifier.height(12.dp))
@@ -143,7 +143,7 @@ fun MedicalBioScreen(
                 ) {
                     OutlinedTextField(
                         value = viewModel.height,
-                        onValueChange = { viewModel.setHeight(it) },
+                        onValueChange = { viewModel.height = it },
                         label = { Text("Height", style = MaterialTheme.typography.bodySmall) },
                         shape = ShapeInput,
                         singleLine = true,
@@ -153,7 +153,7 @@ fun MedicalBioScreen(
                     UnitToggle(
                         options = heightUnits,
                         selected = viewModel.heightUnit,
-                        onSelect = { viewModel.setHeightUnit(it) },
+                        onSelect = { viewModel.heightUnit = it },
                     )
                 }
                 Spacer(Modifier.height(12.dp))
@@ -180,7 +180,7 @@ fun MedicalBioScreen(
                             DropdownMenuItem(
                                 colors = MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.onBackground),
                                 text = { Text(bg) },
-                                onClick = { viewModel.setBloodGroup(bg); bloodGroupExpanded = false },
+                                onClick = { viewModel.bloodGroup = bg; bloodGroupExpanded = false },
                             )
                         }
                     }
@@ -195,7 +195,7 @@ fun MedicalBioScreen(
                     maritalStatuses.forEach { status ->
                         FilterChip(
                             selected = viewModel.maritalStatus == status,
-                            onClick = { viewModel.setMaritalStatus(status) },
+                            onClick = { viewModel.maritalStatus = status },
                             label = {
                                 Text(
                                     text = status.replaceFirstChar { it.uppercase() }.lowercase().replaceFirstChar { it.uppercase() },

@@ -19,17 +19,11 @@ class MedicalBioViewModel(
 ) : ViewModel() {
 
     var weight by mutableStateOf("")
-        private set
     var weightUnit by mutableStateOf("KG")
-        private set
     var height by mutableStateOf("")
-        private set
     var heightUnit by mutableStateOf("CM")
-        private set
     var bloodGroup by mutableStateOf("")
-        private set
     var maritalStatus by mutableStateOf("")
-        private set
 
     val allergies = mutableStateListOf<String>()
     val chronicConditions = mutableStateListOf<String>()
@@ -73,13 +67,6 @@ class MedicalBioViewModel(
             isLoading = false
         }
     }
-
-    fun setWeight(value: String) { weight = value }
-    fun setWeightUnit(value: String) { weightUnit = value }
-    fun setHeight(value: String) { height = value }
-    fun setHeightUnit(value: String) { heightUnit = value }
-    fun setBloodGroup(value: String) { bloodGroup = value }
-    fun setMaritalStatus(value: String) { maritalStatus = value }
 
     fun addAllergy(value: String) {
         val trimmed = value.trim()
