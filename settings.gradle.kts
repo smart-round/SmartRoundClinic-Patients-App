@@ -1,4 +1,5 @@
 rootProject.name = "SmartRoundClinicPatient"
+rootProject.projectDir = rootProject.projectDir.canonicalFile
 
 pluginManagement {
     repositories {
