@@ -46,6 +46,8 @@ fun ProfileRoot(
     onExitProfile: (() -> Unit)? = null,
     pendingSupportTicketId: String? = null,
     onPendingSupportTicketNavigated: () -> Unit = {},
+    pendingMedicalHistory: Boolean = false,
+    onPendingMedicalHistoryNavigated: () -> Unit = {},
 ) {
     val backStack = retain { mutableStateListOf<NavKey>(ProfileList) }
     val isAtRoot = backStack.size == 1
@@ -58,6 +60,13 @@ fun ProfileRoot(
     LaunchedEffect(pendingSupportTicketId) {
         if (!pendingSupportTicketId.isNullOrBlank()) {
             if (backStack.none { it is ContactSupport }) backStack.add(ContactSupport)
+        }
+    }
+
+    LaunchedEffect(pendingMedicalHistory) {
+        if (pendingMedicalHistory) {
+            if (backStack.none { it is MedicalHistory }) backStack.add(MedicalHistory)
+            onPendingMedicalHistoryNavigated()
         }
     }
 

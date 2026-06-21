@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -42,9 +43,12 @@ import ke.co.smartroundclinic.patient.generated.resources.bottom_bar_group
 import ke.co.smartroundclinic.patient.generated.resources.bottom_bar_home
 import ke.co.smartroundclinic.patient.generated.resources.bottom_bar_layers
 import ke.co.smartroundclinic.patient.generated.resources.bottom_bar_vector
+import ke.co.smartroundclinic.patient.core.notification.NotificationDeepLink
+import ke.co.smartroundclinic.patient.core.notification.NotificationEvent
 import ke.co.smartroundclinic.patient.presentation.main.articles.ArticlesRoot
 import ke.co.smartroundclinic.patient.presentation.main.bookings.BookingsRoot
 import ke.co.smartroundclinic.patient.presentation.main.chat.ChatRoot
+import ke.co.smartroundclinic.patient.presentation.main.chat.destinations.ConsultationChat
 import ke.co.smartroundclinic.patient.presentation.main.destinations.Appointments
 import ke.co.smartroundclinic.patient.presentation.main.destinations.Articles
 import ke.co.smartroundclinic.patient.presentation.main.destinations.Bookings
@@ -52,6 +56,7 @@ import ke.co.smartroundclinic.patient.presentation.main.destinations.Doctors
 import ke.co.smartroundclinic.patient.presentation.main.destinations.Home
 import ke.co.smartroundclinic.patient.presentation.main.Services.ServicesRoot
 import ke.co.smartroundclinic.patient.presentation.main.home.HomeRoot
+import ke.co.smartroundclinic.patient.presentation.main.home.destinations.Notifications
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -75,12 +80,46 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
     val currentTab = backStack.lastOrNull() ?: Home
 
     var isAtRoot by remember { mutableStateOf(true) }
+    var pendingHomeDestinations by remember { mutableStateOf<List<NavKey>>(emptyList()) }
+    var pendingBookingAppointmentId by remember { mutableStateOf<String?>(null) }
+    var pendingConsultation by remember { mutableStateOf<ConsultationChat?>(null) }
+    var pendingSupportTicketId by remember { mutableStateOf<String?>(null) }
+    var pendingMedicalHistory by remember { mutableStateOf(false) }
 
     fun selectTab(dest: NavKey) {
         if (currentTab != dest) {
             backStack.clear()
             backStack.add(dest)
             isAtRoot = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        NotificationDeepLink.pendingEvent.collect { event ->
+            if (event == null) return@collect
+            NotificationDeepLink.consume()
+            when (event) {
+                is NotificationEvent.ToNotifications -> {
+                    selectTab(Home)
+                    pendingHomeDestinations = listOf(Notifications)
+                }
+                is NotificationEvent.ToAppointmentDetail -> {
+                    selectTab(Bookings)
+                    pendingBookingAppointmentId = event.appointmentId
+                }
+                is NotificationEvent.ToConsultationChat -> {
+                    selectTab(Appointments)
+                    pendingConsultation = ConsultationChat(event.appointmentId, event.doctorName)
+                }
+                is NotificationEvent.ToSupportTicket -> {
+                    selectTab(Home)
+                    pendingSupportTicketId = event.ticketId
+                }
+                is NotificationEvent.ToMedicalHistory -> {
+                    selectTab(Home)
+                    pendingMedicalHistory = true
+                }
+            }
         }
     }
 
@@ -107,12 +146,30 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
                         onAtRootChanged = { isAtRoot = it },
                         onSignOut = onSignOut,
                         onNavigateToServices = { selectTab(Doctors) },
+                        pendingDestinations = pendingHomeDestinations,
+                        onPendingNavigated = { pendingHomeDestinations = emptyList() },
+                        pendingSupportTicketId = pendingSupportTicketId,
+                        onPendingSupportTicketNavigated = { pendingSupportTicketId = null },
+                        pendingMedicalHistory = pendingMedicalHistory,
+                        onPendingMedicalHistoryNavigated = { pendingMedicalHistory = false },
                     )
                 }
-                entry<Appointments> { ChatRoot(onAtRootChanged = { isAtRoot = it }) }
+                entry<Appointments> {
+                    ChatRoot(
+                        onAtRootChanged = { isAtRoot = it },
+                        pendingConversation = pendingConsultation,
+                        onPendingNavigated = { pendingConsultation = null },
+                    )
+                }
                 entry<Doctors> { ServicesRoot(onAtRootChanged = { isAtRoot = it }) }
                 entry<Articles> { ArticlesRoot(onAtRootChanged = { isAtRoot = it }) }
-                entry<Bookings> { BookingsRoot(onAtRootChanged = { isAtRoot = it }) }
+                entry<Bookings> {
+                    BookingsRoot(
+                        onAtRootChanged = { isAtRoot = it },
+                        pendingAppointmentId = pendingBookingAppointmentId,
+                        onPendingNavigated = { pendingBookingAppointmentId = null },
+                    )
+                }
             },
         )
     }

@@ -21,7 +21,6 @@ import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeBo
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeDoctorArticleDetail
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeDoctorProfile
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeDoctorsBySpeciality
-import ke.co.smartroundclinic.patient.core.notification.NotificationDeepLink
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.HomeScreen
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.Notifications
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.UserProfile
@@ -38,6 +37,12 @@ fun HomeRoot(
     onAtRootChanged: (Boolean) -> Unit = {},
     onSignOut: () -> Unit = {},
     onNavigateToServices: () -> Unit = {},
+    pendingDestinations: List<NavKey> = emptyList(),
+    onPendingNavigated: () -> Unit = {},
+    pendingSupportTicketId: String? = null,
+    onPendingSupportTicketNavigated: () -> Unit = {},
+    pendingMedicalHistory: Boolean = false,
+    onPendingMedicalHistoryNavigated: () -> Unit = {},
 ) {
     val backStack = retain { mutableStateListOf<NavKey>(HomeScreen) }
     val isAtRoot = backStack.size == 1
@@ -47,15 +52,24 @@ fun HomeRoot(
 
     SideEffect { onAtRootChanged(isAtRoot) }
 
-    // Navigate to Notifications when a push notification is tapped
-    LaunchedEffect(Unit) {
-        NotificationDeepLink.pending.collect { pending ->
-            if (pending) {
-                NotificationDeepLink.consume()
-                if (!backStack.contains(Notifications)) {
-                    backStack.add(Notifications)
-                }
+    LaunchedEffect(pendingDestinations) {
+        if (pendingDestinations.isNotEmpty()) {
+            pendingDestinations.forEach { dest ->
+                if (backStack.none { it::class == dest::class }) backStack.add(dest)
             }
+            onPendingNavigated()
+        }
+    }
+
+    LaunchedEffect(pendingSupportTicketId) {
+        if (!pendingSupportTicketId.isNullOrBlank()) {
+            if (backStack.none { it is UserProfile }) backStack.add(UserProfile)
+        }
+    }
+
+    LaunchedEffect(pendingMedicalHistory) {
+        if (pendingMedicalHistory) {
+            if (backStack.none { it is UserProfile }) backStack.add(UserProfile)
         }
     }
 
@@ -87,6 +101,10 @@ fun HomeRoot(
                 ProfileRoot(
                     onSignOut = onSignOut,
                     onExitProfile = { backStack.removeLastOrNull() },
+                    pendingSupportTicketId = pendingSupportTicketId,
+                    onPendingSupportTicketNavigated = onPendingSupportTicketNavigated,
+                    pendingMedicalHistory = pendingMedicalHistory,
+                    onPendingMedicalHistoryNavigated = onPendingMedicalHistoryNavigated,
                 )
             }
             entry<HomeDoctorsBySpeciality> { dest ->

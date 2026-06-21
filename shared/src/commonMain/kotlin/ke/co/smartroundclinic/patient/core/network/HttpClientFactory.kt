@@ -56,10 +56,13 @@ internal fun buildHttpClient(engine: HttpClientEngine, tokenProvider: () -> Stri
     install(HttpRequestRetry) {
         maxRetries = 3
         retryIf { request, response ->
-            request.method == HttpMethod.Get && response.status.value in 500..599
+            request.method == HttpMethod.Get
+                && response.status.value in 500..599
+                && request.url.protocol.name != "wss"
         }
         retryOnExceptionIf { request, _ ->
             request.method == HttpMethod.Get
+                && request.url.protocol.name != "wss"
         }
         exponentialDelay(
             base = 2.0,

@@ -30,12 +30,22 @@ import kotlinx.datetime.Clock
 fun ChatRoot(
     modifier: Modifier = Modifier,
     onAtRootChanged: (Boolean) -> Unit = {},
+    pendingConversation: ConsultationChat? = null,
+    onPendingNavigated: () -> Unit = {},
 ) {
     val backStack = retain { mutableStateListOf<NavKey>(ConsultationList) }
     val isAtRoot = backStack.size == 1
     val vm: ConsultationViewModel = koinViewModel()
 
     SideEffect { onAtRootChanged(isAtRoot) }
+
+    LaunchedEffect(pendingConversation) {
+        if (pendingConversation != null) {
+            backStack.removeAll { it is ConsultationChat }
+            backStack.add(pendingConversation)
+            onPendingNavigated()
+        }
+    }
 
     NavDisplay(
         modifier = modifier,
