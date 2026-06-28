@@ -56,6 +56,7 @@ class ArticlesViewModel(
         viewModelScope.launch {
             isRefreshing = true
             getLiveArticlesUseCase(forceRefresh = true)
+            getArticleCategoriesUseCase(forceRefresh = true)
             isRefreshing = false
         }
     }
