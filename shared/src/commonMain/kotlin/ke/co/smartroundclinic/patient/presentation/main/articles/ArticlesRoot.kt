@@ -5,6 +5,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.retain.retain
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavKey
@@ -28,6 +29,8 @@ fun ArticlesRoot(
     SideEffect { onAtRootChanged(isAtRoot) }
 
     val liveArticles by viewModel.liveArticles.collectAsState()
+    val categories by viewModel.categories.collectAsState()
+    var selectedCategoryId by retain { mutableStateOf<String?>(null) }
 
     NavDisplay(
         modifier = modifier,
@@ -37,6 +40,9 @@ fun ArticlesRoot(
             entry<ArticleList> {
                 ArticleListScreen(
                     articles = liveArticles,
+                    categories = categories,
+                    selectedCategoryId = selectedCategoryId,
+                    onCategorySelected = { selectedCategoryId = it },
                     isLoading = viewModel.isLoading,
                     hasLoaded = viewModel.hasLoaded,
                     isRefreshing = viewModel.isRefreshing,

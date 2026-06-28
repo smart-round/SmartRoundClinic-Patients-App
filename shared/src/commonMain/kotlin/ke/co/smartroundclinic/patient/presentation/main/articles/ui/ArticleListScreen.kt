@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +43,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -49,15 +52,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import ke.co.smartroundclinic.patient.domain.model.Article
+import ke.co.smartroundclinic.patient.domain.model.ArticleCategory
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
+import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
+import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 import ke.co.smartroundclinic.patient.presentation.theme.Primary90
 import ke.co.smartroundclinic.patient.presentation.theme.ShapeCard
+import ke.co.smartroundclinic.patient.presentation.theme.ShapePill
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ArticleListScreen(
     articles: List<Article>,
+    categories: List<ArticleCategory>,
+    selectedCategoryId: String?,
+    onCategorySelected: (String?) -> Unit,
     isLoading: Boolean,
     hasLoaded: Boolean,
     isRefreshing: Boolean,
@@ -65,6 +75,10 @@ internal fun ArticleListScreen(
     onArticleClick: (Article) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val filteredArticles = if (selectedCategoryId != null) {
+        articles.filter { it.categoryId == selectedCategoryId }
+    } else articles
+
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -72,48 +86,104 @@ internal fun ArticleListScreen(
         },
         contentWindowInsets = WindowInsets(0),
     ) { paddingValues ->
-        when {
-            (isLoading || !hasLoaded) && articles.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Primary40)
-                }
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            if (categories.isNotEmpty()) {
+                CategoryFilterRow(
+                    categories = categories,
+                    selectedCategoryId = selectedCategoryId,
+                    onCategorySelected = onCategorySelected,
+                )
             }
-            hasLoaded && articles.isEmpty() -> {
-                EmptyView(modifier = Modifier.fillMaxSize().padding(paddingValues))
-            }
-            else -> {
-                val pullState = rememberPullToRefreshState()
-                PullToRefreshBox(
-                    isRefreshing = isRefreshing,
-                    onRefresh = onRefresh,
-                    state = pullState,
-                    modifier = Modifier.fillMaxSize().padding(paddingValues),
-                    indicator = {
-                        PullToRefreshDefaults.Indicator(
-                            state = pullState,
-                            isRefreshing = isRefreshing,
-                            color = Primary40,
-                            modifier = Modifier.align(Alignment.TopCenter),
-                        )
-                    },
-                ) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(articles, key = { it.id }) { article ->
-                            ArticleCard(article = article, onClick = { onArticleClick(article) })
-                        }
+            when {
+                (isLoading || !hasLoaded) && filteredArticles.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Primary40)
                     }
-                    if (isLoading && !isRefreshing) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                            CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp), color = Primary40)
+                }
+                hasLoaded && filteredArticles.isEmpty() -> {
+                    EmptyView(modifier = Modifier.fillMaxSize())
+                }
+                else -> {
+                    val pullState = rememberPullToRefreshState()
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshing,
+                        onRefresh = onRefresh,
+                        state = pullState,
+                        modifier = Modifier.fillMaxSize(),
+                        indicator = {
+                            PullToRefreshDefaults.Indicator(
+                                state = pullState,
+                                isRefreshing = isRefreshing,
+                                color = Primary40,
+                                modifier = Modifier.align(Alignment.TopCenter),
+                            )
+                        },
+                    ) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(filteredArticles, key = { it.id }) { article ->
+                                ArticleCard(
+                                    article = article,
+                                    categoryName = categories.find { it.id == article.categoryId }?.name,
+                                    onClick = { onArticleClick(article) },
+                                )
+                            }
+                        }
+                        if (isLoading && !isRefreshing) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                                CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp), color = Primary40)
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CategoryFilterRow(
+    categories: List<ArticleCategory>,
+    selectedCategoryId: String?,
+    onCategorySelected: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item {
+            FilterChip(label = "All", isSelected = selectedCategoryId == null, onClick = { onCategorySelected(null) })
+        }
+        items(categories, key = { it.id }) { cat ->
+            FilterChip(label = cat.name, isSelected = selectedCategoryId == cat.id, onClick = { onCategorySelected(cat.id) })
+        }
+    }
+}
+
+@Composable
+private fun FilterChip(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    val gradient = Brush.horizontalGradient(listOf(GradientStart, GradientEnd))
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .clip(ShapePill)
+            .then(
+                if (isSelected) Modifier.background(gradient)
+                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+            )
+            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -142,6 +212,7 @@ private fun EmptyView(modifier: Modifier = Modifier) {
 @Composable
 private fun ArticleCard(
     article: Article,
+    categoryName: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -219,17 +290,19 @@ private fun ArticleCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Primary90)
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
-                        ) {
-                            Text(
-                                text = "Health",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                                color = Primary40,
-                            )
+                        if (!categoryName.isNullOrBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Primary90)
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                            ) {
+                                Text(
+                                    text = categoryName,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                    color = Primary40,
+                                )
+                            }
                         }
                         if (article.datePosted != null) {
                             Text(
