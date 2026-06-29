@@ -15,15 +15,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.VideoCall
 import androidx.compose.material3.Card
@@ -31,6 +32,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -38,17 +41,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import ke.co.smartroundclinic.patient.domain.model.Appointment
+import ke.co.smartroundclinic.patient.presentation.common.composables.PatientDashboardHeader
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
-import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
-import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 import ke.co.smartroundclinic.patient.presentation.theme.Primary90
 import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
@@ -64,23 +64,18 @@ internal fun ConsultationListScreen(
     doctorName: (String) -> String,
     doctorPicture: (String) -> String?,
     canJoin: (Appointment) -> Boolean = { false },
+    isOverdue: (Appointment) -> Boolean = { false },
+    onCancelClick: (Appointment) -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Brush.horizontalGradient(listOf(GradientStart, GradientEnd)))
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 20.dp),
-        ) {
-            Text(
-                text = "Consultations",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = Color.White,
-                modifier = Modifier.align(Alignment.Center),
-            )
-        }
+        PatientDashboardHeader(
+            title = "Consultations",
+            onProfileClick = onProfileClick,
+            onNotificationsClick = onNotificationsClick,
+        )
 
         PullToRefreshBox(
             isRefreshing = isLoading,
@@ -126,6 +121,8 @@ internal fun ConsultationListScreen(
                             doctorName = doctorName(appointment.doctorId),
                             doctorPicture = doctorPicture(appointment.doctorId),
                             canJoin = canJoin(appointment),
+                            isOverdue = isOverdue(appointment),
+                            onCancelClick = { onCancelClick(appointment) },
                             onClick = { onAppointmentClick(appointment) },
                         )
                     }
@@ -141,12 +138,23 @@ private fun ConsultationCard(
     doctorName: String,
     doctorPicture: String?,
     canJoin: Boolean,
+    isOverdue: Boolean,
+    onCancelClick: () -> Unit,
     onClick: () -> Unit,
 ) {
+    val isConfirmed = appointment.status.equals("CONFIRMED", ignoreCase = true)
+    val isCompleted = appointment.status.equals("COMPLETED", ignoreCase = true)
+    val isClickable = !isConfirmed || canJoin
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClick),
+            .then(
+                if (isClickable)
+                    Modifier.clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClick)
+                else
+                    Modifier
+            ),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(2.dp),
@@ -169,13 +177,35 @@ private fun ConsultationCard(
                     Text(text = appointment.date, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            val isCompleted = appointment.status.equals("COMPLETED", ignoreCase = true)
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                StatusBadge(status = appointment.status)
-                if (!isCompleted && canJoin) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                when {
+                    isOverdue -> OutlinedButton(
+                        onClick = onCancelClick,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.height(28.dp),
+                    ) {
+                        Text(
+                            text = "Cancel",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        )
+                    }
+                    else -> StatusBadge(status = appointment.status)
+                }
+                when {
+                    isCompleted || isOverdue -> Unit
+                    canJoin -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Icon(imageVector = Icons.Filled.VideoCall, contentDescription = null, tint = StatusConfirmed, modifier = Modifier.size(16.dp))
                         Text(text = "Join", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = StatusConfirmed)
+                    }
+                    isConfirmed -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Icon(imageVector = Icons.Filled.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(13.dp))
+                        Text(
+                            text = "Opens ${appointment.slotStart}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }

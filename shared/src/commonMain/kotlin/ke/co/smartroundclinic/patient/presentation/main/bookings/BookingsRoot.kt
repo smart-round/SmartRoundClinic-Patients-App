@@ -6,9 +6,11 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,6 +37,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -76,9 +79,12 @@ import ke.co.smartroundclinic.patient.presentation.main.bookings.destinations.Pa
 import ke.co.smartroundclinic.patient.presentation.main.bookings.destinations.RebookFromBookings
 import ke.co.smartroundclinic.patient.presentation.main.bookings.ui.PaymentHistoryDetailScreen
 import ke.co.smartroundclinic.patient.presentation.main.bookings.ui.PaymentStatusChip
+import ke.co.smartroundclinic.patient.presentation.common.composables.PatientDashboardHeader
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
+import ke.co.smartroundclinic.patient.presentation.theme.Primary40
+import ke.co.smartroundclinic.patient.presentation.theme.ShapeCard
 import ke.co.smartroundclinic.patient.presentation.theme.ShapePill
 import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
 import ke.co.smartroundclinic.patient.presentation.theme.StatusPending
@@ -98,6 +104,8 @@ fun BookingsRoot(
     onAtRootChanged: (Boolean) -> Unit = {},
     pendingAppointmentId: String? = null,
     onPendingNavigated: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
 ) {
     val backStack = retain { mutableStateListOf<NavKey>(BookingsList) }
     val isAtRoot = backStack.size == 1
@@ -122,6 +130,8 @@ fun BookingsRoot(
                 BookingsListScreen(
                     onAppointmentClick = { backStack.add(BookingAppointmentDetail(it)) },
                     onPaymentClick = { backStack.add(PaymentHistoryDetail(it)) },
+                    onProfileClick = onProfileClick,
+                    onNotificationsClick = onNotificationsClick,
                 )
             }
             entry<BookingAppointmentDetail> { dest ->
@@ -192,27 +202,19 @@ fun BookingsRoot(
 private fun BookingsListScreen(
     onAppointmentClick: (String) -> Unit,
     onPaymentClick: (String) -> Unit,
+    onProfileClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Appointments", "Payments")
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Gradient header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Brush.horizontalGradient(listOf(GradientStart, GradientEnd)))
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 20.dp),
-        ) {
-            Text(
-                text = "My Bookings",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = Color.White,
-                modifier = Modifier.align(Alignment.Center),
-            )
-        }
+        PatientDashboardHeader(
+            title = "My Bookings",
+            onProfileClick = onProfileClick,
+            onNotificationsClick = onNotificationsClick,
+        )
 
         // Segmented tab row
         Box(
@@ -560,85 +562,82 @@ private fun AppointmentCard(appointment: Appointment, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = ShapeCard,
         colors = CardDefaults.cardColors(containerColor = CardBackground),
-        elevation = CardDefaults.cardElevation(2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp, pressedElevation = 6.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(Brush.verticalGradient(listOf(GradientStart, GradientEnd))),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (appointment.doctorProfilePicture != null) {
-                        AsyncImage(
-                            model = appointment.doctorProfilePicture,
-                            contentDescription = appointment.doctorName,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape),
-                        )
-                    } else {
-                        Icon(Icons.Filled.Person, null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(26.dp))
-                    }
+        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(Primary40),
+            )
+            Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Appointment Date/Time",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    StatusBadge(status = appointment.status)
                 }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Schedule,
+                        contentDescription = null,
+                        tint = Primary40,
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "${appointment.date}  ·  ${formatTimeRange(appointment.slotStart, appointment.slotEnd)}",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = Primary40,
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Brush.verticalGradient(listOf(GradientStart, GradientEnd))),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (appointment.doctorProfilePicture != null) {
+                            AsyncImage(
+                                model = appointment.doctorProfilePicture,
+                                contentDescription = appointment.doctorName,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                            )
+                        } else {
+                            Icon(Icons.Filled.Person, null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(20.dp))
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
                     Text(
                         text = appointment.doctorName?.let { formatDoctorName(it) } ?: "Doctor",
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.weight(1f),
                     )
-                    if (!appointment.doctorSpeciality.isNullOrBlank()) {
-                        Text(
-                            text = appointment.doctorSpeciality,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
+                    OutlinedButton(
+                        onClick = onClick,
+                        shape = MaterialTheme.shapes.small,
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Primary40),
+                    ) {
+                        Text(text = "View", style = MaterialTheme.typography.labelMedium, color = Primary40, modifier = Modifier.padding(horizontal = 8.dp))
                     }
                 }
-                StatusBadge(status = appointment.status)
-            }
-
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 12.dp),
-                thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant,
-            )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                AppointmentInfoChip(icon = Icons.Filled.CalendarToday, text = appointment.date)
-                AppointmentInfoChip(
-                    icon = Icons.Filled.Schedule,
-                    text = formatTimeRange(appointment.slotStart, appointment.slotEnd),
-                )
-            }
-
-            if (!appointment.notes.isNullOrBlank()) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = appointment.notes,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                )
             }
         }
     }
 }
 
-@Composable
-private fun AppointmentInfoChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.width(4.dp))
-        Text(text = text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
 
 @Composable
 private fun StatusBadge(status: String) {

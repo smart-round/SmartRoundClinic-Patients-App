@@ -32,6 +32,9 @@ fun ChatRoot(
     onAtRootChanged: (Boolean) -> Unit = {},
     pendingConversation: ConsultationChat? = null,
     onPendingNavigated: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
+    onGoToAppointmentDetail: (String) -> Unit = {},
 ) {
     val backStack = retain { mutableStateListOf<NavKey>(ConsultationList) }
     val isAtRoot = backStack.size == 1
@@ -57,12 +60,19 @@ fun ChatRoot(
                     appointments = vm.appointments,
                     isLoading = vm.isLoadingAppointments,
                     onAppointmentClick = { appointment ->
-                        backStack.add(ConsultationChat(appointment.id, vm.doctorName(appointment.doctorId)))
+                        val isCompleted = appointment.status.equals("COMPLETED", ignoreCase = true)
+                        if (isCompleted || canJoinConsultation(appointment)) {
+                            backStack.add(ConsultationChat(appointment.id, vm.doctorName(appointment.doctorId)))
+                        }
                     },
                     onRefresh = vm::loadAppointments,
                     doctorName = vm::doctorName,
                     doctorPicture = vm::doctorPicture,
                     canJoin = ::canJoinConsultation,
+                    isOverdue = ::isOverdueConfirmed,
+                    onCancelClick = { appointment -> onGoToAppointmentDetail(appointment.id) },
+                    onProfileClick = onProfileClick,
+                    onNotificationsClick = onNotificationsClick,
                 )
             }
             entry<ConsultationChat> { dest ->
@@ -71,7 +81,18 @@ fun ChatRoot(
                 }
                 val appointment = vm.appointments.firstOrNull { it.id == dest.appointmentId }
                 val isCompleted = appointment?.status?.equals("COMPLETED", ignoreCase = true) == true
-                val canJoinCall = appointment?.let { canJoinConsultation(it) } ?: false
+                val canJoinCall = appointment?.let { appt ->
+                    try {
+                        val tz = TimeZone.currentSystemDefault()
+                        val date = LocalDate.parse(appt.date)
+                        val parts = appt.slotStart.split(":")
+                        val hour = parts[0].toInt()
+                        val minute = parts.getOrNull(1)?.toInt() ?: 0
+                        val slotInstant = LocalDateTime(date, LocalTime(hour, minute)).toInstant(tz)
+                        val diffMinutes = (Clock.System.now() - slotInstant).inWholeMinutes
+                        diffMinutes in -5..60
+                    } catch (_: Exception) { false }
+                } ?: false
                 ConsultationScreen(
                     doctorName = dest.doctorName,
                     doctorPicture = appointment?.let { vm.doctorPicture(it.doctorId) },
@@ -122,7 +143,23 @@ internal fun canJoinConsultation(appointment: Appointment): Boolean {
         val slotInstant = LocalDateTime(date, LocalTime(hour, minute)).toInstant(tz)
         val now = Clock.System.now()
         val diffMinutes = (now - slotInstant).inWholeMinutes
-        diffMinutes in -30..30
+        diffMinutes in -5..60
+    } catch (_: Exception) {
+        false
+    }
+}
+
+internal fun isOverdueConfirmed(appointment: Appointment): Boolean {
+    if (!appointment.status.equals("CONFIRMED", ignoreCase = true)) return false
+    return try {
+        val tz = TimeZone.currentSystemDefault()
+        val date = LocalDate.parse(appointment.date)
+        val parts = appointment.slotStart.split(":")
+        val hour = parts[0].toInt()
+        val minute = parts.getOrNull(1)?.toInt() ?: 0
+        val slotInstant = LocalDateTime(date, LocalTime(hour, minute)).toInstant(tz)
+        val diffMinutes = (Clock.System.now() - slotInstant).inWholeMinutes
+        diffMinutes > 60
     } catch (_: Exception) {
         false
     }

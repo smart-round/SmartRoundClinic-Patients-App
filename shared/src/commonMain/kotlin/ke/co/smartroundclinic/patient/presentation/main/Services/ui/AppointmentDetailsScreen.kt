@@ -359,11 +359,9 @@ fun AppointmentDetailsScreen(
                 }
             }
 
-            // Cancel button — hide for terminal statuses and past appointments
-            val appointmentDate = runCatching { LocalDate.parse(appointment.date.take(10)) }.getOrNull()
+            // Cancel button — hide only for terminal statuses
             val canCancel = onCancel != null &&
-                appointment.status.lowercase() !in setOf("no_show", "completed", "cancelled") &&
-                appointmentDate != null && appointmentDate >= todayLocalDate()
+                appointment.status.lowercase() !in setOf("no_show", "completed", "cancelled")
             if (canCancel) {
                 Button(
                     onClick = { showCancelSheet = true },

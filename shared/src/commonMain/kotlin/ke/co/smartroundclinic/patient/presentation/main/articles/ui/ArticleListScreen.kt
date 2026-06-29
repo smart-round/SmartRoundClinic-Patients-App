@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,9 +31,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -53,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import ke.co.smartroundclinic.patient.domain.model.Article
 import ke.co.smartroundclinic.patient.domain.model.ArticleCategory
+import ke.co.smartroundclinic.patient.presentation.common.composables.PatientDashboardHeader
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
@@ -73,20 +71,22 @@ internal fun ArticleListScreen(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     onArticleClick: (Article) -> Unit,
+    onProfileClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val filteredArticles = if (selectedCategoryId != null) {
         articles.filter { it.categoryId == selectedCategoryId }
     } else articles
 
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(title = { Text("Articles", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)) })
-        },
-        contentWindowInsets = WindowInsets(0),
-    ) { paddingValues ->
-        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+    Column(modifier = modifier.fillMaxSize()) {
+        PatientDashboardHeader(
+            title = "Articles",
+            onProfileClick = onProfileClick,
+            onNotificationsClick = onNotificationsClick,
+        )
+
+        Column(modifier = Modifier.fillMaxSize()) {
             if (categories.isNotEmpty()) {
                 CategoryFilterRow(
                     categories = categories,

@@ -1,5 +1,7 @@
 package ke.co.smartroundclinic.patient.presentation.main.home.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -15,40 +17,32 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
-import kotlin.math.roundToInt
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.NotificationsNone
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
-import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
+import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -56,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -63,20 +58,18 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.domain.model.Speciality
-import ke.co.smartroundclinic.patient.domain.model.User
-import ke.co.smartroundclinic.patient.generated.resources.Res
-import ke.co.smartroundclinic.patient.generated.resources.notification
+import ke.co.smartroundclinic.patient.presentation.common.composables.PatientDashboardHeader
 import ke.co.smartroundclinic.patient.presentation.main.home.HomeViewModel
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
 import ke.co.smartroundclinic.patient.presentation.theme.SearchBarOverlay
-import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
 import ke.co.smartroundclinic.patient.presentation.theme.Secondary40
 import ke.co.smartroundclinic.patient.presentation.theme.Secondary90
 import ke.co.smartroundclinic.patient.presentation.theme.ServiceTileColors
-import org.jetbrains.compose.resources.painterResource
+import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.math.roundToInt
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,11 +81,9 @@ fun HomeScreen(
     onNotificationClick: () -> Unit = {},
     onDoctorClick: (Doctor) -> Unit = {},
     onSpecialityClick: (Speciality) -> Unit = {},
-    unreadNotificationCount: Int = 0,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = koinViewModel(),
 ) {
-    val user by viewModel.user.collectAsState()
     val doctors = viewModel.doctors
     val specialities = viewModel.specialities
     val isRefreshing = viewModel.isLoading
@@ -112,11 +103,9 @@ fun HomeScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState()),
             ) {
-                HomeHeader(
-                    user = user,
+                PatientDashboardHeader(
                     onProfileClick = onProfileClick,
-                    onNotificationClick = onNotificationClick,
-                    unreadCount = unreadNotificationCount,
+                    onNotificationsClick = onNotificationClick,
                 )
                 Spacer(Modifier.height(20.dp))
                 ConsultDoctorSection(doctors = doctors, onSeeAll = onSeeAllDoctors, onDoctorClick = onDoctorClick)
@@ -132,95 +121,6 @@ fun HomeScreen(
     }
 }
 
-@Composable
-private fun HomeHeader(
-    user: User?,
-    onProfileClick: () -> Unit = {},
-    onNotificationClick: () -> Unit = {},
-    unreadCount: Int = 0,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp))
-            .background(brush = Brush.horizontalGradient(listOf(GradientStart, GradientEnd)))
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.25f))
-                        .clickable(
-                            indication = null,
-                            interactionSource = remember { MutableInteractionSource() },
-                            onClick = onProfileClick,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Person,
-                        contentDescription = "Profile",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    if (user?.profilePicture != null) {
-                        AsyncImage(
-                            model = user.profilePicture,
-                            contentDescription = "Profile picture",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape),
-                        )
-                    }
-                }
-                Spacer(Modifier.width(8.dp))
-                val firstName = user?.fullName?.split(" ")?.firstOrNull() ?: "there"
-                Text(
-                    text = "Hello $firstName 👋",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    modifier = Modifier.weight(1f),
-                )
-
-                Box(
-                    modifier = Modifier.clickable(
-                        enabled = true,
-                        onClick = onNotificationClick
-                    )
-                ) {
-                    Icon(
-                        painter = painterResource(Res.drawable.notification),
-                        contentDescription = "Notifications",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    if (unreadCount > 0) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(Color.Red)
-                                .align(Alignment.TopEnd)
-                                .offset(x=4.dp, y = (-14).dp)
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = "Your health, seamlessly\nmanaged in one place.",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = Color.White,
-            )
-            Spacer(Modifier.height(4.dp))
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

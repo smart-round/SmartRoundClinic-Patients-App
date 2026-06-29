@@ -56,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.AnnotatedString
@@ -125,10 +126,10 @@ fun SignUpScreen(
     val photoSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val previewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
     val emailBivr = remember { BringIntoViewRequester() }
     val phoneBivr = remember { BringIntoViewRequester() }
     val passwordBivr = remember { BringIntoViewRequester() }
-    val buttonBivr = remember { BringIntoViewRequester() }
     val allCountries = rememberCountryCodes()
     val isLoading by formViewModel.isLoading.collectAsStateWithLifecycle()
 
@@ -156,7 +157,16 @@ fun SignUpScreen(
         else -> null
     }
     val emailError = if (formViewModel.email.isNotBlank() && !formViewModel.email.isValidEmail()) "Enter a valid email" else null
-    val phoneError = if (formViewModel.phoneNumber.isNotBlank() && (formViewModel.phoneNumber.length < 6 || formViewModel.phoneNumber.length > 12)) "Enter a valid phone number" else null
+    val phoneError = if (formViewModel.phoneNumber.isNotBlank()) {
+        val n = formViewModel.phoneNumber
+        val isKenya = formViewModel.countryDialCode == "+254"
+        when {
+            isKenya && n.length != 9 -> "Enter 9 digits (e.g. 712345678)"
+            isKenya && !n.startsWith("7") && !n.startsWith("1") -> "Number must start with 7 or 1"
+            !isKenya && (n.length < 5 || n.length > 12) -> "Enter a valid phone number"
+            else -> null
+        }
+    } else null
 
     val isFormValid = formViewModel.fullName.isNotBlank() &&
             formViewModel.gender.isNotBlank() &&
@@ -239,8 +249,12 @@ fun SignUpScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding(),
+    ) {
+    Column(
+        modifier = Modifier
+            .weight(1f)
             .verticalScroll(rememberScrollState())
-            .imePadding()
             .padding(horizontal = 16.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -389,12 +403,13 @@ fun SignUpScreen(
         Spacer(Modifier.height(12.dp))
 
         Column(modifier = Modifier.bringIntoViewRequester(phoneBivr)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.width(120.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Box(modifier = Modifier.width(130.dp)) {
                     OutlinedTextField(
                         value = "${formViewModel.countryFlag} ${formViewModel.countryDialCode}",
                         onValueChange = {},
                         readOnly = true,
+                        label = { Text("Code", style = MaterialTheme.typography.bodySmall) },
                         trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
                         shape = ShapeInput,
                         singleLine = true,
@@ -414,9 +429,14 @@ fun SignUpScreen(
                     value = formViewModel.phoneNumber,
                     onValueChange = { if (it.all { c -> c.isDigit() }) formViewModel.phoneNumber = it },
                     label = { Text("Phone", style = MaterialTheme.typography.bodySmall) },
-                    placeholder = { Text("712345678", style = MaterialTheme.typography.bodySmall) },
+                    placeholder = {
+                        Text(
+                            if (formViewModel.countryDialCode == "+254") "712345678" else "Phone number",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    },
                     isError = phoneError != null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                     shape = ShapeInput,
                     singleLine = true,
                     modifier = Modifier
@@ -442,7 +462,7 @@ fun SignUpScreen(
                 }
             },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { scope.launch { buttonBivr.bringIntoView() } }),
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
             shape = ShapeInput,
             singleLine = true,
             modifier = Modifier
@@ -451,45 +471,52 @@ fun SignUpScreen(
                 .onFocusChanged { if (it.isFocused) scope.launch { passwordBivr.bringIntoView() } },
         )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(8.dp))
+    } // end scrollable form Column
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .bringIntoViewRequester(buttonBivr),
+    // Fixed footer — always visible above the keyboard
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
+    ) {
+        PrimaryButton(
+            onClick = {
+                formViewModel.signUp(
+                    profilePictureBytes = filesViewModel.profilePictureBytes,
+                    onSuccess = { email -> onNext(email) },
+                )
+            },
+            enabled = isFormValid && !isLoading,
         ) {
-            PrimaryButton(
-                onClick = {
-                    formViewModel.signUp(
-                        profilePictureBytes = filesViewModel.profilePictureBytes,
-                        onSuccess = { email -> onNext(email) },
+            if (isLoading) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 14.dp)) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
                     )
-                },
-                enabled = isFormValid && !isLoading,
-            ) {
-                if (isLoading) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 14.dp)) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    }
-                } else {
-                    Text("Sign Up", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.padding(vertical = 14.dp))
                 }
+            } else {
+                Text("Sign Up", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.padding(vertical = 14.dp))
             }
+        }
 
-            Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                Text("Already have an account? ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onBackground)
-                TextButton(onClick = onSignIn, contentPadding = PaddingValues(0.dp)) {
-                    Text("Sign in", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Already have an account? ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onBackground)
+            TextButton(onClick = onSignIn, contentPadding = PaddingValues(0.dp)) {
+                Text("Sign in", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             }
         }
     }
+    } // end outer imePadding Column
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

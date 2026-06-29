@@ -57,6 +57,7 @@ import ke.co.smartroundclinic.patient.presentation.main.destinations.Home
 import ke.co.smartroundclinic.patient.presentation.main.Services.ServicesRoot
 import ke.co.smartroundclinic.patient.presentation.main.home.HomeRoot
 import ke.co.smartroundclinic.patient.presentation.main.home.destinations.Notifications
+import ke.co.smartroundclinic.patient.presentation.main.home.destinations.UserProfile
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -159,15 +160,35 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
                         onAtRootChanged = { isAtRoot = it },
                         pendingConversation = pendingConsultation,
                         onPendingNavigated = { pendingConsultation = null },
+                        onProfileClick = { selectTab(Home); pendingHomeDestinations = listOf(UserProfile) },
+                        onNotificationsClick = { selectTab(Home); pendingHomeDestinations = listOf(Notifications) },
+                        onGoToAppointmentDetail = { appointmentId ->
+                            selectTab(Bookings)
+                            pendingBookingAppointmentId = appointmentId
+                        },
                     )
                 }
-                entry<Doctors> { ServicesRoot(onAtRootChanged = { isAtRoot = it }) }
-                entry<Articles> { ArticlesRoot(onAtRootChanged = { isAtRoot = it }) }
+                entry<Doctors> {
+                    ServicesRoot(
+                        onAtRootChanged = { isAtRoot = it },
+                        onProfileClick = { selectTab(Home); pendingHomeDestinations = listOf(UserProfile) },
+                        onNotificationsClick = { selectTab(Home); pendingHomeDestinations = listOf(Notifications) },
+                    )
+                }
+                entry<Articles> {
+                    ArticlesRoot(
+                        onAtRootChanged = { isAtRoot = it },
+                        onProfileClick = { selectTab(Home); pendingHomeDestinations = listOf(UserProfile) },
+                        onNotificationsClick = { selectTab(Home); pendingHomeDestinations = listOf(Notifications) },
+                    )
+                }
                 entry<Bookings> {
                     BookingsRoot(
                         onAtRootChanged = { isAtRoot = it },
                         pendingAppointmentId = pendingBookingAppointmentId,
                         onPendingNavigated = { pendingBookingAppointmentId = null },
+                        onProfileClick = { selectTab(Home); pendingHomeDestinations = listOf(UserProfile) },
+                        onNotificationsClick = { selectTab(Home); pendingHomeDestinations = listOf(Notifications) },
                     )
                 }
             },

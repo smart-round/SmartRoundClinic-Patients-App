@@ -28,6 +28,8 @@ import org.koin.compose.viewmodel.koinViewModel
 fun ServicesRoot(
     modifier: Modifier = Modifier,
     onAtRootChanged: (Boolean) -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
 ) {
     val backStack = retain { mutableStateListOf<NavKey>(ServicesList) }
     val isAtRoot = backStack.size == 1
@@ -53,6 +55,8 @@ fun ServicesRoot(
             entry<ServicesList> {
                 ServiceCategoriesScreen(
                     specialities = vm.specialities,
+                    onProfileClick = onProfileClick,
+                    onNotificationsClick = onNotificationsClick,
                     onSpecialityClick = { speciality ->
                         backStack.add(
                             DoctorsByCategory(

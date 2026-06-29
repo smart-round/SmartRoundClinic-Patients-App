@@ -91,7 +91,6 @@ fun HomeRoot(
                     onSpecialityClick = { speciality ->
                         backStack.add(HomeDoctorsBySpeciality(speciality.id, speciality.title))
                     },
-                    unreadNotificationCount = notificationsVm.unreadCount,
                 )
             }
             entry<Notifications> {

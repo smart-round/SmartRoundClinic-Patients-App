@@ -22,6 +22,8 @@ import org.koin.compose.viewmodel.koinViewModel
 fun ArticlesRoot(
     modifier: Modifier = Modifier,
     onAtRootChanged: (Boolean) -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
 ) {
     val viewModel = koinViewModel<ArticlesViewModel>()
     val backStack = retain { mutableStateListOf<NavKey>(ArticleList) }
@@ -49,6 +51,8 @@ fun ArticlesRoot(
                     isRefreshing = viewModel.isRefreshing,
                     onRefresh = { viewModel.pullRefresh() },
                     onArticleClick = { article -> backStack.add(ArticleDetail(article.id)) },
+                    onProfileClick = onProfileClick,
+                    onNotificationsClick = onNotificationsClick,
                 )
             }
             entry<ArticleDetail> { dest ->
