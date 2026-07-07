@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.domain.model.CallJoinInfo
 import ke.co.smartroundclinic.patient.presentation.main.chat.call.CallConnectionState
@@ -151,69 +152,56 @@ private fun ActiveCall(
             val remoteAudioEnabled = remote?.audioEnabled ?: false
             val hasRemote = remote != null
 
+            // If the doctor hasn't joined yet, self is always shown full-screen — there's
+            // nothing to flip to. Once they join, `selfIsPrimary` takes over.
+            val effectiveSelfPrimary = selfIsPrimary || !hasRemote
+
+            val fullScreenModifier = Modifier.fillMaxSize()
+
             Box(modifier = Modifier.fillMaxSize()) {
-                // Primary — fills the screen.
-                if (selfIsPrimary) {
-                    ParticipantView(
-                        picture = selfPicture,
-                        label = "You",
-                        audioEnabled = isAudioEnabled,
-                        showVideo = isVideoEnabled,
-                        videoContent = { LocalVideoPreview(controller, it) },
-                        avatarSize = 112.dp,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
+                val smallTileModifier = Modifier
+                    .statusBarsPadding()
+                    .padding(16.dp)
+                    .align(Alignment.TopEnd)
+                    .size(width = 110.dp, height = 150.dp)
+                    .clip(RoundedCornerShape(12.dp))
+
+                // Both participants' video views are mounted exactly once and stay mounted
+                // for the rest of the call — RealtimeKit hands back the same underlying
+                // native view from getSelfPreview()/getVideoView() each time, so
+                // conditionally adding/removing them from the tree (e.g. to swap primary vs
+                // secondary, or hide/show on camera toggle) crashes when Compose tries to
+                // re-parent a view mid-detach. Flipping and muting are handled entirely via
+                // size/z-order/overlay instead.
+                ParticipantView(
+                    picture = selfPicture,
+                    label = "You",
+                    audioEnabled = isAudioEnabled,
+                    showVideo = isVideoEnabled,
+                    videoContent = { LocalVideoPreview(controller, it) },
+                    avatarSize = if (effectiveSelfPrimary) 112.dp else 56.dp,
+                    modifier = (if (effectiveSelfPrimary) fullScreenModifier else smallTileModifier)
+                        .zIndex(if (effectiveSelfPrimary) 0f else 1f)
+                        .then(if (!effectiveSelfPrimary) Modifier.clickable { selfIsPrimary = true } else Modifier),
+                )
+
+                if (hasRemote) {
                     ParticipantView(
                         picture = doctorPicture,
                         label = remoteName,
                         audioEnabled = remoteAudioEnabled,
                         showVideo = remoteHasVideo,
                         videoContent = { RemoteVideoView(controller, it) },
-                        avatarSize = 112.dp,
-                        modifier = Modifier.fillMaxSize(),
+                        avatarSize = if (effectiveSelfPrimary) 56.dp else 112.dp,
+                        modifier = (if (effectiveSelfPrimary) smallTileModifier else fullScreenModifier)
+                            .zIndex(if (effectiveSelfPrimary) 1f else 0f)
+                            .then(if (effectiveSelfPrimary) Modifier.clickable { selfIsPrimary = false } else Modifier),
                     )
                 }
 
-                // Secondary — small floating tile, tap to flip. Only meaningful once
-                // the doctor has actually joined.
-                if (hasRemote) {
-                    Box(
-                        modifier = Modifier
-                            .statusBarsPadding()
-                            .padding(16.dp)
-                            .align(Alignment.TopEnd)
-                            .size(width = 110.dp, height = 150.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { selfIsPrimary = !selfIsPrimary },
-                    ) {
-                        if (selfIsPrimary) {
-                            ParticipantView(
-                                picture = doctorPicture,
-                                label = remoteName,
-                                audioEnabled = remoteAudioEnabled,
-                                showVideo = remoteHasVideo,
-                                videoContent = { RemoteVideoView(controller, it) },
-                                avatarSize = 56.dp,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        } else {
-                            ParticipantView(
-                                picture = selfPicture,
-                                label = "You",
-                                audioEnabled = isAudioEnabled,
-                                showVideo = isVideoEnabled,
-                                videoContent = { LocalVideoPreview(controller, it) },
-                                avatarSize = 56.dp,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
-                    }
-                }
-
-                Column(modifier = Modifier.statusBarsPadding().padding(16.dp).align(Alignment.TopStart)) {
+                Column(modifier = Modifier.statusBarsPadding().padding(16.dp).align(Alignment.TopStart).zIndex(2f)) {
                     Text(
-                        text = if (selfIsPrimary) "You" else remoteName,
+                        text = if (effectiveSelfPrimary) "You" else remoteName,
                         color = Color.White,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                         maxLines = 1,
@@ -255,10 +243,16 @@ private fun ParticipantView(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.background(Brush.verticalGradient(listOf(GradientStart, GradientEnd)))) {
-        if (showVideo) {
-            videoContent(Modifier.fillMaxSize())
-        } else {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        // Always mounted — see the note on LocalVideoPreview/RemoteVideoView for why this
+        // must never be conditionally added/removed. The avatar card below simply draws
+        // over it when the camera is off.
+        videoContent(Modifier.fillMaxSize())
+
+        if (!showVideo) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(GradientStart, GradientEnd))),
+                contentAlignment = Alignment.Center,
+            ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Box(contentAlignment = Alignment.Center) {
                         SoundWavePulse(active = audioEnabled, baseSize = avatarSize)
