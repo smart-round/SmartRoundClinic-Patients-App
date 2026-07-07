@@ -89,7 +89,7 @@ fun ChatRoot(
                         val hour = parts[0].toInt()
                         val minute = parts.getOrNull(1)?.toInt() ?: 0
                         val slotInstant = LocalDateTime(date, LocalTime(hour, minute)).toInstant(tz)
-                        val diffMinutes = (Clock.System.now() - slotInstant).inWholeMinutes
+                        val diffMinutes = (kotlin.time.Clock.System.now() - slotInstant).inWholeMinutes
                         diffMinutes in -5..60
                     } catch (_: Exception) { false }
                 } ?: false
@@ -141,7 +141,7 @@ internal fun canJoinConsultation(appointment: Appointment): Boolean {
         val hour = timeParts[0].toInt()
         val minute = timeParts.getOrNull(1)?.toInt() ?: 0
         val slotInstant = LocalDateTime(date, LocalTime(hour, minute)).toInstant(tz)
-        val now = Clock.System.now()
+        val now = kotlin.time.Clock.System.now()
         val diffMinutes = (now - slotInstant).inWholeMinutes
         diffMinutes in -5..60
     } catch (_: Exception) {
@@ -158,7 +158,7 @@ internal fun isOverdueConfirmed(appointment: Appointment): Boolean {
         val hour = parts[0].toInt()
         val minute = parts.getOrNull(1)?.toInt() ?: 0
         val slotInstant = LocalDateTime(date, LocalTime(hour, minute)).toInstant(tz)
-        val diffMinutes = (Clock.System.now() - slotInstant).inWholeMinutes
+        val diffMinutes = (kotlin.time.Clock.System.now() - slotInstant).inWholeMinutes
         diffMinutes > 60
     } catch (_: Exception) {
         false

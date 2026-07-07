@@ -54,8 +54,10 @@ kotlin {
             // Explicit JVM artifact so the RealtimeKit SDK can resolve ContentNegotiation at runtime
             implementation(libs.ktor.content.negotiation)
             implementation(libs.ktor.serialization.json)
-            // Cloudflare RealtimeKit Android UI Kit
-            implementation("com.cloudflare.realtimekit:ui-android:1.1.0")
+            // Cloudflare RealtimeKit Core SDK — call logic only, no prebuilt UI.
+            // We own the call screen (see presentation/main/chat/call/) so we can
+            // support background continuity and a foreground-service notification.
+            implementation("com.cloudflare.realtimekit:core-android:2.1.0")
             // Chrome Custom Tabs for in-app browser (payment checkout)
             implementation("androidx.browser:browser:1.8.0")
         }

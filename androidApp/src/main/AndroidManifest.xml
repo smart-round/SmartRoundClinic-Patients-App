@@ -14,6 +14,9 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -35,12 +38,14 @@
             </intent-filter>
         </activity>
 
-        <!-- Cloudflare RealtimeKit's meeting activity extends AppCompatActivity, so it
-             needs an AppCompat theme regardless of the rest of the app's theming. -->
-        <activity
-            android:name="com.cloudflare.realtimekit.ui.screens.RtkMeetingActivity"
-            android:theme="@style/Theme.AppCompat.NoActionBar"
-            tools:replace="android:theme" />
+        <!-- Keeps the call's audio/video running when the app is backgrounded during
+             a consultation. We own this service (unlike the old UI Kit's KeepAliveService,
+             which didn't even exist in the SDK version this app was pinned to). -->
+        <service
+            android:name="ke.co.smartroundclinic.patient.presentation.main.chat.call.CallForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback|camera|microphone" />
     </application>
 
 </manifest>
