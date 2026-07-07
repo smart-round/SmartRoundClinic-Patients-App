@@ -115,11 +115,15 @@ fun ChatRoot(
                 )
             }
             entry<ConsultationCall> { dest ->
-                val doctorName = backStack
-                    .filterIsInstance<ConsultationChat>()
-                    .firstOrNull()?.doctorName ?: "Doctor"
+                val callChat = backStack.filterIsInstance<ConsultationChat>().firstOrNull()
+                val doctorName = callChat?.doctorName ?: "Doctor"
+                val doctorPicture = callChat?.let { c ->
+                    vm.appointments.firstOrNull { it.id == c.appointmentId }?.let { vm.doctorPicture(it.doctorId) }
+                }
                 CallScreen(
                     doctorName = doctorName,
+                    doctorPicture = doctorPicture,
+                    selfPicture = vm.currentUserProfilePicture,
                     isVideo = dest.isVideo,
                     joinState = vm.callJoinState,
                     onJoin = { vm.joinCall(dest.sessionId) },
