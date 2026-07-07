@@ -14,6 +14,18 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+// Force kotlinx-datetime to a single version across every target (Android + iOS).
+// Without this, iOS transitively resolves a newer version than Android's declared
+// 0.6.2 — and RealtimeKit's compiled Android bytecode hard-references
+// kotlinx.datetime.Clock$System as a real class, which newer kotlinx-datetime
+// versions restructure away, crashing with NoClassDefFoundError at runtime the
+// first time the SDK logs anything.
+configurations.all {
+    resolutionStrategy {
+        force("org.jetbrains.kotlinx:kotlinx-datetime:${libs.versions.kotlinx.datetime.get()}")
+    }
+}
+
 compose.resources {
     packageOfResClass = "ke.co.smartroundclinic.patient.generated.resources"
 }

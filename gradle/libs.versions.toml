@@ -29,7 +29,7 @@ koin = "4.1.0"
 material3-extended-icons = "1.7.3"
 filekit = "0.14.0"
 napier = "2.7.1"
-kotlinx-datetime = "0.7.1"
+kotlinx-datetime = "0.6.2"
 google-services = "4.4.2"
 kmpnotifier = "1.6.1"
 
