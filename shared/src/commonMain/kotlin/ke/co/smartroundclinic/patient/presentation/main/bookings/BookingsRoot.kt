@@ -149,6 +149,14 @@ fun BookingsRoot(
                     },
                     onCancel = { id, reason -> servicesVm.cancelAppointment(id, reason) },
                     isCancelling = servicesVm.isCancelling,
+                    myRatingOfDoctor = servicesVm.myRatingOfDoctor,
+                    hasAlreadyRatedAppointment = servicesVm.hasAlreadyRatedAppointment,
+                    isSubmittingRating = servicesVm.isSubmittingRating,
+                    onSubmitRating = { rating, comment ->
+                        servicesVm.appointmentDetail?.let { servicesVm.submitRating(it.id, it.doctorId, rating, comment) }
+                    },
+                    onUpdateRating = { rating, comment -> servicesVm.updateMyRating(rating, comment) },
+                    onDeleteRating = { servicesVm.deleteMyRating() },
                 )
             }
             entry<RebookFromBookings> { dest ->

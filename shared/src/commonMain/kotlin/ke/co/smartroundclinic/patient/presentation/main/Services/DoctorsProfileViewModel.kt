@@ -7,9 +7,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.aakira.napier.Napier
 import ke.co.smartroundclinic.patient.common.Resource
+import ke.co.smartroundclinic.patient.data.remote.dto.response.toDomain
 import ke.co.smartroundclinic.patient.domain.model.Doctor
+import ke.co.smartroundclinic.patient.domain.model.Rating
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorArticlesUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorProfileUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.rating.GetDoctorRatingsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.speciality.GetSpecialityPricingUseCase
 import kotlinx.coroutines.launch
 
@@ -17,10 +20,54 @@ class DoctorsProfileViewModel(
     private val getDoctorArticlesUseCase: GetDoctorArticlesUseCase,
     private val getDoctorProfileUseCase: GetDoctorProfileUseCase,
     private val getSpecialityPricingUseCase: GetSpecialityPricingUseCase,
+    private val getDoctorRatingsUseCase: GetDoctorRatingsUseCase,
 ) : ViewModel() {
 
     var uiState by mutableStateOf(DoctorProfileUiState())
         private set
+
+    var reviews by mutableStateOf<List<Rating>>(emptyList())
+        private set
+    var isLoadingReviews by mutableStateOf(false)
+        private set
+    var isLoadingMoreReviews by mutableStateOf(false)
+        private set
+    var reviewsCurrentPage by mutableStateOf(1)
+        private set
+    var reviewsTotalPages by mutableStateOf(1)
+        private set
+
+    fun loadReviews(doctorId: String) {
+        reviewsCurrentPage = 1
+        reviewsTotalPages = 1
+        reviews = emptyList()
+        loadReviewsPage(doctorId, page = 1, append = false)
+    }
+
+    fun loadMoreReviews(doctorId: String) {
+        if (isLoadingMoreReviews || isLoadingReviews || reviewsCurrentPage >= reviewsTotalPages) return
+        loadReviewsPage(doctorId, page = reviewsCurrentPage + 1, append = true)
+    }
+
+    private fun loadReviewsPage(doctorId: String, page: Int, append: Boolean) {
+        viewModelScope.launch {
+            if (append) isLoadingMoreReviews = true else isLoadingReviews = true
+            when (val result = getDoctorRatingsUseCase(doctorId, page)) {
+                is Resource.Success -> {
+                    val data = result.data?.data
+                    if (data != null) {
+                        val mapped = data.items.map { it.toDomain() }
+                        reviews = if (append) reviews + mapped else mapped
+                        reviewsCurrentPage = data.page
+                        val size = if (data.size > 0) data.size else 20
+                        reviewsTotalPages = ((data.total + size - 1) / size).coerceAtLeast(1)
+                    }
+                }
+                else -> {}
+            }
+            if (append) isLoadingMoreReviews = false else isLoadingReviews = false
+        }
+    }
 
     fun load(doctor: Doctor) {
         viewModelScope.launch {

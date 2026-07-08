@@ -13,6 +13,7 @@ import ke.co.smartroundclinic.patient.domain.model.CalendarView
 import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.domain.model.Speciality
 import ke.co.smartroundclinic.patient.domain.model.MedicalRecord
+import ke.co.smartroundclinic.patient.domain.model.Rating
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.BookAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.CancelAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetAppointmentUseCase
@@ -23,6 +24,9 @@ import ke.co.smartroundclinic.patient.core.snackbar.SnackbarController
 import ke.co.smartroundclinic.patient.domain.usecase.medicalrecord.GetMedicalRecordUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.payments.GetStkPushStatusUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.payments.StkPushPreBookingUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.rating.DeleteDoctorRatingUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.rating.RateDoctorUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.rating.UpdateDoctorRatingUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.speciality.GetSpecialitiesUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -35,6 +39,8 @@ data class StkPushResult(
     val currency: String,
 )
 
+private const val ALREADY_RATED_MESSAGE = "You have already rated this appointment"
+
 class ServicesViewModel(
     private val getSpecialitiesUseCase: GetSpecialitiesUseCase,
     private val getDoctorsBySpecializationUseCase: GetDoctorsBySpecializationUseCase,
@@ -46,6 +52,9 @@ class ServicesViewModel(
     private val stkPushPreBookingUseCase: StkPushPreBookingUseCase,
     private val getStkPushStatusUseCase: GetStkPushStatusUseCase,
     private val getMedicalRecordUseCase: GetMedicalRecordUseCase,
+    private val rateDoctorUseCase: RateDoctorUseCase,
+    private val updateDoctorRatingUseCase: UpdateDoctorRatingUseCase,
+    private val deleteDoctorRatingUseCase: DeleteDoctorRatingUseCase,
     private val snackbarController: SnackbarController,
 ) : ViewModel() {
 
@@ -118,6 +127,13 @@ class ServicesViewModel(
     var medicalRecord by mutableStateOf<MedicalRecord?>(null)
         private set
     var isLoadingMedicalRecord by mutableStateOf(false)
+        private set
+
+    var myRatingOfDoctor by mutableStateOf<Rating?>(null)
+        private set
+    var hasAlreadyRatedAppointment by mutableStateOf(false)
+        private set
+    var isSubmittingRating by mutableStateOf(false)
         private set
 
     init {
@@ -328,6 +344,8 @@ class ServicesViewModel(
     }
 
     fun loadAppointmentDetail(id: String) {
+        myRatingOfDoctor = null
+        hasAlreadyRatedAppointment = false
         viewModelScope.launch {
             when (val result = getAppointmentUseCase(id)) {
                 is Resource.Success -> appointmentDetail = result.data
@@ -335,6 +353,59 @@ class ServicesViewModel(
             }
         }
         loadMedicalRecord(id)
+    }
+
+    fun submitRating(appointmentId: String, doctorId: String, rating: Int, comment: String?) {
+        if (isSubmittingRating) return
+        viewModelScope.launch {
+            isSubmittingRating = true
+            when (val result = rateDoctorUseCase(appointmentId, doctorId, rating, comment)) {
+                is Resource.Success -> {
+                    myRatingOfDoctor = result.data
+                    snackbarController.show("Rating submitted")
+                }
+                is Resource.Error -> {
+                    if (result.message == ALREADY_RATED_MESSAGE) hasAlreadyRatedAppointment = true
+                    snackbarController.show(result.message ?: "Failed to submit rating", isError = true)
+                }
+                else -> {}
+            }
+            isSubmittingRating = false
+        }
+    }
+
+    fun updateMyRating(rating: Int, comment: String?) {
+        val existing = myRatingOfDoctor ?: return
+        if (isSubmittingRating) return
+        viewModelScope.launch {
+            isSubmittingRating = true
+            when (val result = updateDoctorRatingUseCase(existing.id, rating, comment)) {
+                is Resource.Success -> {
+                    myRatingOfDoctor = result.data
+                    snackbarController.show("Rating updated")
+                }
+                is Resource.Error -> snackbarController.show(result.message ?: "Failed to update rating", isError = true)
+                else -> {}
+            }
+            isSubmittingRating = false
+        }
+    }
+
+    fun deleteMyRating() {
+        val existing = myRatingOfDoctor ?: return
+        if (isSubmittingRating) return
+        viewModelScope.launch {
+            isSubmittingRating = true
+            when (val result = deleteDoctorRatingUseCase(existing.id)) {
+                is Resource.Success -> {
+                    myRatingOfDoctor = null
+                    snackbarController.show("Rating deleted")
+                }
+                is Resource.Error -> snackbarController.show(result.message ?: "Failed to delete rating", isError = true)
+                else -> {}
+            }
+            isSubmittingRating = false
+        }
     }
 
     private fun loadMedicalRecord(appointmentId: String) {

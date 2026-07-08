@@ -40,15 +40,24 @@ class SupportViewModel(
     var totalPages by mutableStateOf(1)
         private set
 
+    var isLoadingCategories by mutableStateOf(false)
+        private set
+
     init {
         load()
     }
 
     fun load() {
         loadTicketsPage(currentPage)
+        loadCategories()
+    }
+
+    fun loadCategories() {
         viewModelScope.launch {
+            isLoadingCategories = true
             val categoriesResult = getIssueCategoriesUseCase()
             if (categoriesResult is Resource.Success) categories = categoriesResult.data ?: emptyList()
+            isLoadingCategories = false
         }
     }
 

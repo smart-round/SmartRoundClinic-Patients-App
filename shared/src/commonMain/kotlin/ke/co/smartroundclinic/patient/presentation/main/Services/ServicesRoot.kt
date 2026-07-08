@@ -167,6 +167,14 @@ fun ServicesRoot(
                     },
                     onCancel = { id, reason -> vm.cancelAppointment(id, reason) },
                     isCancelling = vm.isCancelling,
+                    myRatingOfDoctor = vm.myRatingOfDoctor,
+                    hasAlreadyRatedAppointment = vm.hasAlreadyRatedAppointment,
+                    isSubmittingRating = vm.isSubmittingRating,
+                    onSubmitRating = { rating, comment ->
+                        vm.appointmentDetail?.let { vm.submitRating(it.id, it.doctorId, rating, comment) }
+                    },
+                    onUpdateRating = { rating, comment -> vm.updateMyRating(rating, comment) },
+                    onDeleteRating = { vm.deleteMyRating() },
                 )
             }
         },
