@@ -65,7 +65,9 @@ fun SupportRoot(
                 CreateSupportTicketScreen(
                     categories = vm.categories,
                     isCreating = vm.isCreating,
+                    isLoadingCategories = vm.isLoadingCategories,
                     onBack = { backStack.removeLastOrNull() },
+                    onOpenCategoryDropdown = { vm.loadCategories() },
                     onSubmit = { categoryId, title, description ->
                         vm.createTicket(
                             categoryId = categoryId,

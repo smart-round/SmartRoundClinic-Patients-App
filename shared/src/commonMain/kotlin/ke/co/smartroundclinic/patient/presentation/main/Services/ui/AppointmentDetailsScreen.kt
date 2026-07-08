@@ -54,11 +54,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import androidx.compose.material3.AlertDialog
 import ke.co.smartroundclinic.patient.domain.model.Appointment
 import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.domain.model.MedicalRecord
 import ke.co.smartroundclinic.patient.domain.model.PrescriptionItem
+import ke.co.smartroundclinic.patient.domain.model.Rating
 import ke.co.smartroundclinic.patient.presentation.common.composables.PrimaryButton
+import ke.co.smartroundclinic.patient.presentation.common.composables.StarRatingDisplay
+import ke.co.smartroundclinic.patient.presentation.common.composables.StarRatingInput
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 import ke.co.smartroundclinic.patient.presentation.theme.Primary90
@@ -90,12 +94,19 @@ fun AppointmentDetailsScreen(
     onRebook: ((doctor: Doctor, previousAppointmentId: String) -> Unit)? = null,
     onCancel: ((id: String, reason: String?) -> Unit)? = null,
     isCancelling: Boolean = false,
+    myRatingOfDoctor: Rating? = null,
+    hasAlreadyRatedAppointment: Boolean = false,
+    isSubmittingRating: Boolean = false,
+    onSubmitRating: (Int, String?) -> Unit = { _, _ -> },
+    onUpdateRating: (Int, String?) -> Unit = { _, _ -> },
+    onDeleteRating: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(appointmentId) { onLoad(appointmentId) }
 
     var showCancelSheet by remember { mutableStateOf(false) }
     var cancelReason by remember { mutableStateOf("") }
+    var showCancelReasonError by remember { mutableStateOf(false) }
     val cancelSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     if (showCancelSheet) {
@@ -123,9 +134,16 @@ fun AppointmentDetailsScreen(
                 )
                 OutlinedTextField(
                     value = cancelReason,
-                    onValueChange = { cancelReason = it },
-                    label = { Text("Reason (optional)") },
+                    onValueChange = {
+                        cancelReason = it
+                        if (showCancelReasonError && it.isNotBlank()) showCancelReasonError = false
+                    },
+                    label = { Text("Reason") },
                     placeholder = { Text("Enter a reason…") },
+                    isError = showCancelReasonError,
+                    supportingText = {
+                        if (showCancelReasonError) Text("A reason is required to cancel this appointment")
+                    },
                     minLines = 3,
                     maxLines = 5,
                     modifier = Modifier.fillMaxWidth(),
@@ -140,8 +158,12 @@ fun AppointmentDetailsScreen(
                         .then(
                             if (!isCancelling)
                                 Modifier.clickable {
-                                    onCancel?.invoke(appointmentId, cancelReason.ifBlank { null })
-                                    showCancelSheet = false
+                                    if (cancelReason.isBlank()) {
+                                        showCancelReasonError = true
+                                    } else {
+                                        onCancel?.invoke(appointmentId, cancelReason.trim())
+                                        showCancelSheet = false
+                                    }
                                 }
                             else Modifier,
                         ),
@@ -321,6 +343,18 @@ fun AppointmentDetailsScreen(
                 isLoading = isLoadingMedicalRecord,
             )
 
+            // Rate Doctor — only for COMPLETED appointments
+            if (appointment.status.lowercase() == "completed") {
+                RateDoctorCard(
+                    myRating = myRatingOfDoctor,
+                    hasAlreadyRated = hasAlreadyRatedAppointment,
+                    isSubmitting = isSubmittingRating,
+                    onSubmit = onSubmitRating,
+                    onUpdate = onUpdateRating,
+                    onDelete = onDeleteRating,
+                )
+            }
+
             // Rebook button — only for COMPLETED appointments within the same calendar month
             val canRebook = appointment.status.lowercase() == "completed" &&
                 onRebook != null &&
@@ -364,7 +398,11 @@ fun AppointmentDetailsScreen(
                 appointment.status.lowercase() !in setOf("no_show", "completed", "cancelled")
             if (canCancel) {
                 Button(
-                    onClick = { showCancelSheet = true },
+                    onClick = {
+                        cancelReason = ""
+                        showCancelReasonError = false
+                        showCancelSheet = true
+                    },
                     enabled = !isCancelling,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(16.dp),
@@ -538,6 +576,127 @@ private fun PrescriptionItemRow(item: PrescriptionItem) {
                 style = MaterialTheme.typography.labelSmall,
                 color = Tertiary40,
             )
+        }
+    }
+}
+
+@Composable
+private fun RateDoctorCard(
+    myRating: Rating?,
+    hasAlreadyRated: Boolean,
+    isSubmitting: Boolean,
+    onSubmit: (Int, String?) -> Unit,
+    onUpdate: (Int, String?) -> Unit,
+    onDelete: () -> Unit,
+) {
+    var isEditing by remember(myRating) { mutableStateOf(myRating == null) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Rating") },
+            text = { Text("Are you sure you want to delete this rating?", style = MaterialTheme.typography.bodyMedium) },
+            confirmButton = {
+                TextButton(onClick = { showDeleteDialog = false; onDelete() }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    DetailCard(title = "Rate This Doctor") {
+        when {
+            myRating != null && !isEditing -> {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StarRatingDisplay(rating = myRating.rating.toDouble(), starSize = 20.dp)
+                    if (!myRating.comment.isNullOrBlank()) {
+                        Text(
+                            text = myRating.comment,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Row {
+                        TextButton(onClick = { isEditing = true }) {
+                            Text("Edit", style = MaterialTheme.typography.labelSmall, color = Tertiary40)
+                        }
+                        TextButton(onClick = { showDeleteDialog = true }) {
+                            Text("Delete", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+            hasAlreadyRated -> {
+                Text(
+                    text = "You've already rated this appointment.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            else -> {
+                RatingForm(
+                    initialRating = myRating?.rating ?: 0,
+                    initialComment = myRating?.comment.orEmpty(),
+                    isSubmitting = isSubmitting,
+                    submitLabel = if (myRating != null) "Save Changes" else "Submit Rating",
+                    onCancel = if (myRating != null) ({ isEditing = false }) else null,
+                    onSubmit = { rating, comment ->
+                        if (myRating != null) onUpdate(rating, comment) else onSubmit(rating, comment)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RatingForm(
+    initialRating: Int,
+    initialComment: String,
+    isSubmitting: Boolean,
+    submitLabel: String,
+    onCancel: (() -> Unit)?,
+    onSubmit: (Int, String?) -> Unit,
+) {
+    var rating by remember { mutableStateOf(initialRating) }
+    var comment by remember { mutableStateOf(initialComment) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        StarRatingInput(rating = rating, onRatingChange = { rating = it })
+        OutlinedTextField(
+            value = comment,
+            onValueChange = { comment = it },
+            placeholder = { Text("Add a comment (optional)", style = MaterialTheme.typography.bodySmall) },
+            shape = ShapeCard,
+            minLines = 2,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (onCancel != null) {
+                TextButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
+                    Text("Cancel", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            PrimaryButton(
+                onClick = { onSubmit(rating, comment.ifBlank { null }) },
+                enabled = rating > 0 && !isSubmitting,
+                modifier = Modifier.weight(1f),
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                } else {
+                    Text(
+                        text = submitLabel,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                        modifier = Modifier.padding(vertical = 4.dp),
+                    )
+                }
+            }
         }
     }
 }

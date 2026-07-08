@@ -54,6 +54,10 @@ import ke.co.smartroundclinic.patient.domain.usecase.medicalrecord.GetMedicalRec
 import ke.co.smartroundclinic.patient.domain.usecase.medicalrecord.GetMyMedicalHistoryUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.personalinfo.GetPersonalInformationUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.personalinfo.UpdatePersonalInformationUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.rating.DeleteDoctorRatingUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.rating.GetDoctorRatingsUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.rating.RateDoctorUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.rating.UpdateDoctorRatingUseCase
 import ke.co.smartroundclinic.patient.presentation.auth.ForgotPasswordViewModel
 import ke.co.smartroundclinic.patient.presentation.auth.SignInViewModel
 import ke.co.smartroundclinic.patient.presentation.main.articles.ArticlesViewModel
@@ -145,8 +149,8 @@ val useCaseModule = module {
     viewModel { ArticlesViewModel(get(), get(), get(), get()) }
     viewModel { HomeViewModel(get(), get(), get(), get()) }
     viewModel { ProfileViewModel(get(), get(), get(), get(), get(), get(), get()) }
-    viewModel { DoctorsProfileViewModel(get(), get(), get()) }
-    viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { DoctorsProfileViewModel(get(), get(), get(), get()) }
+    viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ConsultationViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get()) }
     viewModel { MedicalBioViewModel(get(), get(), get()) }
@@ -159,6 +163,12 @@ val useCaseModule = module {
     // Personal information use cases
     single { GetPersonalInformationUseCase(get()) }
     single { UpdatePersonalInformationUseCase(get()) }
+
+    // Rating use cases
+    single { RateDoctorUseCase(get()) }
+    single { UpdateDoctorRatingUseCase(get()) }
+    single { DeleteDoctorRatingUseCase(get()) }
+    single { GetDoctorRatingsUseCase(get()) }
 
     // Support use cases + ViewModels
     single { GetIssueCategoriesUseCase(get()) }

@@ -50,11 +50,11 @@ fun setupNotificationListener() {
                 "Doctor Joined the Call",
                 "Consultation Ended",
                 "Call Ended" -> {
-                    if (!consultationId.isNullOrBlank()) NotificationEvent.ToConsultationChat(consultationId, doctorName)
+                    if (!appointmentId.isNullOrBlank()) NotificationEvent.ToConsultationChat(appointmentId, doctorName)
                     else NotificationEvent.ToNotifications
                 }
                 "New Chat Message" -> when {
-                    !consultationId.isNullOrBlank() -> NotificationEvent.ToConsultationChat(consultationId, doctorName)
+                    !appointmentId.isNullOrBlank() -> NotificationEvent.ToConsultationChat(appointmentId, doctorName)
                     !ticketId.isNullOrBlank() -> NotificationEvent.ToSupportTicket(ticketId)
                     else -> NotificationEvent.ToNotifications
                 }

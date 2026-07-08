@@ -77,6 +77,8 @@ class ConsultationViewModel(
 
     var currentUserId by mutableStateOf("")
         private set
+    var currentUserProfilePicture by mutableStateOf<String?>(null)
+        private set
 
     // ─── Active session ────────────────────────────────────────────────────
 
@@ -115,6 +117,7 @@ class ConsultationViewModel(
         viewModelScope.launch {
             userLocalRepository.observeUser().collect { user ->
                 currentUserId = user?.id ?: ""
+                currentUserProfilePicture = user?.profilePicture
             }
         }
     }

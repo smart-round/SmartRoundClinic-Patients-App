@@ -4,8 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,6 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
@@ -29,17 +35,22 @@ import androidx.compose.material.icons.filled.WorkHistory
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,21 +61,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import androidx.compose.foundation.clickable
 import ke.co.smartroundclinic.patient.domain.model.Article
 import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.domain.model.DoctorProfile
+import ke.co.smartroundclinic.patient.domain.model.Rating
 import ke.co.smartroundclinic.patient.domain.model.SpecialityPricing
+import ke.co.smartroundclinic.patient.presentation.common.composables.StarRatingDisplay
 import ke.co.smartroundclinic.patient.presentation.main.Services.DoctorProfileUiState
 import ke.co.smartroundclinic.patient.presentation.main.Services.DoctorsProfileViewModel
 import ke.co.smartroundclinic.patient.presentation.main.Services.SectionState
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
+import ke.co.smartroundclinic.patient.presentation.theme.ShapeCard
 import org.koin.compose.viewmodel.koinViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DoctorProfileScreen(
     doctor: Doctor,
@@ -78,6 +94,21 @@ fun DoctorProfileScreen(
 
     val uiState = vm.uiState
     var selectedTab by remember { mutableIntStateOf(0) }
+    var showReviewsSheet by remember { mutableStateOf(false) }
+
+    if (showReviewsSheet) {
+        LaunchedEffect(Unit) { vm.loadReviews(doctor.id) }
+        DoctorReviewsSheet(
+            averageRating = doctor.averageRating,
+            totalReviews = doctor.totalReviews,
+            reviews = vm.reviews,
+            isLoading = vm.isLoadingReviews,
+            isLoadingMore = vm.isLoadingMoreReviews,
+            hasMore = vm.reviewsCurrentPage < vm.reviewsTotalPages,
+            onLoadMore = { vm.loadMoreReviews(doctor.id) },
+            onDismiss = { showReviewsSheet = false },
+        )
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -114,7 +145,7 @@ fun DoctorProfileScreen(
                     .padding(bottom = 88.dp),
             ) {
                 when (selectedTab) {
-                    0 -> AboutTab(doctor = doctor, uiState = uiState)
+                    0 -> AboutTab(doctor = doctor, uiState = uiState, onRatingClick = { showReviewsSheet = true })
                     1 -> SpecialtyPricingTab(pricingState = uiState.pricing)
                     2 -> DoctorArticlesTab(articlesState = uiState.articles, onArticleClick = onArticleClick)
                 }
@@ -236,7 +267,7 @@ private fun DoctorProfileHeader(doctor: Doctor, onBack: () -> Unit) {
 }
 
 @Composable
-private fun AboutTab(doctor: Doctor, uiState: DoctorProfileUiState) {
+private fun AboutTab(doctor: Doctor, uiState: DoctorProfileUiState, onRatingClick: () -> Unit) {
     Column(modifier = Modifier.padding(16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -246,7 +277,13 @@ private fun AboutTab(doctor: Doctor, uiState: DoctorProfileUiState) {
                 StatCard(icon = Icons.Filled.WorkHistory, value = "${doctor.yearsOfExperience}+", label = "Years Exp.", modifier = Modifier.weight(1f))
             }
             StatCard(icon = Icons.Filled.Star, value = "${doctor.totalBookings}+", label = "Patients", modifier = Modifier.weight(1f))
-            StatCard(icon = Icons.Filled.Star, value = doctor.averageRating.formatOneDecimal(), label = "Rating", modifier = Modifier.weight(1f))
+            StatCard(
+                icon = Icons.Filled.Star,
+                value = doctor.averageRating.formatOneDecimal(),
+                label = "Rating",
+                modifier = Modifier.weight(1f),
+                onClick = onRatingClick,
+            )
         }
 
         Spacer(Modifier.height(20.dp))
@@ -307,9 +344,15 @@ private fun ProfileDetails(profile: DoctorProfile, doctor: Doctor) {
 }
 
 @Composable
-private fun StatCard(icon: ImageVector, value: String, label: String, modifier: Modifier = Modifier) {
+private fun StatCard(
+    icon: ImageVector,
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
     Card(
-        modifier = modifier,
+        modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier,
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
         elevation = CardDefaults.cardElevation(0.dp),
@@ -443,6 +486,162 @@ private fun SectionError(message: String) {
     ) {
         Icon(imageVector = Icons.Filled.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(36.dp))
         Text(text = message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DoctorReviewsSheet(
+    averageRating: Double,
+    totalReviews: Int,
+    reviews: List<Rating>,
+    isLoading: Boolean,
+    isLoadingMore: Boolean,
+    hasMore: Boolean,
+    onLoadMore: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val listState = rememberLazyListState()
+
+    val nearBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
+            lastVisible >= info.totalItemsCount - 3
+        }
+    }
+    LaunchedEffect(nearBottom) {
+        if (nearBottom && hasMore && !isLoading && !isLoadingMore) onLoadMore()
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        containerColor = MaterialTheme.colorScheme.background,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Reviews",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(imageVector = Icons.Filled.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "${averageRating.formatOneDecimal()} · $totalReviews reviews",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+
+            when {
+                isLoading && reviews.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                reviews.isEmpty() -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            text = "No reviews yet",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(reviews, key = { it.id }) { review -> ReviewItem(review) }
+                        if (isLoadingMore) {
+                            item(key = "loading_more") {
+                                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        } else if (!hasMore) {
+                            item(key = "end_of_list") {
+                                Text(
+                                    text = "· End of reviews ·",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReviewItem(review: Rating) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = ShapeCard,
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        elevation = CardDefaults.cardElevation(0.dp),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (review.raterProfilePicture != null) {
+                        AsyncImage(
+                            model = review.raterProfilePicture,
+                            contentDescription = review.raterName,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                        )
+                    } else {
+                        Icon(imageVector = Icons.Filled.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = review.raterName ?: "Patient",
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = review.createdAt.take(10),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            StarRatingDisplay(rating = review.rating.toDouble(), starSize = 14.dp)
+            if (!review.comment.isNullOrBlank()) {
+                Text(
+                    text = review.comment,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
     }
 }
 

@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		C08C834E2BDBE76C7437A752 /* RealtimeKit in Frameworks */ = {isa = PBXBuildFile; productRef = C08C834C2BDBE76C7437A752 /* RealtimeKit */; };
-		C08C834F2BDBE76C7437A752 /* RealtimeKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = C08C834D2BDBE76C7437A752 /* RealtimeKitUI */; };
 		FB00000000000000000000B3 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = FB00000000000000000000B2 /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
@@ -48,7 +47,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				C08C834E2BDBE76C7437A752 /* RealtimeKit in Frameworks */,
-				C08C834F2BDBE76C7437A752 /* RealtimeKitUI in Frameworks */,
 				FB00000000000000000000B3 /* FirebaseMessaging in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -95,7 +93,6 @@
 			name = iosApp;
 			packageProductDependencies = (
 				C08C834C2BDBE76C7437A752 /* RealtimeKit */,
-				C08C834D2BDBE76C7437A752 /* RealtimeKitUI */,
 				FB00000000000000000000B2 /* FirebaseMessaging */,
 			);
 			productName = iosApp;
@@ -127,7 +124,6 @@
 			mainGroup = 480269CB385A937D0090635F;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				C08C834B2BDBE76C7437A752 /* XCLocalSwiftPackageReference "LocalPackages/RealtimeKitUI" */,
 				C08C834B2BDBE76C7437A753 /* XCRemoteSwiftPackageReference "realtimekit-ios-core" */,
 				FB00000000000000000000B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
@@ -401,13 +397,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		C08C834B2BDBE76C7437A752 /* XCLocalSwiftPackageReference "LocalPackages/RealtimeKitUI" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = LocalPackages/RealtimeKitUI;
-		};
-/* End XCLocalSwiftPackageReference section */
-
 /* Begin XCRemoteSwiftPackageReference section */
 		C08C834B2BDBE76C7437A753 /* XCRemoteSwiftPackageReference "realtimekit-ios-core" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -432,11 +421,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C08C834B2BDBE76C7437A753 /* XCRemoteSwiftPackageReference "realtimekit-ios-core" */;
 			productName = RealtimeKit;
-		};
-		C08C834D2BDBE76C7437A752 /* RealtimeKitUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C08C834B2BDBE76C7437A752 /* XCLocalSwiftPackageReference "LocalPackages/RealtimeKitUI" */;
-			productName = RealtimeKitUI;
 		};
 		FB00000000000000000000B2 /* FirebaseMessaging */ = {
 			isa = XCSwiftPackageProductDependency;

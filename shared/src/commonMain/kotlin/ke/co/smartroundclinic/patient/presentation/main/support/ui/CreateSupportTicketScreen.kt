@@ -53,7 +53,9 @@ import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 internal fun CreateSupportTicketScreen(
     categories: List<IssueCategory>,
     isCreating: Boolean,
+    isLoadingCategories: Boolean,
     onBack: () -> Unit,
+    onOpenCategoryDropdown: () -> Unit = {},
     onSubmit: (categoryId: String, title: String, description: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -90,7 +92,10 @@ internal fun CreateSupportTicketScreen(
                         readOnly = true,
                         placeholder = { Text("Select a category") },
                         trailingIcon = { Icon(Icons.Outlined.ExpandMore, contentDescription = null) },
-                        modifier = Modifier.fillMaxWidth().clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { categoryDropdownOpen = true },
+                        modifier = Modifier.fillMaxWidth().clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
+                            categoryDropdownOpen = true
+                            onOpenCategoryDropdown()
+                        },
                         enabled = false,
                     )
                     DropdownMenu(
@@ -99,12 +104,25 @@ internal fun CreateSupportTicketScreen(
                         containerColor = MaterialTheme.colorScheme.background,
                         modifier = Modifier.fillMaxWidth(0.9f),
                     ) {
-                        categories.forEach { cat ->
+                        if (isLoadingCategories) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(modifier = Modifier.height(20.dp), strokeWidth = 2.dp, color = Primary40)
+                            }
+                        } else if (categories.isEmpty()) {
                             DropdownMenuItem(
-                                colors = MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.onBackground),
-                                text = { Text(cat.name, style = MaterialTheme.typography.bodyMedium) },
-                                onClick = { selectedCategory = cat; categoryDropdownOpen = false },
+                                enabled = false,
+                                colors = MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                                text = { Text("No categories available", style = MaterialTheme.typography.bodyMedium) },
+                                onClick = {},
                             )
+                        } else {
+                            categories.forEach { cat ->
+                                DropdownMenuItem(
+                                    colors = MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.onBackground),
+                                    text = { Text(cat.name, style = MaterialTheme.typography.bodyMedium) },
+                                    onClick = { selectedCategory = cat; categoryDropdownOpen = false },
+                                )
+                            }
                         }
                     }
                 }

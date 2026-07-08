@@ -4,12 +4,6 @@ import FirebaseCore
 import FirebaseMessaging
 import UserNotifications
 import RealtimeKit
-import RealtimeKitUI
-
-/// Retained for the lifetime of an active meeting.
-/// rtkUI owns the delegate relationship with RtkSetupViewController; if it
-/// is released before the user taps "Join", the meeting room VC is never shown.
-private var activeMeeting: RealtimeKitUI?
 
 class AppDelegate: NSObject, UIApplicationDelegate {
 
@@ -64,7 +58,7 @@ struct iOSApp: App {
             )
         )
         MainViewControllerKt.doInitKoin()
-        wireRealtimeMeetingBridge()
+        wireRtkCallBridge()
     }
 
     var body: some Scene {
@@ -73,34 +67,191 @@ struct iOSApp: App {
         }
     }
 
-    private func wireRealtimeMeetingBridge() {
-        RealtimeMeetingBridge.shared.factory = { authToken, enableVideo, onLeave in
-            let rtkUI = RealtimeKitUI(
-                meetingInfo: RtkMeetingInfo(
-                    authToken: authToken,
-                    enableAudio: true,
-                    enableVideo: enableVideo.boolValue
-                )
+    private func wireRtkCallBridge() {
+        RtkCallBridge.shared.factory = { authToken, enableAudio, enableVideo, listener in
+            RtkCallSessionImpl(
+                authToken: authToken,
+                enableAudio: enableAudio.boolValue,
+                enableVideo: enableVideo.boolValue,
+                listener: listener
             )
-            activeMeeting = rtkUI   // keep alive so the delegate link stays valid
-
-            // MeetingViewController never calls self.dismiss — it only calls the completion.
-            // We must dismiss the entire RTK modal chain here before notifying Kotlin.
-            // Weak ref avoids a retain cycle; UIKit retains vc while it's presented.
-            weak var setupVC: UIViewController?
-            let vc = rtkUI.startMeeting {
-                activeMeeting = nil
-                if let presenter = setupVC?.presentingViewController {
-                    presenter.dismiss(animated: true) { onLeave() }
-                } else {
-                    // Presenter is gone — Kotlin onDispose will clean up the Compose side.
-                    onLeave()
-                }
-            }
-            setupVC = vc
-            vc.modalPresentationStyle = .fullScreen
-            vc.overrideUserInterfaceStyle = .dark
-            return vc
         }
     }
+}
+
+/// Swift-side handle over one live RealtimeKit `RealtimeKitClient`, driven by
+/// [ke.co.smartroundclinic.patient.presentation.main.chat.call.RtkCallController] via the
+/// `IosCallSession`/`IosCallSessionListener` Kotlin interfaces. Mirrors the Android actual's
+/// init→auto-joinRoom chain and event forwarding, since Kotlin has no direct visibility into
+/// RealtimeKit on iOS (it's linked only into this app target via SPM, not cinterop'd into the
+/// shared Kotlin framework).
+private final class RtkCallSessionImpl: NSObject, RtkMeetingRoomEventListener, RtkSelfEventListener, RtkParticipantsEventListener, IosCallSession {
+    private let client: RealtimeKitClient
+    private let listener: IosCallSessionListener
+
+    init(authToken: String, enableAudio: Bool, enableVideo: Bool, listener: IosCallSessionListener) {
+        client = RealtimeKitiOSClientBuilder().build()
+        self.listener = listener
+        super.init()
+
+        client.addMeetingRoomEventListener(meetingRoomEventListener: self)
+        client.addSelfEventListener(selfEventListener: self)
+        client.addParticipantsEventListener(participantsEventListener: self)
+
+        let meetingInfo = RtkMeetingInfo(authToken: authToken, enableAudio: enableAudio, enableVideo: enableVideo)
+        client.doInit(meetingInfo: meetingInfo, onSuccess: {}, onFailure: { [weak self] error in
+            self?.listener.onFailed(message: error.message)
+        })
+    }
+
+    // MARK: - IosCallSession (called from Kotlin)
+
+    func leaveRoom() {
+        client.leaveRoom(onSuccess: {}, onFailure: { [weak self] _ in self?.listener.onEnded() })
+    }
+
+    func toggleAudio() {
+        if client.localUser.audioEnabled {
+            client.localUser.disableAudio(onResult: { _ in })
+        } else {
+            client.localUser.enableAudio(onResult: { _ in })
+        }
+    }
+
+    func toggleVideo() {
+        if client.localUser.videoEnabled {
+            client.localUser.disableVideo(onResult: { _ in })
+        } else {
+            client.localUser.enableVideo(onResult: { _ in })
+        }
+    }
+
+    func switchCamera() {
+        client.localUser.switchCamera()
+    }
+
+    func dispose() {
+        client.removeMeetingRoomEventListener(meetingRoomEventListener: self)
+        client.removeSelfEventListener(selfEventListener: self)
+        client.removeParticipantsEventListener(participantsEventListener: self)
+        client.release(onSuccess: {}, onFailure: { _ in })
+    }
+
+    func localVideoView() -> UIView? {
+        client.localUser.getSelfPreview()
+    }
+
+    func remoteVideoView() -> UIView? {
+        client.participants.joined.first?.getVideoView()
+    }
+
+    // MARK: - RtkConnectionEventListener (required by RtkMeetingRoomEventListener)
+
+    func onMediaConnectionUpdate(update: MediaConnectionUpdate) {}
+    func onSocketConnectionUpdate(newState: SocketConnectionState) {}
+
+    // MARK: - RtkMeetingRoomEventListener
+
+    func onMeetingInitStarted() {}
+
+    func onMeetingInitCompleted(meeting: RealtimeKitClient) {
+        meeting.joinRoom(onSuccess: {}, onFailure: { [weak self] error in
+            self?.listener.onFailed(message: error.message)
+        })
+    }
+
+    func onMeetingInitFailed(error: MeetingError) {
+        listener.onFailed(message: error.message)
+    }
+
+    func onMeetingRoomJoinStarted() {}
+
+    func onMeetingRoomJoinCompleted(meeting: RealtimeKitClient) {
+        listener.onConnected()
+        listener.onAudioUpdate(enabled: meeting.localUser.audioEnabled)
+        listener.onVideoUpdate(enabled: meeting.localUser.videoEnabled)
+        if let participant = meeting.participants.joined.first {
+            listener.onRemoteParticipantUpdate(
+                name: participant.name,
+                audioEnabled: participant.audioEnabled,
+                videoEnabled: participant.videoEnabled
+            )
+        }
+    }
+
+    func onMeetingRoomJoinFailed(error: MeetingError) {
+        listener.onFailed(message: error.message)
+    }
+
+    func onMeetingRoomLeaveStarted() {}
+
+    func onMeetingRoomLeaveCompleted() {
+        listener.onEnded()
+    }
+
+    func onMeetingEnded() {
+        listener.onEnded()
+    }
+
+    func onActiveTabUpdate(meeting: RealtimeKitClient, activeTab: ActiveTab) {}
+
+    // MARK: - RtkSelfEventListener
+
+    func onMeetingRoomJoinedWithoutCameraPermission() {}
+    func onMeetingRoomJoinedWithoutMicPermission() {}
+
+    func onAudioUpdate(isEnabled: Bool) {
+        listener.onAudioUpdate(enabled: isEnabled)
+    }
+
+    func onVideoUpdate(isEnabled: Bool) {
+        listener.onVideoUpdate(enabled: isEnabled)
+    }
+
+    func onScreenShareUpdate(isEnabled: Bool) {}
+    func onPinned() {}
+    func onUnpinned() {}
+    func onAudioDevicesUpdated(devices: [AudioDevice]) {}
+    func onAudioDeviceChanged(audioDevice: AudioDevice) {}
+    func onVideoDeviceChanged(videoDevice: VideoDevice) {}
+    func onWaitListStatusUpdate(waitListStatus: WaitListStatus) {}
+    func onUpdate(participant: RtkSelfParticipant) {}
+
+    func onRemovedFromMeeting() {
+        listener.onEnded()
+    }
+
+    func onScreenShareStartFailed(reason: String) {}
+    func onPermissionsUpdated(permission: SelfPermissions) {}
+
+    // MARK: - RtkParticipantsEventListener
+
+    func onParticipantJoin(participant: RtkRemoteParticipant) {
+        listener.onRemoteParticipantUpdate(
+            name: participant.name,
+            audioEnabled: participant.audioEnabled,
+            videoEnabled: participant.videoEnabled
+        )
+    }
+
+    func onParticipantLeave(participant: RtkRemoteParticipant) {
+        listener.onRemoteParticipantUpdate(name: nil, audioEnabled: false, videoEnabled: false)
+    }
+
+    func onAudioUpdate(participant: RtkRemoteParticipant, isEnabled: Bool) {
+        listener.onRemoteParticipantUpdate(name: participant.name, audioEnabled: isEnabled, videoEnabled: participant.videoEnabled)
+    }
+
+    func onVideoUpdate(participant: RtkRemoteParticipant, isEnabled: Bool) {
+        listener.onRemoteParticipantUpdate(name: participant.name, audioEnabled: participant.audioEnabled, videoEnabled: isEnabled)
+    }
+
+    func onScreenShareUpdate(participant: RtkRemoteParticipant, isEnabled: Bool) {}
+    func onParticipantPinned(participant: RtkRemoteParticipant) {}
+    func onParticipantUnpinned(participant: RtkRemoteParticipant) {}
+    func onActiveParticipantsChanged(active: [RtkRemoteParticipant]) {}
+    func onActiveSpeakerChanged(participant: RtkRemoteParticipant?) {}
+    func onAllParticipantsUpdated(allParticipants: [RtkParticipant]) {}
+    func onNewBroadcastMessage(type: String, payload: [String: Any]) {}
+    func onUpdate(participants: RtkParticipants) {}
 }
