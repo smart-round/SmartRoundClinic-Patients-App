@@ -244,13 +244,16 @@ private fun ParticipantView(
 ) {
     Box(modifier = modifier.background(Brush.verticalGradient(listOf(GradientStart, GradientEnd)))) {
         // Always mounted — see the note on LocalVideoPreview/RemoteVideoView for why this
-        // must never be conditionally added/removed. The avatar card below simply draws
-        // over it when the camera is off.
-        videoContent(Modifier.fillMaxSize())
+        // must never be conditionally added/removed. On iOS, a *visible* (non-zero-size)
+        // interop view punches a permanent transparent hole through the whole Compose canvas
+        // at its bounds, so Compose content drawn "over" it (the avatar below) would never
+        // actually render there — shrinking it to near-zero size when the camera is off keeps
+        // it mounted without reserving any visible/cutout space.
+        videoContent(if (showVideo) Modifier.fillMaxSize() else Modifier.size(1.dp))
 
         if (!showVideo) {
             Box(
-                modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(GradientStart, GradientEnd))),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
