@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,7 +22,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.Image
@@ -51,13 +51,16 @@ import coil3.compose.AsyncImage
 import ke.co.smartroundclinic.patient.domain.model.Article
 import ke.co.smartroundclinic.patient.domain.model.ArticleCategory
 import ke.co.smartroundclinic.patient.presentation.common.composables.PatientDashboardHeader
-import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 import ke.co.smartroundclinic.patient.presentation.theme.Primary90
+import ke.co.smartroundclinic.patient.presentation.theme.Primary95
 import ke.co.smartroundclinic.patient.presentation.theme.ShapeCard
 import ke.co.smartroundclinic.patient.presentation.theme.ShapePill
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -127,7 +130,7 @@ internal fun ArticleListScreen(
                             items(filteredArticles, key = { it.id }) { article ->
                                 ArticleCard(
                                     article = article,
-                                    categoryName = categories.find { it.id == article.categoryId }?.name,
+                                    authorName = article.authorName ?: categories.find { it.id == article.categoryId }?.name,
                                     onClick = { onArticleClick(article) },
                                 )
                             }
@@ -212,106 +215,111 @@ private fun EmptyView(modifier: Modifier = Modifier) {
 @Composable
 private fun ArticleCard(
     article: Article,
-    categoryName: String?,
+    authorName: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min)
-            .clip(ShapeCard)
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-                onClick = onClick,
-            ),
+    val readMinutes = remember(article.content) {
+        val words = article.content
+            .replace(Regex("<[^>]+>"), "")
+            .trim()
+            .split(Regex("\\s+"))
+            .count { it.isNotBlank() }
+        maxOf(1, words / 200)
+    }
+
+    val formattedDate = remember(article.datePosted, article.createdAt) {
+        val dateStr = article.datePosted ?: article.createdAt
+        try {
+            val dt = Instant.parse(dateStr).toLocalDateTime(TimeZone.currentSystemDefault())
+            val month = dt.month.name.lowercase().replaceFirstChar { it.uppercase() }.take(3)
+            "${dt.dayOfMonth} $month"
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    Card(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = ShapeCard,
+        colors = CardDefaults.cardColors(containerColor = Primary95),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .width(4.dp)
-                .fillMaxHeight()
-                .background(Primary40),
-        )
-        Card(
-            modifier = Modifier.weight(1f),
-            shape = RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 16.dp, bottomEnd = 16.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBackground),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        ) {
-            Column {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (article.thumbnailUrl != null) {
-                        AsyncImage(
-                            model = article.thumbnailUrl,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(topEnd = 16.dp)),
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Outlined.Image,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.size(40.dp),
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 170.dp)) {
+            Column(
+                modifier = Modifier.weight(1f).fillMaxHeight().padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (!authorName.isNullOrBlank()) {
+                    Text(
+                        text = authorName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Primary40,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Text(
+                    text = article.title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (article.summary.isNotBlank()) {
+                    Text(
+                        text = article.summary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+
+                Spacer(Modifier.weight(1f))
+
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "$readMinutes min read",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (formattedDate.isNotBlank()) {
+                        Text(
+                            text = formattedDate,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            modifier = Modifier.padding(start = 6.dp),
                         )
                     }
                 }
+            }
 
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = article.title,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface,
+            Box(
+                modifier = Modifier
+                    .width(110.dp)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (article.thumbnailUrl != null) {
+                    AsyncImage(
+                        model = article.thumbnailUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.matchParentSize(),
                     )
-                    if (article.summary.isNotBlank()) {
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = article.summary,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (!categoryName.isNullOrBlank()) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(Primary90)
-                                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                            ) {
-                                Text(
-                                    text = categoryName,
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                                    color = Primary40,
-                                )
-                            }
-                        }
-                        if (article.datePosted != null) {
-                            Text(
-                                text = article.datePosted.take(10),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.Image,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(28.dp),
+                    )
                 }
             }
         }

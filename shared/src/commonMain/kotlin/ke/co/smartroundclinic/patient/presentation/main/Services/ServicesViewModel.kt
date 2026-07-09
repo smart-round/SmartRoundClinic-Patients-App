@@ -19,6 +19,8 @@ import ke.co.smartroundclinic.patient.domain.usecase.appointment.CancelAppointme
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.availability.GetAvailableSlotsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.availability.GetCalendarViewUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.datastore.GetKeyUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.datastore.SetKeyUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorsBySpecializationUseCase
 import ke.co.smartroundclinic.patient.core.snackbar.SnackbarController
 import ke.co.smartroundclinic.patient.domain.usecase.medicalrecord.GetMedicalRecordUseCase
@@ -31,6 +33,9 @@ import ke.co.smartroundclinic.patient.domain.usecase.speciality.GetSpecialitiesU
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 data class StkPushResult(
     val invoiceId: String,
@@ -39,7 +44,19 @@ data class StkPushResult(
     val currency: String,
 )
 
+// Persisted client-side (DataStore) from the moment an STK push completes until the
+// resulting booking returns 201, so a killed/backgrounded app can resume the retry
+// flow on next launch instead of losing track of a payment the patient already made.
+@Serializable
+data class PendingBookingPayment(
+    val doctorId: String,
+    val date: String,
+    val slotStart: String,
+    val transactionRef: String,
+)
+
 private const val ALREADY_RATED_MESSAGE = "You have already rated this appointment"
+private const val PENDING_BOOKING_PAYMENT_KEY = "pending_booking_payment"
 
 class ServicesViewModel(
     private val getSpecialitiesUseCase: GetSpecialitiesUseCase,
@@ -55,6 +72,8 @@ class ServicesViewModel(
     private val rateDoctorUseCase: RateDoctorUseCase,
     private val updateDoctorRatingUseCase: UpdateDoctorRatingUseCase,
     private val deleteDoctorRatingUseCase: DeleteDoctorRatingUseCase,
+    private val getKeyUseCase: GetKeyUseCase,
+    private val setKeyUseCase: SetKeyUseCase,
     private val snackbarController: SnackbarController,
 ) : ViewModel() {
 
@@ -118,6 +137,12 @@ class ServicesViewModel(
     var bookingError by mutableStateOf<String?>(null)
         private set
 
+    // Non-null from the moment a payment completes until its booking succeeds (201) or the
+    // transactionRef is confirmed spent (409). Retryable — the "book" CTA reuses this ref
+    // instead of starting a new STK push while it's set.
+    var pendingBookingPayment by mutableStateOf<PendingBookingPayment?>(null)
+        private set
+
     var appointmentDetail by mutableStateOf<Appointment?>(null)
         private set
 
@@ -141,6 +166,7 @@ class ServicesViewModel(
             val result = getSpecialitiesUseCase()
             if (result is Resource.Success) specialities = result.data ?: emptyList()
         }
+        viewModelScope.launch { resumePendingBookingPayment() }
     }
 
     fun loadDoctorsBySpeciality(specialityId: String) {
@@ -181,15 +207,17 @@ class ServicesViewModel(
     }
 
     fun loadSlots(doctorId: String, date: String) {
-        viewModelScope.launch {
-            isLoadingSlots = true
-            availableSlots = emptyList()
-            when (val result = getAvailableSlotsUseCase(doctorId, date)) {
-                is Resource.Success -> availableSlots = result.data ?: emptyList()
-                else -> availableSlots = emptyList()
-            }
-            isLoadingSlots = false
+        viewModelScope.launch { fetchAvailableSlots(doctorId, date) }
+    }
+
+    private suspend fun fetchAvailableSlots(doctorId: String, date: String) {
+        isLoadingSlots = true
+        availableSlots = emptyList()
+        when (val result = getAvailableSlotsUseCase(doctorId, date)) {
+            is Resource.Success -> availableSlots = result.data ?: emptyList()
+            else -> availableSlots = emptyList()
         }
+        isLoadingSlots = false
     }
 
     fun initiateStkPush(
@@ -282,35 +310,113 @@ class ServicesViewModel(
         val doctorId = pendingDoctorId ?: return
         val date = pendingDate ?: return
         val slot = pendingSlot ?: return
+        val ref = transactionRef ?: return
         viewModelScope.launch {
-            isBooking = true
-            bookedAppointment = null
-            bookingError = null
-            var lastError: String? = null
-            repeat(4) { attempt ->
-                if (attempt > 0) delay(3_000)
-                when (val result = bookAppointmentUseCase(doctorId, date, slot, transactionRef = transactionRef)) {
-                    is Resource.Success -> {
-                        bookedAppointment = result.data
-                        isBooking = false
-                        return@launch
-                    }
-                    is Resource.Error -> {
-                        lastError = result.message
-                        val isPendingPayment = result.message?.contains("PENDING", ignoreCase = true) == true
-                        if (!isPendingPayment || attempt == 3) {
-                            val msg = result.message ?: "Booking failed"
+            persistPendingBookingPayment(doctorId, date, slot, ref)
+            attemptBooking(doctorId, date, slot, ref)
+        }
+    }
+
+    /**
+     * Retries a booking for an already-completed payment against a newly picked date/slot —
+     * used after a 400 "slot taken" conflict. Never starts a new STK push.
+     */
+    fun retryBooking(date: String, slot: String) {
+        val pending = pendingBookingPayment ?: return
+        if (isBooking) return
+        pendingDoctorId = pending.doctorId
+        pendingDate = date
+        pendingSlot = slot
+        viewModelScope.launch {
+            persistPendingBookingPayment(pending.doctorId, date, slot, pending.transactionRef)
+            attemptBooking(pending.doctorId, date, slot, pending.transactionRef)
+        }
+    }
+
+    /** On process restart, resumes any payment that completed but never turned into a booking. */
+    private suspend fun resumePendingBookingPayment() {
+        val stored = getKeyUseCase(PENDING_BOOKING_PAYMENT_KEY) ?: return
+        val pending = runCatching { Json.decodeFromString<PendingBookingPayment>(stored) }.getOrNull()
+        if (pending == null) {
+            setKeyUseCase(PENDING_BOOKING_PAYMENT_KEY, null)
+            return
+        }
+        pendingBookingPayment = pending
+        pendingDoctorId = pending.doctorId
+        pendingDate = pending.date
+        pendingSlot = pending.slotStart
+        attemptBooking(pending.doctorId, pending.date, pending.slotStart, pending.transactionRef)
+    }
+
+    private suspend fun persistPendingBookingPayment(doctorId: String, date: String, slotStart: String, transactionRef: String) {
+        val pending = PendingBookingPayment(doctorId, date, slotStart, transactionRef)
+        pendingBookingPayment = pending
+        setKeyUseCase(PENDING_BOOKING_PAYMENT_KEY, Json.encodeToString(pending))
+    }
+
+    private suspend fun clearPendingBookingPayment() {
+        pendingBookingPayment = null
+        setKeyUseCase(PENDING_BOOKING_PAYMENT_KEY, null)
+    }
+
+    /**
+     * Books against a transactionRef that has already been paid. Only two outcomes are terminal:
+     * 201 (booked) and 409 "already been used" (transactionRef spent, needs a fresh payment).
+     * A 400 "Slot ... is not available" conflict is always retryable with the same
+     * transactionRef — it refreshes availability and leaves [pendingBookingPayment] intact so
+     * the patient can pick another time without paying again.
+     */
+    private suspend fun attemptBooking(doctorId: String, date: String, slot: String, transactionRef: String) {
+        isBooking = true
+        bookedAppointment = null
+        bookingError = null
+        repeat(4) { attempt ->
+            if (attempt > 0) delay(3_000)
+            when (val result = bookAppointmentUseCase(doctorId, date, slot, transactionRef = transactionRef)) {
+                is Resource.Success -> {
+                    bookedAppointment = result.data
+                    clearPendingBookingPayment()
+                    pendingDoctorId = null
+                    pendingDate = null
+                    pendingSlot = null
+                    isBooking = false
+                    return
+                }
+                is Resource.Error -> {
+                    val msg = result.message ?: "Booking failed"
+                    when {
+                        msg.startsWith("Slot ") && msg.contains("is not available", ignoreCase = true) -> {
+                            snackbarController.show(
+                                "Your selected time was just taken — pick another time. You've already paid, no need to pay again.",
+                            )
+                            pendingSlot = null
+                            fetchAvailableSlots(doctorId, date)
+                            isBooking = false
+                            return
+                        }
+                        msg.contains("already been used", ignoreCase = true) -> {
+                            bookingError = msg
+                            snackbarController.show(msg, isError = true)
+                            clearPendingBookingPayment()
+                            pendingDoctorId = null
+                            pendingDate = null
+                            pendingSlot = null
+                            isBooking = false
+                            return
+                        }
+                        msg.contains("PENDING", ignoreCase = true) && attempt < 3 -> Unit
+                        else -> {
                             bookingError = msg
                             snackbarController.show(msg, isError = true)
                             isBooking = false
-                            return@launch
+                            return
                         }
                     }
-                    else -> {}
                 }
+                else -> {}
             }
-            isBooking = false
         }
+        isBooking = false
     }
 
     fun dismissStkPush() {

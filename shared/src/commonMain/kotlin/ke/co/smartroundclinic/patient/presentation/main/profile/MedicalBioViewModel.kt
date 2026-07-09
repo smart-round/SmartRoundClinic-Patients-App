@@ -8,13 +8,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.core.snackbar.SnackbarController
+import ke.co.smartroundclinic.patient.domain.repository.UserLocalRepository
+import ke.co.smartroundclinic.patient.domain.usecase.personalinfo.CreatePersonalInformationUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.personalinfo.GetPersonalInformationUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.personalinfo.UpdatePersonalInformationUseCase
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+
+// This clinic currently only operates in Kenya — the phone number collected at sign-up has no
+// separate country-code field, but the backend requires one to create a personal-information record.
+private const val DEFAULT_COUNTRY_CODE = "254"
 
 class MedicalBioViewModel(
     private val getPersonalInformationUseCase: GetPersonalInformationUseCase,
+    private val createPersonalInformationUseCase: CreatePersonalInformationUseCase,
     private val updatePersonalInformationUseCase: UpdatePersonalInformationUseCase,
+    private val userLocalRepository: UserLocalRepository,
     private val snackbarController: SnackbarController,
 ) : ViewModel() {
 
@@ -36,6 +45,11 @@ class MedicalBioViewModel(
     var saveSuccess by mutableStateOf(false)
         private set
 
+    // Drives create (POST, no record yet) vs update (PUT, editing an existing record) and the
+    // screen's button label. Set from the GET result — never present without first checking it.
+    var hasExistingProfile by mutableStateOf(false)
+        private set
+
     init {
         load()
     }
@@ -46,6 +60,7 @@ class MedicalBioViewModel(
             when (val result = getPersonalInformationUseCase()) {
                 is Resource.Success -> {
                     val data = result.data
+                    hasExistingProfile = data != null
                     if (data != null) {
                         weight = data.weight?.toString() ?: ""
                         weightIn = data.weightIn ?: "KG"
@@ -61,7 +76,13 @@ class MedicalBioViewModel(
                         currentMedications.addAll(data.currentMedications)
                     }
                 }
-                is Resource.Error -> snackbarController.show(result.message ?: "Failed to load medical info", isError = true)
+                is Resource.Error -> {
+                    hasExistingProfile = false
+                    // "Not found" just means this patient hasn't created a profile yet — expected
+                    // for new sign-ups, not a real error worth alarming them with.
+                    val notFound = result.message?.contains("not found", ignoreCase = true) == true
+                    if (!notFound) snackbarController.show(result.message ?: "Failed to load medical info", isError = true)
+                }
                 else -> {}
             }
             isLoading = false
@@ -93,18 +114,60 @@ class MedicalBioViewModel(
         viewModelScope.launch {
             isSaving = true
             saveSuccess = false
-            when (val result = updatePersonalInformationUseCase(
-                weight = weight.toDoubleOrNull(),
-                weightIn = weightIn.ifBlank { null },
-                height = height.toDoubleOrNull(),
-                heightIn = heightIn.ifBlank { null },
-                bloodGroup = bloodGroup.ifBlank { null },
-                maritalStatus = maritalStatus.ifBlank { null },
-                allergies = allergies.toList(),
-                chronicConditions = chronicConditions.toList(),
-                currentMedications = currentMedications.toList(),
-            )) {
+
+            val result = if (hasExistingProfile) {
+                updatePersonalInformationUseCase(
+                    weight = weight.toDoubleOrNull(),
+                    weightIn = weightIn.ifBlank { null },
+                    height = height.toDoubleOrNull(),
+                    heightIn = heightIn.ifBlank { null },
+                    bloodGroup = bloodGroup.ifBlank { null },
+                    maritalStatus = maritalStatus.ifBlank { null },
+                    allergies = allergies.toList(),
+                    chronicConditions = chronicConditions.toList(),
+                    currentMedications = currentMedications.toList(),
+                )
+            } else {
+                val user = userLocalRepository.observeUser().first()
+                val phoneNumber = user?.phoneNumber
+                val dateOfBirth = user?.dateOfBirth
+                when {
+                    user == null -> {
+                        snackbarController.show("Could not load your profile. Please try again.", isError = true)
+                        null
+                    }
+                    phoneNumber.isNullOrBlank() || dateOfBirth.isNullOrBlank() -> {
+                        snackbarController.show(
+                            "Please add your phone number and date of birth in your profile first",
+                            isError = true,
+                        )
+                        null
+                    }
+                    bloodGroup.isBlank() -> {
+                        snackbarController.show("Blood group is required", isError = true)
+                        null
+                    }
+                    else -> createPersonalInformationUseCase(
+                        gender = user.gender,
+                        phoneNumber = phoneNumber,
+                        countryCode = DEFAULT_COUNTRY_CODE,
+                        bloodGroup = bloodGroup,
+                        dateOfBirth = dateOfBirth,
+                        weight = weight.toDoubleOrNull(),
+                        weightIn = weightIn.ifBlank { null },
+                        height = height.toDoubleOrNull(),
+                        heightIn = heightIn.ifBlank { null },
+                        maritalStatus = maritalStatus.ifBlank { null },
+                        allergies = allergies.toList(),
+                        chronicConditions = chronicConditions.toList(),
+                        currentMedications = currentMedications.toList(),
+                    )
+                }
+            }
+
+            when (result) {
                 is Resource.Success -> {
+                    hasExistingProfile = true
                     saveSuccess = true
                     snackbarController.show("Medical information saved")
                 }

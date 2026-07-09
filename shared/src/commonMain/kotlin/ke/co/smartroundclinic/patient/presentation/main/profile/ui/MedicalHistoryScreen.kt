@@ -168,7 +168,7 @@ private fun MedicalRecordItem(record: MedicalRecord, modifier: Modifier = Modifi
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = "Dr. ${record.doctorId.take(8)}",
+                        text = record.doctorName?.let { "Dr. $it" } ?: "Doctor",
                         style = MaterialTheme.typography.bodySmall,
                         color = Tertiary40,
                     )

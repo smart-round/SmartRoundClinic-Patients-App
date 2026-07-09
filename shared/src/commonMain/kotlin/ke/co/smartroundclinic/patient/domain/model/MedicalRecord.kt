@@ -14,6 +14,7 @@ data class MedicalRecord(
     val additionalNotes: String?,
     val createdAt: String,
     val updatedAt: String?,
+    val doctorName: String? = null,
 )
 
 data class PrescriptionItem(

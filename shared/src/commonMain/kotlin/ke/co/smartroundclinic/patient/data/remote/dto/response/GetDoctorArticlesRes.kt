@@ -33,7 +33,8 @@ data class GetDoctorArticlesItem(
     val summary: String, // By keeping low blood pressure you improve your cadio-vascular health
     val thumbnailUrl: String, // https://868c9d8e015c6365c5f70beed2b85140.r2.cloudflarestorage.com/smartroundclinic-private/article-thumbnails/69ecff55c09d71db52617907.jpeg?x-id=GetObject&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ecf53ae43fb6944a55fda7f081e3b1c1%2F20260522%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260522T160341Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&X-Amz-Signature=63582002d1e5dcd79c6e0e98554f192848b8533321bb0ab9a0b6e3a29d36abfe
     val title: String, // How to maintaing you Blood Pressure
-    val updatedAt: String? = null // 2026-04-30T22:06:41.098046733Z
+    val updatedAt: String? = null, // 2026-04-30T22:06:41.098046733Z
+    val authorName: String? = null,
 )
 
 fun GetDoctorArticlesItem.toDomain() = Article(
@@ -53,4 +54,5 @@ fun GetDoctorArticlesItem.toDomain() = Article(
     datePosted = datePosted,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    authorName = authorName,
 )

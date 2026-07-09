@@ -3,9 +3,11 @@ package ke.co.smartroundclinic.patient.data.repository
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import ke.co.smartroundclinic.patient.common.Resource
+import ke.co.smartroundclinic.patient.data.remote.dto.request.CreatePersonalInformationReq
 import ke.co.smartroundclinic.patient.data.remote.dto.request.UpdatePersonalInformationReq
 import ke.co.smartroundclinic.patient.data.remote.dto.response.PersonalInformationResponse
 import ke.co.smartroundclinic.patient.domain.repository.PersonalInformationRepository
@@ -19,6 +21,49 @@ class PersonalInformationRepositoryImpl(private val client: HttpClient) : Person
         withContext(Dispatchers.IO) {
             try {
                 val response = client.get("patient/personal-information").body<PersonalInformationResponse>()
+                if (response.status) Resource.Success(data = response, message = response.message)
+                else Resource.Error(message = response.message)
+            } catch (e: Exception) {
+                Resource.Error(e.message ?: "An unknown error occurred")
+            }
+        }
+
+    override suspend fun create(
+        gender: String,
+        phoneNumber: String,
+        countryCode: String,
+        bloodGroup: String,
+        dateOfBirth: String,
+        weight: Double?,
+        weightIn: String?,
+        height: Double?,
+        heightIn: String?,
+        maritalStatus: String?,
+        allergies: List<String>,
+        chronicConditions: List<String>,
+        currentMedications: List<String>,
+    ): Resource<PersonalInformationResponse> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = client.post("patient/personal-information") {
+                    setBody(
+                        CreatePersonalInformationReq(
+                            gender = gender,
+                            phoneNumber = phoneNumber,
+                            countryCode = countryCode,
+                            bloodGroup = bloodGroup,
+                            dateOfBirth = dateOfBirth,
+                            weight = weight,
+                            weightIn = weightIn,
+                            height = height,
+                            heightIn = heightIn,
+                            maritalStatus = maritalStatus,
+                            allergies = allergies,
+                            chronicConditions = chronicConditions,
+                            currentMedications = currentMedications,
+                        )
+                    )
+                }.body<PersonalInformationResponse>()
                 if (response.status) Resource.Success(data = response, message = response.message)
                 else Resource.Error(message = response.message)
             } catch (e: Exception) {

@@ -65,6 +65,7 @@ private val MpesaGreen = Color(0xFF00A650)
 fun StkPushSheet(
     sheetState: SheetState,
     isStkInitiating: Boolean,
+    isBooking: Boolean = false,
     stkPushData: StkPushResult?,
     stkPollState: String?,
     stkError: String?,
@@ -129,6 +130,7 @@ fun StkPushSheet(
             AnimatedContent(
                 targetState = when {
                     bookedAppointmentId != null -> "SUCCESS"
+                    isBooking -> "BOOKING"
                     stkPollState == "FAILED" || (!isStkInitiating && stkPushData == null && stkError != null) -> "FAILED"
                     stkPushData != null -> "POLLING"
                     isStkInitiating -> "SENDING"
@@ -147,6 +149,7 @@ fun StkPushSheet(
                         onSend = onSendStkPush,
                     )
                     "SENDING" -> SendingContent()
+                    "BOOKING" -> BookingContent()
                     "POLLING" -> PollingContent(stkPushData = stkPushData)
                     else -> FailedContent(
                         message = stkError ?: "Payment was not completed. Please try again.",
@@ -336,6 +339,36 @@ private fun SendingContent() {
         Text(
             text = "Sending M-Pesa prompt…",
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun BookingContent() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(48.dp),
+            color = MpesaGreen,
+            strokeWidth = 3.dp,
+        )
+        Spacer(Modifier.height(20.dp))
+        Text(
+            text = "Confirming your booking…",
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Your payment was received. Please don't close this screen.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
     }

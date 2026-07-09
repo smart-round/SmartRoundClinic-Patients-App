@@ -181,6 +181,7 @@ fun HomeRoot(
                     stkError = servicesVm.stkError,
                     bookedAppointmentId = servicesVm.bookedAppointment?.id,
                     bookingError = servicesVm.bookingError,
+                    pendingBookingPayment = servicesVm.pendingBookingPayment,
                     onLoadCalendar = { yearMonth -> servicesVm.loadCalendarView(dest.doctorId, yearMonth) },
                     onLoadSlots = { date -> servicesVm.loadSlots(dest.doctorId, date) },
                     isRebooking = dest.previousAppointmentId != null,
@@ -195,6 +196,7 @@ fun HomeRoot(
                             previousAppointmentId = dest.previousAppointmentId,
                         )
                     },
+                    onRetryBooking = { date, slotStart -> servicesVm.retryBooking(date, slotStart) },
                     onDismissStkPush = { servicesVm.dismissStkPush() },
                     onViewBooking = { appointmentId ->
                         servicesVm.clearBookingState()

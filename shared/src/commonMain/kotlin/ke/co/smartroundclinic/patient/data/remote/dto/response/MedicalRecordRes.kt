@@ -28,6 +28,7 @@ data class MedicalRecordData(
     val additionalNotes: String? = null,
     val createdAt: String,
     val updatedAt: String? = null,
+    val doctorName: String? = null,
 )
 
 @Serializable
@@ -62,4 +63,5 @@ fun MedicalRecordData.toDomain() = MedicalRecord(
     additionalNotes = additionalNotes,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    doctorName = doctorName,
 )

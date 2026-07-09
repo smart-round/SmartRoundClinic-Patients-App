@@ -302,7 +302,7 @@ fun MedicalBioScreen(
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 } else {
                     Text(
-                        "Save Changes",
+                        if (viewModel.hasExistingProfile) "Update" else "Create",
                         style = MaterialTheme.typography.labelLarge,
                         color = Color.White,
                         modifier = Modifier.padding(vertical = 14.dp),

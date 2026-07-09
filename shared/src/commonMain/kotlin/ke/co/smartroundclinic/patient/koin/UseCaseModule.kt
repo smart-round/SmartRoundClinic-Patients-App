@@ -52,6 +52,7 @@ import ke.co.smartroundclinic.patient.domain.usecase.datastore.ObserveKeyUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.datastore.SetKeyUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.medicalrecord.GetMedicalRecordUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.medicalrecord.GetMyMedicalHistoryUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.personalinfo.CreatePersonalInformationUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.personalinfo.GetPersonalInformationUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.personalinfo.UpdatePersonalInformationUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.rating.DeleteDoctorRatingUseCase
@@ -150,10 +151,10 @@ val useCaseModule = module {
     viewModel { HomeViewModel(get(), get(), get(), get()) }
     viewModel { ProfileViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { DoctorsProfileViewModel(get(), get(), get(), get()) }
-    viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ConsultationViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get()) }
-    viewModel { MedicalBioViewModel(get(), get(), get()) }
+    viewModel { MedicalBioViewModel(get(), get(), get(), get(), get()) }
     viewModel { MedicalHistoryViewModel(get()) }
 
     // Medical record use cases
@@ -162,6 +163,7 @@ val useCaseModule = module {
 
     // Personal information use cases
     single { GetPersonalInformationUseCase(get()) }
+    single { CreatePersonalInformationUseCase(get()) }
     single { UpdatePersonalInformationUseCase(get()) }
 
     // Rating use cases

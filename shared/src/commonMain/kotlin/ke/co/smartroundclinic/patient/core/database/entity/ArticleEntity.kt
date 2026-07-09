@@ -18,6 +18,7 @@ data class ArticleEntity(
     val datePosted: String?,
     val createdAt: String,
     val updatedAt: String?,
+    val authorName: String? = null,
 )
 
 fun ArticleEntity.toDomain() = Article(
@@ -37,6 +38,7 @@ fun ArticleEntity.toDomain() = Article(
     datePosted = datePosted,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    authorName = authorName,
 )
 
 fun Article.toEntity() = ArticleEntity(
@@ -51,4 +53,5 @@ fun Article.toEntity() = ArticleEntity(
     datePosted = datePosted,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    authorName = authorName,
 )

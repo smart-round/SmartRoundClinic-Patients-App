@@ -67,6 +67,7 @@ import ke.co.smartroundclinic.patient.domain.model.CalendarDay
 import ke.co.smartroundclinic.patient.domain.model.CalendarView
 import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.presentation.common.composables.PrimaryButton
+import ke.co.smartroundclinic.patient.presentation.main.Services.PendingBookingPayment
 import ke.co.smartroundclinic.patient.presentation.main.Services.StkPushResult
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
@@ -97,11 +98,13 @@ fun BookAppointmentScreen(
     stkError: String?,
     bookedAppointmentId: String?,
     bookingError: String?,
+    pendingBookingPayment: PendingBookingPayment? = null,
     onLoadCalendar: (yearMonth: String) -> Unit,
     onLoadSlots: (date: String) -> Unit,
     isRebooking: Boolean = false,
     previousAppointmentId: String? = null,
     onInitiateStkPush: (date: String, slotStart: String, phoneNumber: String) -> Unit,
+    onRetryBooking: (date: String, slotStart: String) -> Unit = { _, _ -> },
     onDismissStkPush: () -> Unit,
     onViewBooking: (appointmentId: String) -> Unit,
     onDismissResult: () -> Unit,
@@ -119,6 +122,10 @@ fun BookAppointmentScreen(
     var selectedSlot by remember { mutableStateOf<String?>(null) }
     var showStkSheet by remember { mutableStateOf(false) }
 
+    // An already-paid transactionRef for this doctor is waiting on a successful booking —
+    // the CTA below reuses it instead of starting a new STK push.
+    val hasPendingPayment = pendingBookingPayment != null && pendingBookingPayment.doctorId == doctor.id
+
     val yearMonthStr = "$displayYear-${displayMonth.toString().padStart(2, '0')}"
 
     LaunchedEffect(yearMonthStr) {
@@ -128,6 +135,24 @@ fun BookAppointmentScreen(
     LaunchedEffect(selectedDate) {
         selectedDate?.let { onLoadSlots(it) }
         selectedSlot = null
+    }
+
+    // Jump straight to the date that was already paid for, so the refreshed slot list
+    // (fetched by the ViewModel the moment the conflict/resume happened) is visible immediately.
+    LaunchedEffect(pendingBookingPayment) {
+        val pending = pendingBookingPayment
+        if (pending != null && pending.doctorId == doctor.id && selectedDate == null) {
+            selectedDate = pending.date
+        }
+    }
+
+    // A booking attempt that ends without success and without a terminal (409) error, while a
+    // payment is still pending, was a retryable 400 slot conflict — close the sheet and drop
+    // back to the picker instead of leaving the patient stuck on a payment-flow dead end.
+    LaunchedEffect(isBooking, bookedAppointmentId, bookingError, hasPendingPayment) {
+        if (!isBooking && bookedAppointmentId == null && bookingError == null && hasPendingPayment) {
+            showStkSheet = false
+        }
     }
 
     // Keep showStkSheet true so the success state is visible inside the sheet
@@ -272,10 +297,15 @@ fun BookAppointmentScreen(
             }
         }
 
-        // Pay Now button
+        // Pay Now / Confirm Booking button — reuses an already-paid transactionRef instead of
+        // starting a new payment whenever one is pending (e.g. after a slot-conflict retry).
         Button(
             onClick = {
-                if (selectedDate != null && selectedSlot != null) showStkSheet = true
+                val date = selectedDate
+                val slot = selectedSlot
+                if (date != null && slot != null) {
+                    if (hasPendingPayment) onRetryBooking(date, slot) else showStkSheet = true
+                }
             },
             enabled = selectedDate != null && selectedSlot != null && !isStkInitiating && !isBooking,
             modifier = Modifier
@@ -297,7 +327,11 @@ fun BookAppointmentScreen(
                 )
             } else {
                 Text(
-                    text = if (isRebooking) "Pay Follow-Up Fee" else "Pay Now",
+                    text = when {
+                        hasPendingPayment -> "Confirm Booking — Already Paid"
+                        isRebooking -> "Pay Follow-Up Fee"
+                        else -> "Pay Now"
+                    },
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                 )
             }
@@ -325,6 +359,7 @@ fun BookAppointmentScreen(
         StkPushSheet(
             sheetState = stkSheetState,
             isStkInitiating = isStkInitiating,
+            isBooking = isBooking,
             stkPushData = stkPushData,
             stkPollState = stkPollState,
             stkError = stkError,

@@ -5,6 +5,21 @@ import ke.co.smartroundclinic.patient.data.remote.dto.response.PersonalInformati
 
 interface PersonalInformationRepository {
     suspend fun get(): Resource<PersonalInformationResponse>
+    suspend fun create(
+        gender: String,
+        phoneNumber: String,
+        countryCode: String,
+        bloodGroup: String,
+        dateOfBirth: String,
+        weight: Double? = null,
+        weightIn: String? = null,
+        height: Double? = null,
+        heightIn: String? = null,
+        maritalStatus: String? = null,
+        allergies: List<String> = emptyList(),
+        chronicConditions: List<String> = emptyList(),
+        currentMedications: List<String> = emptyList(),
+    ): Resource<PersonalInformationResponse>
     suspend fun update(
         weight: Double? = null,
         weightIn: String? = null,

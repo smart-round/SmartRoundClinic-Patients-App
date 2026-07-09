@@ -18,6 +18,7 @@ data class ArticleData(
     val datePosted: String? = null,
     val createdAt: String = "",
     val updatedAt: String? = null,
+    val authorName: String? = null,
 )
 
 @Serializable
@@ -70,6 +71,7 @@ fun ArticleData.toDomain() = Article(
     datePosted = datePosted,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    authorName = authorName,
 )
 
 fun ArticleCategoryData.toDomain() = ArticleCategory(id = id, name = name, isActive = isActive)
