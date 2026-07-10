@@ -2,6 +2,10 @@ package ke.co.smartroundclinic.patient.presentation.main.chat.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,6 +46,7 @@ import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Videocam
@@ -247,41 +252,48 @@ internal fun ConsultationScreen(
                     }
                 }
                 else -> {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        if (isLoadingMoreHistory) {
-                            item(key = "loading_more") {
-                                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Primary40, strokeWidth = 2.dp)
+                    Box(modifier = Modifier.weight(1f)) {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            if (isLoadingMoreHistory) {
+                                item(key = "loading_more") {
+                                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Primary40, strokeWidth = 2.dp)
+                                    }
                                 }
                             }
-                        }
-                        items(
-                            conversationItems,
-                            key = { item ->
+                            items(
+                                conversationItems,
+                                key = { item ->
+                                    when (item) {
+                                        is ConversationItem.ConsultationDivider -> "divider_${item.consultationId}"
+                                        is ConversationItem.MessageItem -> item.message.id
+                                    }
+                                },
+                            ) { item ->
                                 when (item) {
-                                    is ConversationItem.ConsultationDivider -> "divider_${item.consultationId}"
-                                    is ConversationItem.MessageItem -> item.message.id
+                                    is ConversationItem.ConsultationDivider -> ConsultationDividerRow(label = item.label)
+                                    is ConversationItem.MessageItem -> MessageBubble(
+                                        message = item.message,
+                                        fromMe = item.message.senderId == currentUserId,
+                                        onFileClick = { viewerFile = it },
+                                    )
                                 }
-                            },
-                        ) { item ->
-                            when (item) {
-                                is ConversationItem.ConsultationDivider -> ConsultationDividerRow(label = item.label)
-                                is ConversationItem.MessageItem -> MessageBubble(
-                                    message = item.message,
-                                    fromMe = item.message.senderId == currentUserId,
-                                    onFileClick = { viewerFile = it },
-                                )
+                            }
+                            // Optimistic pending messages — appear immediately, removed when server echoes back
+                            items(pendingFiles, key = { "p_${it.localId}" }) { pending ->
+                                PendingFileBubble(pending = pending)
                             }
                         }
-                        // Optimistic pending messages — appear immediately, removed when server echoes back
-                        items(pendingFiles, key = { "p_${it.localId}" }) { pending ->
-                            PendingFileBubble(pending = pending)
-                        }
+                        ScrollToBottomButton(
+                            visible = listState.canScrollForward,
+                            onClick = { scope.launch { if (totalItems > 0) listState.animateScrollToItem(totalItems - 1) } },
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                        )
                     }
                 }
             }
@@ -356,6 +368,35 @@ private fun ConsultationDividerRow(label: String, modifier: Modifier = Modifier)
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         HorizontalDivider(modifier = Modifier.weight(1f), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+@Composable
+private fun ScrollToBottomButton(visible: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn() + scaleIn(),
+        exit = fadeOut() + scaleOut(),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                    onClick = onClick,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.KeyboardArrowDown,
+                contentDescription = "Scroll to bottom",
+                tint = Primary40,
+            )
+        }
     }
 }
 

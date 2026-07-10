@@ -45,6 +45,10 @@ import kotlinx.serialization.json.Json
 
 private val wsJson = Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false }
 
+// Keep the initial/each older-page fetch small — the full history loads incrementally as the
+// patient scrolls up, rather than pulling an entire multi-consultation thread up front.
+private const val HISTORY_PAGE_SIZE = 5
+
 data class PendingFile(
     val localId: String,
     val fileName: String,
@@ -203,25 +207,36 @@ class ConsultationViewModel(
         }
     }
 
+    // Bumped on every loadMergedHistory call so a slow, superseded loadMoreHistory (or an old
+    // loadMergedHistory itself) can detect it's stale and discard its result instead of mutating
+    // `messages` out from under a newer load — this, plus the id dedup below, is what prevents the
+    // duplicate-key LazyColumn crash under rapid scroll.
+    private var historyGeneration = 0
+
     /** Loads the merged history for a doctor-patient pair — replaces whatever is currently shown. */
     fun loadMergedHistory(doctorId: String, patientId: String) {
+        val generation = ++historyGeneration
+        isLoadingHistory = true
+        messages.clear()
+        nextHistoryCursor = null
+        hasMoreHistory = false
         viewModelScope.launch {
-            isLoadingHistory = true
-            messages.clear()
-            nextHistoryCursor = null
-            hasMoreHistory = false
-            when (val result = getMergedHistoryUseCase(doctorId, patientId)) {
-                is Resource.Success -> {
-                    val (items, cursor) = result.data ?: (emptyList<ConsultationMessage>() to null)
-                    // Backend returns newest-first (for cursor paging); render ascending, oldest at top.
-                    messages.addAll(items.asReversed())
-                    nextHistoryCursor = cursor
-                    hasMoreHistory = cursor != null
+            try {
+                when (val result = getMergedHistoryUseCase(doctorId, patientId, size = HISTORY_PAGE_SIZE)) {
+                    is Resource.Success -> {
+                        if (generation != historyGeneration) return@launch
+                        val (items, cursor) = result.data ?: (emptyList<ConsultationMessage>() to null)
+                        // Backend returns newest-first (for cursor paging); render ascending, oldest at top.
+                        messages.addAll(items.asReversed())
+                        nextHistoryCursor = cursor
+                        hasMoreHistory = cursor != null
+                    }
+                    is Resource.Error -> snackbarController.show(result.message ?: "Failed to load conversation", isError = true)
+                    else -> {}
                 }
-                is Resource.Error -> snackbarController.show(result.message ?: "Failed to load conversation", isError = true)
-                else -> {}
+            } finally {
+                if (generation == historyGeneration) isLoadingHistory = false
             }
-            isLoadingHistory = false
         }
     }
 
@@ -229,19 +244,29 @@ class ConsultationViewModel(
     fun loadMoreHistory(doctorId: String, patientId: String) {
         val cursor = nextHistoryCursor ?: return
         if (isLoadingMoreHistory) return
+        // Set synchronously (not inside the coroutine) — otherwise a fast fling can fire this
+        // multiple times before the first launch even starts, each fetching and inserting the
+        // same page and producing a duplicate message id, which crashes the LazyColumn.
+        isLoadingMoreHistory = true
+        val generation = historyGeneration
         viewModelScope.launch {
-            isLoadingMoreHistory = true
-            when (val result = getMergedHistoryUseCase(doctorId, patientId, before = cursor)) {
-                is Resource.Success -> {
-                    val (items, nextCursor) = result.data ?: (emptyList<ConsultationMessage>() to null)
-                    messages.addAll(0, items.asReversed())
-                    nextHistoryCursor = nextCursor
-                    hasMoreHistory = nextCursor != null
+            try {
+                when (val result = getMergedHistoryUseCase(doctorId, patientId, before = cursor, size = HISTORY_PAGE_SIZE)) {
+                    is Resource.Success -> {
+                        if (generation == historyGeneration) {
+                            val (items, nextCursor) = result.data ?: (emptyList<ConsultationMessage>() to null)
+                            val existingIds = messages.mapTo(HashSet()) { it.id }
+                            messages.addAll(0, items.asReversed().filterNot { it.id in existingIds })
+                            nextHistoryCursor = nextCursor
+                            hasMoreHistory = nextCursor != null
+                        }
+                    }
+                    is Resource.Error -> snackbarController.show(result.message ?: "Failed to load more messages", isError = true)
+                    else -> {}
                 }
-                is Resource.Error -> snackbarController.show(result.message ?: "Failed to load more messages", isError = true)
-                else -> {}
+            } finally {
+                isLoadingMoreHistory = false
             }
-            isLoadingMoreHistory = false
         }
     }
 
@@ -312,9 +337,14 @@ class ConsultationViewModel(
 
     fun sendText(text: String) {
         if (text.isBlank()) return
+        val session = wsSession
+        if (session == null) {
+            snackbarController.show("Not connected. Please wait a moment and try again.", isError = true)
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                wsSession?.send(
+                session.send(
                     Frame.Text(wsJson.encodeToString(ConsultationWsOutgoing(type = "TEXT", message = text)))
                 )
             } catch (_: Exception) {
