@@ -9,7 +9,6 @@ data class ConversationThread(
     val counterpartPicture: String?,
     val lastMessagePreview: String?,
     val lastMessageAt: String?,
-    val latestConsultationStatus: String,
     val latestAppointmentId: String,
     val isOnline: Boolean = false,
     val lastSeenAt: String? = null,

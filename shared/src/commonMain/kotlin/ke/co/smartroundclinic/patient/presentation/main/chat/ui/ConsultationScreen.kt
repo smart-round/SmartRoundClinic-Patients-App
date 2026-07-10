@@ -99,7 +99,6 @@ import io.github.vinceglb.filekit.readBytes
 import ke.co.smartroundclinic.patient.data.remote.dto.response.MedicalRecordData
 import ke.co.smartroundclinic.patient.domain.model.ConsultationFileAttachment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
-import ke.co.smartroundclinic.patient.domain.model.ConsultationSession
 import ke.co.smartroundclinic.patient.presentation.main.chat.PendingFile
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 import ke.co.smartroundclinic.patient.presentation.theme.Tertiary20
@@ -112,8 +111,10 @@ import ke.co.smartroundclinic.patient.presentation.theme.Tertiary40
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,18 +122,14 @@ import kotlinx.datetime.toLocalDateTime
 internal fun ConsultationScreen(
     doctorName: String,
     doctorPicture: String?,
-    session: ConsultationSession?,
     messages: List<ConsultationMessage>,
     pendingFiles: List<PendingFile> = emptyList(),
-    isStartingSession: Boolean,
     isLoadingHistory: Boolean = false,
     isLoadingMoreHistory: Boolean = false,
     hasMoreHistory: Boolean = false,
     onLoadMoreHistory: () -> Unit = {},
     isConnected: Boolean,
     isUploadingFile: Boolean,
-    isCompleted: Boolean = false,
-    canJoinCall: Boolean = false,
     currentUserId: String,
     otherPartyTyping: Boolean = false,
     otherPartyOnline: Boolean = false,
@@ -223,7 +220,7 @@ internal fun ConsultationScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            if (session != null) {
+                            if (isConnected) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -254,7 +251,7 @@ internal fun ConsultationScreen(
                     }
                 },
                 actions = {
-                    if (session != null && !isCompleted && canJoinCall) {
+                    if (isConnected) {
                         IconButton(onClick = onVideoCall) {
                             Icon(imageVector = Icons.Filled.Videocam, contentDescription = "Video call", tint = Primary40)
                         }
@@ -281,7 +278,7 @@ internal fun ConsultationScreen(
                 messages.isEmpty() && pendingFiles.isEmpty() -> {
                     Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = if (isStartingSession) "Starting session…" else "Say hello to start the conversation!",
+                            text = "Say hello to start the conversation!",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -306,13 +303,13 @@ internal fun ConsultationScreen(
                                 conversationItems,
                                 key = { item ->
                                     when (item) {
-                                        is ConversationItem.ConsultationDivider -> "divider_${item.consultationId}"
+                                        is ConversationItem.DateDivider -> "divider_${item.dateKey}"
                                         is ConversationItem.MessageItem -> item.message.id
                                     }
                                 },
                             ) { item ->
                                 when (item) {
-                                    is ConversationItem.ConsultationDivider -> ConsultationDividerRow(label = item.label)
+                                    is ConversationItem.DateDivider -> DateDividerRow(label = item.label)
                                     is ConversationItem.MessageItem -> {
                                         val fromMe = item.message.senderId == currentUserId
                                         MessageBubble(
@@ -347,7 +344,7 @@ internal fun ConsultationScreen(
                 value = inputText,
                 onValueChange = { inputText = it },
                 isUploading = isUploadingFile,
-                enabled = session != null,
+                enabled = isConnected,
                 onSend = {
                     if (inputText.isNotBlank()) {
                         onSendText(inputText.trim())
@@ -374,7 +371,7 @@ internal fun ConsultationScreen(
 }
 
 private sealed class ConversationItem {
-    data class ConsultationDivider(val label: String, val consultationId: String) : ConversationItem()
+    data class DateDivider(val label: String, val dateKey: String) : ConversationItem()
     data class MessageItem(val message: ConsultationMessage) : ConversationItem()
 }
 
@@ -405,29 +402,41 @@ private fun formatLastSeen(iso: String): String = try {
     else "${dateTime.date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${dateTime.date.dayOfMonth} at $time"
 } catch (_: Exception) { "recently" }
 
-// The merged history spans every consultation a doctor-patient pair has had — insert a divider
-// whenever the consultation changes so users can tell which visit a run of messages belongs to.
+// This is a permanent, ongoing conversation (not scoped to any one visit) — insert a WhatsApp-style
+// day divider whenever the calendar date changes, rather than grouping by visit/consultation.
 private fun buildConversationItems(messages: List<ConsultationMessage>): List<ConversationItem> {
     val items = mutableListOf<ConversationItem>()
-    var lastConsultationId: String? = null
+    var lastDateKey: String? = null
     for (message in messages) {
-        if (message.consultationId != lastConsultationId) {
-            items += ConversationItem.ConsultationDivider(consultationDividerLabel(message.createdAt), message.consultationId)
-            lastConsultationId = message.consultationId
+        val dateKey = dateKeyOf(message.createdAt)
+        if (dateKey != lastDateKey) {
+            items += ConversationItem.DateDivider(dateDividerLabel(message.createdAt), dateKey)
+            lastDateKey = dateKey
         }
         items += ConversationItem.MessageItem(message)
     }
     return items
 }
 
-private fun consultationDividerLabel(iso: String): String = try {
-    val date = Instant.parse(iso).toLocalDateTime(TimeZone.currentSystemDefault()).date
-    val month = date.month.name.lowercase().replaceFirstChar { it.uppercase() }
-    "Consultation — $month ${date.dayOfMonth}, ${date.year}"
-} catch (_: Exception) { "Consultation" }
+private fun dateKeyOf(iso: String): String = try {
+    Instant.parse(iso).toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+} catch (_: Exception) { "unknown" }
+
+private fun dateDividerLabel(iso: String): String = try {
+    val zone = TimeZone.currentSystemDefault()
+    val date = Instant.parse(iso).toLocalDateTime(zone).date
+    val today = Clock.System.now().toLocalDateTime(zone).date
+    val yesterday = today.minus(1, DateTimeUnit.DAY)
+    val month = date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+    when (date) {
+        today -> "Today"
+        yesterday -> "Yesterday"
+        else -> "$month ${date.dayOfMonth}, ${date.year}"
+    }
+} catch (_: Exception) { "" }
 
 @Composable
-private fun ConsultationDividerRow(label: String, modifier: Modifier = Modifier) {
+private fun DateDividerRow(label: String, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier.fillMaxWidth().padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1178,7 +1187,7 @@ private fun MessageInput(
             ) {
                 if (value.isEmpty()) {
                     Text(
-                        text = if (enabled) "Type a message…" else "Start a session to chat",
+                        text = if (enabled) "Type a message…" else "Connecting…",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

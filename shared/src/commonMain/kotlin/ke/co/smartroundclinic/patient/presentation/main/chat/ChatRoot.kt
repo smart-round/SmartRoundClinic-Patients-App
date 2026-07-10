@@ -9,22 +9,13 @@ import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
-import ke.co.smartroundclinic.patient.domain.model.Appointment
 import ke.co.smartroundclinic.patient.presentation.main.chat.destinations.ConsultationCall
 import ke.co.smartroundclinic.patient.presentation.main.chat.destinations.ConsultationChat
 import ke.co.smartroundclinic.patient.presentation.main.chat.destinations.ConsultationList
 import ke.co.smartroundclinic.patient.presentation.main.chat.ui.CallScreen
 import ke.co.smartroundclinic.patient.presentation.main.chat.ui.ConsultationListScreen
 import ke.co.smartroundclinic.patient.presentation.main.chat.ui.ConsultationScreen
-
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.LocalTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toInstant
-
 import org.koin.compose.viewmodel.koinViewModel
-import kotlinx.datetime.Clock
 
 @Composable
 fun ChatRoot(
@@ -40,6 +31,12 @@ fun ChatRoot(
     val vm: ConsultationViewModel = koinViewModel()
 
     SideEffect { onAtRootChanged(isAtRoot) }
+
+    // The chat list has no socket of its own — keep its online/last-seen previews live by polling
+    // only while it's the visible screen (stop once a specific conversation is opened).
+    LaunchedEffect(isAtRoot) {
+        if (isAtRoot) vm.startThreadsPolling() else vm.stopThreadsPolling()
+    }
 
     LaunchedEffect(pendingConversation) {
         if (pendingConversation != null) {
@@ -68,8 +65,8 @@ fun ChatRoot(
                 )
             }
             entry<ConsultationChat> { dest ->
-                LaunchedEffect(dest.latestAppointmentId) {
-                    vm.startConsultation(dest.latestAppointmentId)
+                LaunchedEffect(dest.doctorId) {
+                    vm.connectToThread(dest.doctorId)
                 }
                 // currentUserId loads asynchronously from Room — re-key on it so that if this fires
                 // before it's populated (cold start / fresh login), it retries once the id is ready
@@ -80,24 +77,18 @@ fun ChatRoot(
                     }
                 }
                 val appointment = vm.appointments.firstOrNull { it.id == dest.latestAppointmentId }
-                val isCompleted = appointment?.status?.equals("COMPLETED", ignoreCase = true) == true
-                val canJoinCall = appointment?.let { canJoinConsultation(it) } ?: false
                 val doctorPicture = vm.threads.firstOrNull { it.doctorId == dest.doctorId }?.counterpartPicture
                     ?: appointment?.let { vm.doctorPicture(it.doctorId) }
                 ConsultationScreen(
                     doctorName = dest.doctorName,
                     doctorPicture = doctorPicture,
-                    session = vm.activeSession,
                     messages = vm.messages,
-                    isStartingSession = vm.isStartingSession,
                     isLoadingHistory = vm.isLoadingHistory,
                     isLoadingMoreHistory = vm.isLoadingMoreHistory,
                     hasMoreHistory = vm.hasMoreHistory,
                     onLoadMoreHistory = { vm.loadMoreHistory(dest.doctorId, vm.currentUserId) },
                     isConnected = vm.isConnected,
                     isUploadingFile = vm.isUploadingFile,
-                    isCompleted = isCompleted,
-                    canJoinCall = canJoinCall,
                     pendingFiles = vm.pendingFiles,
                     currentUserId = vm.currentUserId,
                     otherPartyTyping = vm.otherPartyTyping,
@@ -107,10 +98,10 @@ fun ChatRoot(
                     otherPartyLastDeliveredAt = vm.otherPartyLastDeliveredAt,
                     onTyping = vm::sendTypingEvent,
                     onBack = {
-                        vm.endConsultation()
+                        vm.disconnect()
                         backStack.removeLastOrNull()
                     },
-                    onVideoCall = { backStack.add(ConsultationCall(vm.activeSession?.id ?: "", isVideo = true)) },
+                    onVideoCall = { backStack.add(ConsultationCall(dest.doctorId, isVideo = true)) },
                     onSendText = vm::sendText,
                     onSendFile = vm::sendFile,
                 )
@@ -128,7 +119,7 @@ fun ChatRoot(
                     selfPicture = vm.currentUserProfilePicture,
                     isVideo = dest.isVideo,
                     joinState = vm.callJoinState,
-                    onJoin = { vm.joinCall(dest.sessionId) },
+                    onJoin = { vm.joinCall(dest.otherUserId) },
                     onEnd = {
                         vm.clearCallState()
                         backStack.removeLastOrNull()
@@ -137,20 +128,4 @@ fun ChatRoot(
             }
         },
     )
-}
-
-internal fun canJoinConsultation(appointment: Appointment): Boolean {
-    return try {
-        val tz = TimeZone.currentSystemDefault()
-        val date = LocalDate.parse(appointment.date)
-        val timeParts = appointment.slotStart.split(":")
-        val hour = timeParts[0].toInt()
-        val minute = timeParts.getOrNull(1)?.toInt() ?: 0
-        val slotInstant = LocalDateTime(date, LocalTime(hour, minute)).toInstant(tz)
-        val now = Clock.System.now()
-        val diffMinutes = (now - slotInstant).inWholeMinutes
-        diffMinutes in -5..60
-    } catch (_: Exception) {
-        false
-    }
 }
