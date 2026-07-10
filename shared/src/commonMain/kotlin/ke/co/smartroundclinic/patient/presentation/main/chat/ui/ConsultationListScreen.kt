@@ -1,7 +1,9 @@
 package ke.co.smartroundclinic.patient.presentation.main.chat.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,14 +22,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +48,7 @@ import ke.co.smartroundclinic.patient.domain.model.ConversationThread
 import ke.co.smartroundclinic.patient.presentation.common.composables.PatientDashboardHeader
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 import ke.co.smartroundclinic.patient.presentation.theme.Primary90
+import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
@@ -52,10 +60,13 @@ internal fun ConsultationListScreen(
     isLoading: Boolean,
     onThreadClick: (ConversationThread) -> Unit,
     onRefresh: () -> Unit,
+    onDeleteThread: (ConversationThread) -> Unit = {},
     onProfileClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    var threadPendingDelete by remember { mutableStateOf<ConversationThread?>(null) }
+
     Column(modifier = modifier.fillMaxSize()) {
         PatientDashboardHeader(
             title = "Consultations",
@@ -100,7 +111,11 @@ internal fun ConsultationListScreen(
                     modifier = Modifier.fillMaxSize().navigationBarsPadding(),
                 ) {
                     items(threads, key = { it.threadId }) { thread ->
-                        ConsultationThreadRow(thread = thread, onClick = { onThreadClick(thread) })
+                        ConsultationThreadRow(
+                            thread = thread,
+                            onClick = { onThreadClick(thread) },
+                            onLongClick = { threadPendingDelete = thread },
+                        )
                         HorizontalDivider(
                             thickness = 0.5.dp,
                             color = MaterialTheme.colorScheme.outlineVariant,
@@ -111,19 +126,55 @@ internal fun ConsultationListScreen(
             }
         }
     }
+
+    threadPendingDelete?.let { thread ->
+        AlertDialog(
+            onDismissRequest = { threadPendingDelete = null },
+            title = { Text("Delete conversation?") },
+            text = { Text("This removes your conversation with Dr. ${thread.counterpartName} from this list. It will reappear if they send a new message.") },
+            confirmButton = {
+                TextButton(onClick = { onDeleteThread(thread); threadPendingDelete = null }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { threadPendingDelete = null }) { Text("Cancel") }
+            },
+        )
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ConsultationThreadRow(thread: ConversationThread, onClick: () -> Unit) {
+private fun ConsultationThreadRow(thread: ConversationThread, onClick: () -> Unit, onLongClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClick)
+            .combinedClickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        DoctorAvatar(picture = thread.counterpartPicture, size = 48)
+        Box {
+            DoctorAvatar(picture = thread.counterpartPicture, size = 48)
+            if (thread.isOnline) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(13.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(2.dp)
+                        .clip(CircleShape)
+                        .background(StatusConfirmed),
+                )
+            }
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "Dr. ${thread.counterpartName}",

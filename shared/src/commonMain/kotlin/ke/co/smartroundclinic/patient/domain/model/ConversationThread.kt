@@ -11,4 +11,6 @@ data class ConversationThread(
     val lastMessageAt: String?,
     val latestConsultationStatus: String,
     val latestAppointmentId: String,
+    val isOnline: Boolean = false,
+    val lastSeenAt: String? = null,
 )

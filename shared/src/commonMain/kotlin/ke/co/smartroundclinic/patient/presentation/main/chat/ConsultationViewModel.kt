@@ -18,6 +18,10 @@ import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.core.database.entity.DoctorEntity
 import ke.co.smartroundclinic.patient.core.snackbar.SnackbarController
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationMessageData
+import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationPresenceEventData
+import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationReadReceiptEventData
+import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationTypingEventData
+import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationWsEventPeek
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationWsOutgoing
 import ke.co.smartroundclinic.patient.data.remote.dto.response.toDomain
 import ke.co.smartroundclinic.patient.domain.model.Appointment
@@ -29,6 +33,7 @@ import ke.co.smartroundclinic.patient.domain.repository.DoctorLocalRepository
 import ke.co.smartroundclinic.patient.domain.repository.UserLocalRepository
 import ke.co.smartroundclinic.patient.domain.model.CallJoinInfo
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetMyAppointmentsUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.consultation.DeleteConversationThreadUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.GetMergedConsultationHistoryUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.JoinConsultationCallUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.ListConversationThreadsUseCase
@@ -71,6 +76,7 @@ class ConsultationViewModel(
     private val snackbarController: SnackbarController,
     private val listConversationThreadsUseCase: ListConversationThreadsUseCase,
     private val getMergedHistoryUseCase: GetMergedConsultationHistoryUseCase,
+    private val deleteConversationThreadUseCase: DeleteConversationThreadUseCase,
 ) : ViewModel() {
 
     // ─── Consultation list ─────────────────────────────────────────────────
@@ -111,6 +117,20 @@ class ConsultationViewModel(
     var hasMoreHistory by mutableStateOf(false)
         private set
     private var nextHistoryCursor: String? = null
+
+    // ─── Typing / presence / read-receipts for the currently open conversation ─────────────
+    var otherPartyTyping by mutableStateOf(false)
+        private set
+    var otherPartyOnline by mutableStateOf(false)
+        private set
+    var otherPartyLastSeenAt by mutableStateOf<String?>(null)
+        private set
+    var otherPartyLastReadAt by mutableStateOf<String?>(null)
+        private set
+    var otherPartyLastDeliveredAt by mutableStateOf<String?>(null)
+        private set
+    private var typingClearJob: Job? = null
+    private var lastTypingSentTrue = false
 
     // Derived from pendingFiles — true when any non-failed upload is in progress
     val isUploadingFile: Boolean get() = pendingFiles.any { !it.failed }
@@ -220,16 +240,24 @@ class ConsultationViewModel(
         messages.clear()
         nextHistoryCursor = null
         hasMoreHistory = false
+        // Seed presence from the already-fetched thread list — PRESENCE frames on the live socket
+        // will keep it fresh from here.
+        threads.firstOrNull { it.doctorId == doctorId && it.patientId == patientId }?.let {
+            otherPartyOnline = it.isOnline
+            otherPartyLastSeenAt = it.lastSeenAt
+        }
         viewModelScope.launch {
             try {
                 when (val result = getMergedHistoryUseCase(doctorId, patientId, size = HISTORY_PAGE_SIZE)) {
                     is Resource.Success -> {
                         if (generation != historyGeneration) return@launch
-                        val (items, cursor) = result.data ?: (emptyList<ConsultationMessage>() to null)
+                        val page = result.data
                         // Backend returns newest-first (for cursor paging); render ascending, oldest at top.
-                        messages.addAll(items.asReversed())
-                        nextHistoryCursor = cursor
-                        hasMoreHistory = cursor != null
+                        messages.addAll(page?.items.orEmpty().asReversed())
+                        nextHistoryCursor = page?.nextCursor
+                        hasMoreHistory = page?.nextCursor != null
+                        otherPartyLastReadAt = page?.counterpartLastReadAt
+                        otherPartyLastDeliveredAt = page?.counterpartLastDeliveredAt
                     }
                     is Resource.Error -> snackbarController.show(result.message ?: "Failed to load conversation", isError = true)
                     else -> {}
@@ -254,11 +282,11 @@ class ConsultationViewModel(
                 when (val result = getMergedHistoryUseCase(doctorId, patientId, before = cursor, size = HISTORY_PAGE_SIZE)) {
                     is Resource.Success -> {
                         if (generation == historyGeneration) {
-                            val (items, nextCursor) = result.data ?: (emptyList<ConsultationMessage>() to null)
+                            val page = result.data
                             val existingIds = messages.mapTo(HashSet()) { it.id }
-                            messages.addAll(0, items.asReversed().filterNot { it.id in existingIds })
-                            nextHistoryCursor = nextCursor
-                            hasMoreHistory = nextCursor != null
+                            messages.addAll(0, page?.items.orEmpty().asReversed().filterNot { it.id in existingIds })
+                            nextHistoryCursor = page?.nextCursor
+                            hasMoreHistory = page?.nextCursor != null
                         }
                     }
                     is Resource.Error -> snackbarController.show(result.message ?: "Failed to load more messages", isError = true)
@@ -300,16 +328,35 @@ class ConsultationViewModel(
 
                         for (frame in incoming) {
                             if (frame is Frame.Text) {
+                                val raw = frame.readText()
                                 try {
-                                    val dto = wsJson.decodeFromString<ConsultationMessageData>(frame.readText())
-                                    val msg = dto.toDomain()
-                                    withContext(Dispatchers.Main) {
-                                        if (messages.none { it.id == msg.id }) {
-                                            messages.add(msg)
-                                            // Remove matching pending once server echoes the upload back
-                                            if (msg.messageType.uppercase() == "FILE" && msg.senderId == currentUserId) {
-                                                pendingFiles.removeAll { p ->
-                                                    msg.files.any { it.fileName == p.fileName }
+                                    when (wsJson.decodeFromString<ConsultationWsEventPeek>(raw).type) {
+                                        "TYPING" -> {
+                                            val event = wsJson.decodeFromString<ConsultationTypingEventData>(raw)
+                                            withContext(Dispatchers.Main) { handleTypingEvent(event.isTyping) }
+                                        }
+                                        "PRESENCE" -> {
+                                            val event = wsJson.decodeFromString<ConsultationPresenceEventData>(raw)
+                                            withContext(Dispatchers.Main) {
+                                                otherPartyOnline = event.isOnline
+                                                otherPartyLastSeenAt = event.lastSeenAt
+                                            }
+                                        }
+                                        "READ" -> {
+                                            val event = wsJson.decodeFromString<ConsultationReadReceiptEventData>(raw)
+                                            withContext(Dispatchers.Main) { otherPartyLastReadAt = event.lastReadAt }
+                                        }
+                                        else -> {
+                                            val msg = wsJson.decodeFromString<ConsultationMessageData>(raw).toDomain()
+                                            withContext(Dispatchers.Main) {
+                                                if (messages.none { it.id == msg.id }) {
+                                                    messages.add(msg)
+                                                    // Remove matching pending once server echoes the upload back
+                                                    if (msg.messageType.uppercase() == "FILE" && msg.senderId == currentUserId) {
+                                                        pendingFiles.removeAll { p ->
+                                                            msg.files.any { it.fileName == p.fileName }
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -349,6 +396,41 @@ class ConsultationViewModel(
                 )
             } catch (_: Exception) {
                 snackbarController.show("Failed to send message", isError = true)
+            }
+        }
+    }
+
+    // Auto-clears after a few seconds in case the counterpart's client never sends the
+    // "stopped typing" (isTyping=false) event — e.g. they background the app mid-type.
+    private fun handleTypingEvent(isTyping: Boolean) {
+        typingClearJob?.cancel()
+        otherPartyTyping = isTyping
+        if (isTyping) {
+            typingClearJob = viewModelScope.launch {
+                delay(6_000L)
+                otherPartyTyping = false
+            }
+        }
+    }
+
+    /** Debounced — only sends isTyping=true once per burst of typing; isTyping=false always sends immediately. */
+    fun sendTypingEvent(isTyping: Boolean) {
+        val session = wsSession ?: return
+        if (isTyping && lastTypingSentTrue) return
+        lastTypingSentTrue = isTyping
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                session.send(Frame.Text(wsJson.encodeToString(ConsultationWsOutgoing(type = "TYPING", isTyping = isTyping))))
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun deleteThread(doctorId: String, patientId: String) {
+        viewModelScope.launch {
+            when (val result = deleteConversationThreadUseCase(doctorId, patientId)) {
+                is Resource.Success -> threads = threads.filterNot { it.doctorId == doctorId && it.patientId == patientId }
+                is Resource.Error -> snackbarController.show(result.message ?: "Failed to delete conversation", isError = true)
+                else -> {}
             }
         }
     }
@@ -407,6 +489,7 @@ class ConsultationViewModel(
 
     fun endConsultation() {
         wsJob?.cancel()
+        typingClearJob?.cancel()
         wsSession = null
         isConnected = false
         activeSession = null
@@ -414,6 +497,12 @@ class ConsultationViewModel(
         pendingFiles.clear()
         nextHistoryCursor = null
         hasMoreHistory = false
+        otherPartyTyping = false
+        otherPartyOnline = false
+        otherPartyLastSeenAt = null
+        otherPartyLastReadAt = null
+        otherPartyLastDeliveredAt = null
+        lastTypingSentTrue = false
         loadThreads() // refresh list previews now that this thread may have new messages
     }
 

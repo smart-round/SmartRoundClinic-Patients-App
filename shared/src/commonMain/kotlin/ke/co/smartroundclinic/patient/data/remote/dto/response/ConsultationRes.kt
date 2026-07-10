@@ -107,6 +107,39 @@ data class ConsultationWsOutgoing(
     val fileName: String? = null,
     val contentType: String? = null,
     val data: String? = null,
+    val isTyping: Boolean? = null,
+)
+
+/**
+ * Minimal peek shape decoded first from every incoming WS frame to dispatch — TEXT/FILE/PRESCRIPTION
+ * (or an absent/unrecognized type) fall through to [ConsultationMessageData]; TYPING/PRESENCE/READ
+ * decode as their own small shapes below. Never constructed directly, only decoded into.
+ */
+@Serializable
+data class ConsultationWsEventPeek(val type: String? = null)
+
+@Serializable
+data class ConsultationTypingEventData(
+    val type: String = "TYPING",
+    val senderId: String,
+    val isTyping: Boolean,
+)
+
+@Serializable
+data class ConsultationPresenceEventData(
+    val type: String = "PRESENCE",
+    val userId: String,
+    val isOnline: Boolean,
+    val lastSeenAt: String? = null,
+)
+
+@Serializable
+data class ConsultationReadReceiptEventData(
+    val type: String = "READ",
+    val doctorId: String,
+    val patientId: String,
+    val readerId: String,
+    val lastReadAt: String,
 )
 
 @Serializable
@@ -161,6 +194,8 @@ data class ConversationThreadData(
     val lastMessageAt: String? = null,
     val latestConsultationStatus: String,
     val latestAppointmentId: String,
+    val isOnline: Boolean = false,
+    val lastSeenAt: String? = null,
 )
 
 fun ConversationThreadData.toDomain() = ConversationThread(
@@ -173,6 +208,8 @@ fun ConversationThreadData.toDomain() = ConversationThread(
     lastMessageAt = lastMessageAt,
     latestConsultationStatus = latestConsultationStatus,
     latestAppointmentId = latestAppointmentId,
+    isOnline = isOnline,
+    lastSeenAt = lastSeenAt,
 )
 
 @Serializable
@@ -187,4 +224,6 @@ data class ConversationThreadMessagesResponse(
 data class ConversationThreadMessagesData(
     val items: List<ConsultationMessageData> = emptyList(),
     val nextCursor: String? = null,
+    val counterpartLastReadAt: String? = null,
+    val counterpartLastDeliveredAt: String? = null,
 )

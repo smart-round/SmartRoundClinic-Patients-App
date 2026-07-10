@@ -5,6 +5,7 @@ import ke.co.smartroundclinic.patient.domain.model.CallJoinInfo
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
 import ke.co.smartroundclinic.patient.domain.model.ConsultationSession
 import ke.co.smartroundclinic.patient.domain.model.ConversationThread
+import ke.co.smartroundclinic.patient.domain.model.MergedHistoryPage
 
 interface ConsultationRepository {
     suspend fun startOrGet(appointmentId: String): Resource<ConsultationSession>
@@ -15,6 +16,9 @@ interface ConsultationRepository {
     /** One entry per doctor-patient pair the caller participates in — merges all of their consultations. */
     suspend fun listThreads(): Resource<List<ConversationThread>>
 
-    /** Merged, cursor-paginated history across every consultation a (doctorId, patientId) pair has had. Second value is the next page's cursor, null if exhausted. */
-    suspend fun getMergedMessages(doctorId: String, patientId: String, before: String?, size: Int): Resource<Pair<List<ConsultationMessage>, String?>>
+    /** Merged, cursor-paginated history across every consultation a (doctorId, patientId) pair has had. */
+    suspend fun getMergedMessages(doctorId: String, patientId: String, before: String?, size: Int): Resource<MergedHistoryPage>
+
+    /** Hides the thread from the caller's own list only ("delete for me") — reappears on a new message. */
+    suspend fun deleteThread(doctorId: String, patientId: String): Resource<Unit>
 }

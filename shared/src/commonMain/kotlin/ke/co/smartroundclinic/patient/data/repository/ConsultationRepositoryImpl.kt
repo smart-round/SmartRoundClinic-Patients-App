@@ -2,6 +2,7 @@ package ke.co.smartroundclinic.patient.data.repository
 
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.delete
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
@@ -24,6 +25,7 @@ import ke.co.smartroundclinic.patient.domain.model.CallJoinInfo
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
 import ke.co.smartroundclinic.patient.domain.model.ConsultationSession
 import ke.co.smartroundclinic.patient.domain.model.ConversationThread
+import ke.co.smartroundclinic.patient.domain.model.MergedHistoryPage
 import ke.co.smartroundclinic.patient.domain.repository.ConsultationRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -130,18 +132,32 @@ class ConsultationRepositoryImpl(private val client: HttpClient) : ConsultationR
         patientId: String,
         before: String?,
         size: Int,
-    ): Resource<Pair<List<ConsultationMessage>, String?>> = withContext(Dispatchers.IO) {
+    ): Resource<MergedHistoryPage> = withContext(Dispatchers.IO) {
         try {
             val response = client.get("consultation/threads/$doctorId/$patientId/messages") {
                 if (before != null) parameter("before", before)
                 parameter("size", size)
             }.body<ConversationThreadMessagesResponse>()
             if (response.status) {
-                val items = response.data?.items?.map(ConsultationMessageData::toDomain) ?: emptyList()
-                Resource.Success(items to response.data?.nextCursor, response.message)
+                val page = MergedHistoryPage(
+                    items = response.data?.items?.map(ConsultationMessageData::toDomain) ?: emptyList(),
+                    nextCursor = response.data?.nextCursor,
+                    counterpartLastReadAt = response.data?.counterpartLastReadAt,
+                    counterpartLastDeliveredAt = response.data?.counterpartLastDeliveredAt,
+                )
+                Resource.Success(page, response.message)
             } else Resource.Error(response.message)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to load conversation")
+        }
+    }
+
+    override suspend fun deleteThread(doctorId: String, patientId: String): Resource<Unit> = withContext(Dispatchers.IO) {
+        try {
+            client.delete("consultation/threads/$doctorId/$patientId")
+            Resource.Success(Unit)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to delete conversation")
         }
     }
 }

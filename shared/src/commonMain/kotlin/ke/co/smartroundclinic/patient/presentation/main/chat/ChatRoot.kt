@@ -62,6 +62,7 @@ fun ChatRoot(
                         backStack.add(ConsultationChat(thread.doctorId, thread.counterpartName, thread.latestAppointmentId))
                     },
                     onRefresh = vm::loadThreads,
+                    onDeleteThread = { thread -> vm.deleteThread(thread.doctorId, thread.patientId) },
                     onProfileClick = onProfileClick,
                     onNotificationsClick = onNotificationsClick,
                 )
@@ -99,6 +100,12 @@ fun ChatRoot(
                     canJoinCall = canJoinCall,
                     pendingFiles = vm.pendingFiles,
                     currentUserId = vm.currentUserId,
+                    otherPartyTyping = vm.otherPartyTyping,
+                    otherPartyOnline = vm.otherPartyOnline,
+                    otherPartyLastSeenAt = vm.otherPartyLastSeenAt,
+                    otherPartyLastReadAt = vm.otherPartyLastReadAt,
+                    otherPartyLastDeliveredAt = vm.otherPartyLastDeliveredAt,
+                    onTyping = vm::sendTypingEvent,
                     onBack = {
                         vm.endConsultation()
                         backStack.removeLastOrNull()
