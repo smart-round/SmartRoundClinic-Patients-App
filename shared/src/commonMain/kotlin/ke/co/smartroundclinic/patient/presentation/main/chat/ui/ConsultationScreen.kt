@@ -64,6 +64,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,6 +98,9 @@ import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
 import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
 import ke.co.smartroundclinic.patient.presentation.theme.Tertiary40
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,6 +111,10 @@ internal fun ConsultationScreen(
     messages: List<ConsultationMessage>,
     pendingFiles: List<PendingFile> = emptyList(),
     isStartingSession: Boolean,
+    isLoadingHistory: Boolean = false,
+    isLoadingMoreHistory: Boolean = false,
+    hasMoreHistory: Boolean = false,
+    onLoadMoreHistory: () -> Unit = {},
     isConnected: Boolean,
     isUploadingFile: Boolean,
     isCompleted: Boolean = false,
@@ -124,9 +132,25 @@ internal fun ConsultationScreen(
     var viewerFile by remember { mutableStateOf<ConsultationFileAttachment?>(null) }
     var showAttachMenu by remember { mutableStateOf(false) }
 
-    val totalItems = messages.size + pendingFiles.size
-    LaunchedEffect(totalItems) {
+    // NOT remember()'d: `messages` is a SnapshotStateList mutated in place (add/addAll/clear), so its
+    // identity never changes — remember(messages) would cache the first result forever and silently
+    // go stale on every websocket-delivered message. Recomputing here is cheap and always correct.
+    val conversationItems = buildConversationItems(messages)
+    val totalItems = conversationItems.size + pendingFiles.size
+
+    // Only the newest message changing (initial load, or a live append) should snap to bottom —
+    // loadMoreHistory prepends older messages at the top and must NOT fight the user's scroll.
+    val lastMessageId = messages.lastOrNull()?.id
+    LaunchedEffect(lastMessageId, pendingFiles.size) {
         if (totalItems > 0) listState.animateScrollToItem(totalItems - 1)
+    }
+
+    LaunchedEffect(listState, hasMoreHistory) {
+        snapshotFlow { listState.firstVisibleItemIndex }.collect { index ->
+            if (hasMoreHistory && !isLoadingMoreHistory && index <= 2) {
+                onLoadMoreHistory()
+            }
+        }
     }
 
     fun sendPickedFile(name: String, bytes: ByteArray) {
@@ -205,22 +229,21 @@ internal fun ConsultationScreen(
             HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
             when {
-                isStartingSession -> {
+                isLoadingHistory && messages.isEmpty() -> {
                     Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             CircularProgressIndicator(color = Primary40)
-                            Text("Starting session…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Loading conversation…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                    }
-                }
-                session == null -> {
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("No active session", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 messages.isEmpty() && pendingFiles.isEmpty() -> {
                     Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("Session started. Say hello!", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = if (isStartingSession) "Starting session…" else "Say hello to start the conversation!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
                 else -> {
@@ -230,12 +253,30 @@ internal fun ConsultationScreen(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        items(messages, key = { it.id }) { message ->
-                            MessageBubble(
-                                message = message,
-                                fromMe = message.senderId == currentUserId,
-                                onFileClick = { viewerFile = it },
-                            )
+                        if (isLoadingMoreHistory) {
+                            item(key = "loading_more") {
+                                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Primary40, strokeWidth = 2.dp)
+                                }
+                            }
+                        }
+                        items(
+                            conversationItems,
+                            key = { item ->
+                                when (item) {
+                                    is ConversationItem.ConsultationDivider -> "divider_${item.consultationId}"
+                                    is ConversationItem.MessageItem -> item.message.id
+                                }
+                            },
+                        ) { item ->
+                            when (item) {
+                                is ConversationItem.ConsultationDivider -> ConsultationDividerRow(label = item.label)
+                                is ConversationItem.MessageItem -> MessageBubble(
+                                    message = item.message,
+                                    fromMe = item.message.senderId == currentUserId,
+                                    onFileClick = { viewerFile = it },
+                                )
+                            }
                         }
                         // Optimistic pending messages — appear immediately, removed when server echoes back
                         items(pendingFiles, key = { "p_${it.localId}" }) { pending ->
@@ -272,6 +313,49 @@ internal fun ConsultationScreen(
 
     viewerFile?.let { file ->
         FileViewerSheet(file = file, onDismiss = { viewerFile = null })
+    }
+}
+
+private sealed class ConversationItem {
+    data class ConsultationDivider(val label: String, val consultationId: String) : ConversationItem()
+    data class MessageItem(val message: ConsultationMessage) : ConversationItem()
+}
+
+// The merged history spans every consultation a doctor-patient pair has had — insert a divider
+// whenever the consultation changes so users can tell which visit a run of messages belongs to.
+private fun buildConversationItems(messages: List<ConsultationMessage>): List<ConversationItem> {
+    val items = mutableListOf<ConversationItem>()
+    var lastConsultationId: String? = null
+    for (message in messages) {
+        if (message.consultationId != lastConsultationId) {
+            items += ConversationItem.ConsultationDivider(consultationDividerLabel(message.createdAt), message.consultationId)
+            lastConsultationId = message.consultationId
+        }
+        items += ConversationItem.MessageItem(message)
+    }
+    return items
+}
+
+private fun consultationDividerLabel(iso: String): String = try {
+    val date = Instant.parse(iso).toLocalDateTime(TimeZone.currentSystemDefault()).date
+    val month = date.month.name.lowercase().replaceFirstChar { it.uppercase() }
+    "Consultation — $month ${date.dayOfMonth}, ${date.year}"
+} catch (_: Exception) { "Consultation" }
+
+@Composable
+private fun ConsultationDividerRow(label: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        HorizontalDivider(modifier = Modifier.weight(1f), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        HorizontalDivider(modifier = Modifier.weight(1f), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 

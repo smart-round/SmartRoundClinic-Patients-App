@@ -15,25 +15,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.VideoCall
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -44,28 +37,25 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import ke.co.smartroundclinic.patient.domain.model.Appointment
+import ke.co.smartroundclinic.patient.domain.model.ConversationThread
 import ke.co.smartroundclinic.patient.presentation.common.composables.PatientDashboardHeader
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 import ke.co.smartroundclinic.patient.presentation.theme.Primary90
-import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
-import ke.co.smartroundclinic.patient.presentation.theme.StatusPending
-import ke.co.smartroundclinic.patient.presentation.theme.StatusSuccess
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 @Composable
 internal fun ConsultationListScreen(
-    appointments: List<Appointment>,
+    threads: List<ConversationThread>,
     isLoading: Boolean,
-    onAppointmentClick: (Appointment) -> Unit,
+    onThreadClick: (ConversationThread) -> Unit,
     onRefresh: () -> Unit,
-    doctorName: (String) -> String,
-    doctorPicture: (String) -> String?,
-    canJoin: (Appointment) -> Boolean = { false },
-    isOverdue: (Appointment) -> Boolean = { false },
-    onCancelClick: (Appointment) -> Unit = {},
     onProfileClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -82,11 +72,11 @@ internal fun ConsultationListScreen(
             onRefresh = onRefresh,
             modifier = Modifier.fillMaxSize(),
         ) {
-            if (isLoading && appointments.isEmpty()) {
+            if (isLoading && threads.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-            } else if (appointments.isEmpty()) {
+            } else if (threads.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize().navigationBarsPadding(),
                     contentAlignment = Alignment.Center,
@@ -99,10 +89,10 @@ internal fun ConsultationListScreen(
                             Icon(imageVector = Icons.Filled.ChatBubbleOutline, contentDescription = null, tint = Primary40, modifier = Modifier.size(40.dp))
                         }
                         Spacer(Modifier.height(16.dp))
-                        Text(text = "No Active Consultations", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                        Text(text = "No Conversations Yet", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "Confirmed appointments will appear here\nso you can join a consultation with your doctor.",
+                            text = "Conversations with your doctors will appear here\nonce you have a confirmed appointment.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
@@ -115,16 +105,8 @@ internal fun ConsultationListScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize().navigationBarsPadding(),
                 ) {
-                    items(appointments, key = { it.id }) { appointment ->
-                        ConsultationCard(
-                            appointment = appointment,
-                            doctorName = doctorName(appointment.doctorId),
-                            doctorPicture = doctorPicture(appointment.doctorId),
-                            canJoin = canJoin(appointment),
-                            isOverdue = isOverdue(appointment),
-                            onCancelClick = { onCancelClick(appointment) },
-                            onClick = { onAppointmentClick(appointment) },
-                        )
+                    items(threads, key = { it.threadId }) { thread ->
+                        ConsultationThreadCard(thread = thread, onClick = { onThreadClick(thread) })
                     }
                 }
             }
@@ -133,28 +115,11 @@ internal fun ConsultationListScreen(
 }
 
 @Composable
-private fun ConsultationCard(
-    appointment: Appointment,
-    doctorName: String,
-    doctorPicture: String?,
-    canJoin: Boolean,
-    isOverdue: Boolean,
-    onCancelClick: () -> Unit,
-    onClick: () -> Unit,
-) {
-    val isConfirmed = appointment.status.equals("CONFIRMED", ignoreCase = true)
-    val isCompleted = appointment.status.equals("COMPLETED", ignoreCase = true)
-    val isClickable = !isConfirmed || canJoin
-
+private fun ConsultationThreadCard(thread: ConversationThread, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (isClickable)
-                    Modifier.clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClick)
-                else
-                    Modifier
-            ),
+            .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(2.dp),
@@ -164,54 +129,45 @@ private fun ConsultationCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            DoctorAvatar(picture = doctorPicture, size = 48)
+            DoctorAvatar(picture = thread.counterpartPicture, size = 48)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Dr. $doctorName",
+                    text = "Dr. ${thread.counterpartName}",
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                 )
                 Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(imageVector = Icons.Filled.CalendarToday, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(text = appointment.date, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                Text(
+                    text = thread.lastMessagePreview ?: "No messages yet",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                when {
-                    isOverdue -> OutlinedButton(
-                        onClick = onCancelClick,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.height(28.dp),
-                    ) {
-                        Text(
-                            text = "Cancel",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        )
-                    }
-                    else -> StatusBadge(status = appointment.status)
-                }
-                when {
-                    isCompleted || isOverdue -> Unit
-                    canJoin -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Icon(imageVector = Icons.Filled.VideoCall, contentDescription = null, tint = StatusConfirmed, modifier = Modifier.size(16.dp))
-                        Text(text = "Join", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = StatusConfirmed)
-                    }
-                    isConfirmed -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Icon(imageVector = Icons.Filled.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(13.dp))
-                        Text(
-                            text = "Opens ${appointment.slotStart}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+            if (thread.lastMessageAt != null) {
+                Text(
+                    text = formatThreadTimestamp(thread.lastMessageAt),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
 }
+
+private fun formatThreadTimestamp(iso: String): String = try {
+    val zone = TimeZone.currentSystemDefault()
+    val dateTime = Instant.parse(iso).toLocalDateTime(zone)
+    val today = Clock.System.now().toLocalDateTime(zone).date
+    if (dateTime.date == today) {
+        val hour = dateTime.hour
+        val ampm = if (hour < 12) "AM" else "PM"
+        val h = if (hour % 12 == 0) 12 else hour % 12
+        "$h:${dateTime.minute.toString().padStart(2, '0')} $ampm"
+    } else {
+        "${dateTime.date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${dateTime.date.dayOfMonth}"
+    }
+} catch (_: Exception) { "" }
 
 @Composable
 internal fun DoctorAvatar(picture: String?, size: Int, modifier: Modifier = Modifier) {
@@ -234,25 +190,5 @@ internal fun DoctorAvatar(picture: String?, size: Int, modifier: Modifier = Modi
                 modifier = Modifier.size((size * 0.6).dp),
             )
         }
-    }
-}
-
-@Composable
-private fun StatusBadge(status: String) {
-    val (bg, fg) = when (status.lowercase()) {
-        "confirmed" -> StatusConfirmed.copy(alpha = 0.15f) to StatusConfirmed
-        "completed" -> StatusSuccess.copy(alpha = 0.15f) to StatusSuccess
-        else -> StatusPending.copy(alpha = 0.15f) to StatusPending
-    }
-    Box(
-        modifier = Modifier
-            .background(bg, RoundedCornerShape(20.dp))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-    ) {
-        Text(
-            text = status.replaceFirstChar { it.uppercase() },
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-            color = fg,
-        )
     }
 }

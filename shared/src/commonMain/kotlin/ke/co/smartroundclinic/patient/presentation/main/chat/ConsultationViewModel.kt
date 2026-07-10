@@ -23,13 +23,15 @@ import ke.co.smartroundclinic.patient.data.remote.dto.response.toDomain
 import ke.co.smartroundclinic.patient.domain.model.Appointment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
 import ke.co.smartroundclinic.patient.domain.model.ConsultationSession
+import ke.co.smartroundclinic.patient.domain.model.ConversationThread
 import ke.co.smartroundclinic.patient.domain.repository.ConsultationRepository
 import ke.co.smartroundclinic.patient.domain.repository.DoctorLocalRepository
 import ke.co.smartroundclinic.patient.domain.repository.UserLocalRepository
 import ke.co.smartroundclinic.patient.domain.model.CallJoinInfo
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetMyAppointmentsUseCase
-import ke.co.smartroundclinic.patient.domain.usecase.consultation.GetConsultationMessagesUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.consultation.GetMergedConsultationHistoryUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.JoinConsultationCallUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.consultation.ListConversationThreadsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.StartConsultationUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -57,13 +59,14 @@ data class PendingFile(
 class ConsultationViewModel(
     private val consultationRepository: ConsultationRepository,
     private val startConsultationUseCase: StartConsultationUseCase,
-    private val getMessagesUseCase: GetConsultationMessagesUseCase,
     private val joinCallUseCase: JoinConsultationCallUseCase,
     private val getMyAppointments: GetMyAppointmentsUseCase,
     private val userLocalRepository: UserLocalRepository,
     private val doctorLocalRepository: DoctorLocalRepository,
     private val httpClient: HttpClient,
     private val snackbarController: SnackbarController,
+    private val listConversationThreadsUseCase: ListConversationThreadsUseCase,
+    private val getMergedHistoryUseCase: GetMergedConsultationHistoryUseCase,
 ) : ViewModel() {
 
     // ─── Consultation list ─────────────────────────────────────────────────
@@ -71,6 +74,11 @@ class ConsultationViewModel(
     var appointments by mutableStateOf<List<Appointment>>(emptyList())
         private set
     var isLoadingAppointments by mutableStateOf(false)
+        private set
+
+    var threads by mutableStateOf<List<ConversationThread>>(emptyList())
+        private set
+    var isLoadingThreads by mutableStateOf(false)
         private set
 
     private var doctorCache by mutableStateOf<List<DoctorEntity>>(emptyList())
@@ -92,6 +100,14 @@ class ConsultationViewModel(
     var isConnected by mutableStateOf(false)
         private set
 
+    var isLoadingHistory by mutableStateOf(false)
+        private set
+    var isLoadingMoreHistory by mutableStateOf(false)
+        private set
+    var hasMoreHistory by mutableStateOf(false)
+        private set
+    private var nextHistoryCursor: String? = null
+
     // Derived from pendingFiles — true when any non-failed upload is in progress
     val isUploadingFile: Boolean get() = pendingFiles.any { !it.failed }
 
@@ -111,6 +127,7 @@ class ConsultationViewModel(
             if (cached.isNotEmpty()) appointments = cached
             loadAppointments()
         }
+        loadThreads()
     }
 
     private fun loadCurrentUser() {
@@ -165,7 +182,6 @@ class ConsultationViewModel(
                 is Resource.Success -> {
                     val session = result.data ?: return@launch
                     activeSession = session
-                    loadHistory(session.id)
                     connectWebSocket(session.id)
                 }
                 is Resource.Error -> snackbarController.show(result.message ?: "Failed to start consultation", isError = true)
@@ -175,15 +191,57 @@ class ConsultationViewModel(
         }
     }
 
-    private fun loadHistory(sessionId: String) {
+    fun loadThreads() {
         viewModelScope.launch {
-            when (val result = getMessagesUseCase(sessionId)) {
-                is Resource.Success -> {
-                    messages.clear()
-                    messages.addAll(result.data ?: emptyList())
-                }
+            isLoadingThreads = true
+            when (val result = listConversationThreadsUseCase()) {
+                is Resource.Success -> threads = result.data ?: emptyList()
+                is Resource.Error -> snackbarController.show(result.message ?: "Failed to load conversations", isError = true)
                 else -> {}
             }
+            isLoadingThreads = false
+        }
+    }
+
+    /** Loads the merged history for a doctor-patient pair — replaces whatever is currently shown. */
+    fun loadMergedHistory(doctorId: String, patientId: String) {
+        viewModelScope.launch {
+            isLoadingHistory = true
+            messages.clear()
+            nextHistoryCursor = null
+            hasMoreHistory = false
+            when (val result = getMergedHistoryUseCase(doctorId, patientId)) {
+                is Resource.Success -> {
+                    val (items, cursor) = result.data ?: (emptyList<ConsultationMessage>() to null)
+                    // Backend returns newest-first (for cursor paging); render ascending, oldest at top.
+                    messages.addAll(items.asReversed())
+                    nextHistoryCursor = cursor
+                    hasMoreHistory = cursor != null
+                }
+                is Resource.Error -> snackbarController.show(result.message ?: "Failed to load conversation", isError = true)
+                else -> {}
+            }
+            isLoadingHistory = false
+        }
+    }
+
+    /** Loads the next (older) page of history and prepends it. No-op if there's nothing more or a load is already in flight. */
+    fun loadMoreHistory(doctorId: String, patientId: String) {
+        val cursor = nextHistoryCursor ?: return
+        if (isLoadingMoreHistory) return
+        viewModelScope.launch {
+            isLoadingMoreHistory = true
+            when (val result = getMergedHistoryUseCase(doctorId, patientId, before = cursor)) {
+                is Resource.Success -> {
+                    val (items, nextCursor) = result.data ?: (emptyList<ConsultationMessage>() to null)
+                    messages.addAll(0, items.asReversed())
+                    nextHistoryCursor = nextCursor
+                    hasMoreHistory = nextCursor != null
+                }
+                is Resource.Error -> snackbarController.show(result.message ?: "Failed to load more messages", isError = true)
+                else -> {}
+            }
+            isLoadingMoreHistory = false
         }
     }
 
@@ -324,6 +382,9 @@ class ConsultationViewModel(
         activeSession = null
         messages.clear()
         pendingFiles.clear()
+        nextHistoryCursor = null
+        hasMoreHistory = false
+        loadThreads() // refresh list previews now that this thread may have new messages
     }
 
     override fun onCleared() {

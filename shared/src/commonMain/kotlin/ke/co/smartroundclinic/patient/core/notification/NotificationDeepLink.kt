@@ -7,7 +7,7 @@ sealed class NotificationEvent {
     data object ToNotifications : NotificationEvent()
     data object ToMedicalHistory : NotificationEvent()
     data class ToAppointmentDetail(val appointmentId: String) : NotificationEvent()
-    data class ToConsultationChat(val appointmentId: String, val doctorName: String) : NotificationEvent()
+    data class ToConsultationChat(val doctorId: String, val doctorName: String, val appointmentId: String) : NotificationEvent()
     data class ToSupportTicket(val ticketId: String) : NotificationEvent()
 }
 

@@ -2,6 +2,7 @@ package ke.co.smartroundclinic.patient.core.notification
 
 import com.mmk.kmpnotifier.notification.NotifierManager
 import io.github.aakira.napier.Napier
+import ke.co.smartroundclinic.patient.domain.repository.AppointmentLocalRepository
 import ke.co.smartroundclinic.patient.domain.usecase.notification.RegisterDeviceTokenUseCase
 import ke.co.smartroundclinic.patient.notificationPlatform
 import kotlinx.coroutines.CoroutineScope
@@ -17,6 +18,7 @@ fun setupNotificationListener() {
     val scope = CoroutineScope(Dispatchers.IO)
     val component = object : KoinComponent {
         val registerDeviceToken: RegisterDeviceTokenUseCase by inject()
+        val appointmentLocalRepository: AppointmentLocalRepository by inject()
     }
 
     NotifierManager.addListener(object : NotifierManager.Listener {
@@ -33,40 +35,52 @@ fun setupNotificationListener() {
             val appointmentId = data["appointmentId"]?.toString()
             val consultationId = data["consultationId"]?.toString()
             val ticketId = data["ticketId"]?.toString()
+            val doctorId = data["doctorId"]?.toString()
             val doctorName = (data["doctorName"] ?: data["senderName"])?.toString() ?: "Doctor"
 
             Napier.d(tag = TAG, message = "Notification tapped — event=$event appointmentId=$appointmentId consultationId=$consultationId ticketId=$ticketId")
 
-            val notifEvent: NotificationEvent = when (event) {
-                "Appointment Booked",
-                "Appointment Confirmed",
-                "Appointment Cancelled",
-                "Appointment Completed",
-                "Missed Appointment" -> {
-                    if (!appointmentId.isNullOrBlank()) NotificationEvent.ToAppointmentDetail(appointmentId)
-                    else NotificationEvent.ToNotifications
-                }
-                "Doctor is Ready",
-                "Doctor Joined the Call",
-                "Consultation Ended",
-                "Call Ended" -> {
-                    if (!appointmentId.isNullOrBlank()) NotificationEvent.ToConsultationChat(appointmentId, doctorName)
-                    else NotificationEvent.ToNotifications
-                }
-                "New Chat Message" -> when {
-                    !appointmentId.isNullOrBlank() -> NotificationEvent.ToConsultationChat(appointmentId, doctorName)
-                    !ticketId.isNullOrBlank() -> NotificationEvent.ToSupportTicket(ticketId)
-                    else -> NotificationEvent.ToNotifications
-                }
-                "Support ticket status updated" -> {
-                    if (!ticketId.isNullOrBlank()) NotificationEvent.ToSupportTicket(ticketId)
-                    else NotificationEvent.ToNotifications
-                }
-                "Medical Record Updated" -> NotificationEvent.ToMedicalHistory
-                else -> NotificationEvent.ToNotifications
+            suspend fun toConsultationChat(appointmentId: String): NotificationEvent {
+                // The push payload doesn't always carry doctorId (only "New Chat Message" does today) —
+                // fall back to the locally-cached appointment so every chat-bound event can still deep-link.
+                val resolvedDoctorId = doctorId
+                    ?: component.appointmentLocalRepository.getAll().firstOrNull { it.id == appointmentId }?.doctorId
+                return if (!resolvedDoctorId.isNullOrBlank()) NotificationEvent.ToConsultationChat(resolvedDoctorId, doctorName, appointmentId)
+                else NotificationEvent.ToNotifications
             }
 
-            NotificationDeepLink.signal(notifEvent)
+            scope.launch {
+                val notifEvent: NotificationEvent = when (event) {
+                    "Appointment Booked",
+                    "Appointment Confirmed",
+                    "Appointment Cancelled",
+                    "Appointment Completed",
+                    "Missed Appointment" -> {
+                        if (!appointmentId.isNullOrBlank()) NotificationEvent.ToAppointmentDetail(appointmentId)
+                        else NotificationEvent.ToNotifications
+                    }
+                    "Doctor is Ready",
+                    "Doctor Joined the Call",
+                    "Consultation Ended",
+                    "Call Ended" -> {
+                        if (!appointmentId.isNullOrBlank()) toConsultationChat(appointmentId)
+                        else NotificationEvent.ToNotifications
+                    }
+                    "New Chat Message" -> when {
+                        !appointmentId.isNullOrBlank() -> toConsultationChat(appointmentId)
+                        !ticketId.isNullOrBlank() -> NotificationEvent.ToSupportTicket(ticketId)
+                        else -> NotificationEvent.ToNotifications
+                    }
+                    "Support ticket status updated" -> {
+                        if (!ticketId.isNullOrBlank()) NotificationEvent.ToSupportTicket(ticketId)
+                        else NotificationEvent.ToNotifications
+                    }
+                    "Medical Record Updated" -> NotificationEvent.ToMedicalHistory
+                    else -> NotificationEvent.ToNotifications
+                }
+
+                NotificationDeepLink.signal(notifEvent)
+            }
         }
     })
 

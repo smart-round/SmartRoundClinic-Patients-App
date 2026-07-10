@@ -3,6 +3,7 @@ package ke.co.smartroundclinic.patient.data.remote.dto.response
 import ke.co.smartroundclinic.patient.domain.model.ConsultationFileAttachment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
 import ke.co.smartroundclinic.patient.domain.model.ConsultationSession
+import ke.co.smartroundclinic.patient.domain.model.ConversationThread
 import kotlinx.serialization.Serializable
 
 // ─── Session ───────────────────────────────────────────────────────────────
@@ -137,4 +138,53 @@ fun JoinCallData.toDomain() = ke.co.smartroundclinic.patient.domain.model.CallJo
     participantId = participantId,
     authToken = authToken,
     presetName = presetName,
+)
+
+// ─── Conversation threads ───────────────────────────────────────────────────
+
+@Serializable
+data class ConversationThreadsResponse(
+    val data: List<ConversationThreadData>? = null,
+    val httpStatusCode: Int,
+    val message: String,
+    val status: Boolean,
+)
+
+@Serializable
+data class ConversationThreadData(
+    val threadId: String,
+    val doctorId: String,
+    val patientId: String,
+    val counterpartName: String,
+    val counterpartPicture: String? = null,
+    val lastMessagePreview: String? = null,
+    val lastMessageAt: String? = null,
+    val latestConsultationStatus: String,
+    val latestAppointmentId: String,
+)
+
+fun ConversationThreadData.toDomain() = ConversationThread(
+    threadId = threadId,
+    doctorId = doctorId,
+    patientId = patientId,
+    counterpartName = counterpartName,
+    counterpartPicture = counterpartPicture,
+    lastMessagePreview = lastMessagePreview,
+    lastMessageAt = lastMessageAt,
+    latestConsultationStatus = latestConsultationStatus,
+    latestAppointmentId = latestAppointmentId,
+)
+
+@Serializable
+data class ConversationThreadMessagesResponse(
+    val data: ConversationThreadMessagesData? = null,
+    val httpStatusCode: Int,
+    val message: String,
+    val status: Boolean,
+)
+
+@Serializable
+data class ConversationThreadMessagesData(
+    val items: List<ConsultationMessageData> = emptyList(),
+    val nextCursor: String? = null,
 )

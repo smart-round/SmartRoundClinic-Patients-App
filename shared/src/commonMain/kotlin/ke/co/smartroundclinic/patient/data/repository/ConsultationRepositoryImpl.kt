@@ -16,11 +16,14 @@ import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationMessa
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationMessagesResponse
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationSessionResponse
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationWsOutgoing
+import ke.co.smartroundclinic.patient.data.remote.dto.response.ConversationThreadMessagesResponse
+import ke.co.smartroundclinic.patient.data.remote.dto.response.ConversationThreadsResponse
 import ke.co.smartroundclinic.patient.data.remote.dto.response.JoinCallResponse
 import ke.co.smartroundclinic.patient.data.remote.dto.response.toDomain
 import ke.co.smartroundclinic.patient.domain.model.CallJoinInfo
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
 import ke.co.smartroundclinic.patient.domain.model.ConsultationSession
+import ke.co.smartroundclinic.patient.domain.model.ConversationThread
 import ke.co.smartroundclinic.patient.domain.repository.ConsultationRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -108,6 +111,37 @@ class ConsultationRepositoryImpl(private val client: HttpClient) : ConsultationR
             } else Resource.Error(res.message)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to upload file")
+        }
+    }
+
+    override suspend fun listThreads(): Resource<List<ConversationThread>> = withContext(Dispatchers.IO) {
+        try {
+            val response = client.get("consultation/threads").body<ConversationThreadsResponse>()
+            if (response.status) {
+                Resource.Success(response.data?.map { it.toDomain() } ?: emptyList(), response.message)
+            } else Resource.Error(response.message)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to load conversations")
+        }
+    }
+
+    override suspend fun getMergedMessages(
+        doctorId: String,
+        patientId: String,
+        before: String?,
+        size: Int,
+    ): Resource<Pair<List<ConsultationMessage>, String?>> = withContext(Dispatchers.IO) {
+        try {
+            val response = client.get("consultation/threads/$doctorId/$patientId/messages") {
+                if (before != null) parameter("before", before)
+                parameter("size", size)
+            }.body<ConversationThreadMessagesResponse>()
+            if (response.status) {
+                val items = response.data?.items?.map(ConsultationMessageData::toDomain) ?: emptyList()
+                Resource.Success(items to response.data?.nextCursor, response.message)
+            } else Resource.Error(response.message)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to load conversation")
         }
     }
 }
