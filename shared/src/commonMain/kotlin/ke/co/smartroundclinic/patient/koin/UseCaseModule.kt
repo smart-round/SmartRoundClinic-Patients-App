@@ -12,8 +12,11 @@ import ke.co.smartroundclinic.patient.domain.usecase.notification.GetMyNotificat
 import ke.co.smartroundclinic.patient.domain.usecase.notification.MarkNotificationReadUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.notification.RegisterDeviceTokenUseCase
 import ke.co.smartroundclinic.patient.presentation.main.notifications.NotificationsViewModel
+import ke.co.smartroundclinic.patient.domain.usecase.consultation.CancelCallUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.consultation.DeclineCallUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.DeleteConversationThreadUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.GetMergedConsultationHistoryUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.consultation.InviteToCallUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.JoinConsultationCallUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.ListConversationThreadsUseCase
 import ke.co.smartroundclinic.patient.presentation.main.chat.ConsultationViewModel
@@ -112,6 +115,9 @@ val useCaseModule = module {
     single { ListConversationThreadsUseCase(get()) }
     single { GetMergedConsultationHistoryUseCase(get()) }
     single { DeleteConversationThreadUseCase(get()) }
+    single { InviteToCallUseCase(get()) }
+    single { DeclineCallUseCase(get()) }
+    single { CancelCallUseCase(get()) }
 
     // Payment use cases
     single { StkPushPreBookingUseCase(get()) }
@@ -156,7 +162,7 @@ val useCaseModule = module {
     viewModel { ProfileViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { DoctorsProfileViewModel(get(), get(), get(), get()) }
     viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
-    viewModel { ConsultationViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { ConsultationViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get()) }
     viewModel { MedicalBioViewModel(get(), get(), get(), get(), get()) }
     viewModel { MedicalHistoryViewModel(get()) }

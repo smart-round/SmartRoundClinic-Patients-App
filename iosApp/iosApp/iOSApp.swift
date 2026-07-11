@@ -16,6 +16,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         // so it can fire onNotificationClicked and show foreground banners.
         // Overriding that delegate here would break kmpnotifier's handling.
         application.registerForRemoteNotifications()
+        CallKitManager.shared.start()
         return true
     }
 
@@ -59,6 +60,7 @@ struct iOSApp: App {
         )
         MainViewControllerKt.doInitKoin()
         wireRtkCallBridge()
+        wireCallKitBridge()
     }
 
     var body: some Scene {
@@ -75,6 +77,18 @@ struct iOSApp: App {
                 enableVideo: enableVideo.boolValue,
                 listener: listener
             )
+        }
+    }
+
+    // Kotlin's IncomingCallHandler.onCallInvite/onCallDeclined/onCallCancelled (fired from either
+    // the PushKit VoIP push in CallKitManager or the FCM silent-push/WebSocket fallback) call
+    // through these to report/end calls on CallKit — see CallKitBridge.kt for the Kotlin side.
+    private func wireCallKitBridge() {
+        CallKitBridge.shared.onIncomingCall = { callId, callerName, isVideo in
+            CallKitManager.shared.reportIncomingCall(callId: callId, callerName: callerName, isVideo: isVideo.boolValue)
+        }
+        CallKitBridge.shared.onEndCall = { callId in
+            CallKitManager.shared.endCall(callId: callId)
         }
     }
 }

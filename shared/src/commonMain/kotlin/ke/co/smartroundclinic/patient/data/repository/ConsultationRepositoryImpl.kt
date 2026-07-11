@@ -12,12 +12,17 @@ import io.ktor.client.request.setBody
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import ke.co.smartroundclinic.patient.common.Resource
+import ke.co.smartroundclinic.patient.data.remote.dto.request.CallActionReq
+import ke.co.smartroundclinic.patient.data.remote.dto.request.InviteToCallReq
+import ke.co.smartroundclinic.patient.data.remote.dto.response.CallActionRes
+import ke.co.smartroundclinic.patient.data.remote.dto.response.CallInviteRes
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationFileUploadResponse
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationMessageData
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConversationThreadMessagesResponse
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConversationThreadsResponse
 import ke.co.smartroundclinic.patient.data.remote.dto.response.JoinCallResponse
 import ke.co.smartroundclinic.patient.data.remote.dto.response.toDomain
+import ke.co.smartroundclinic.patient.domain.model.CallInvite
 import ke.co.smartroundclinic.patient.domain.model.CallJoinInfo
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
 import ke.co.smartroundclinic.patient.domain.model.ConversationThread
@@ -36,6 +41,40 @@ class ConsultationRepositoryImpl(private val client: HttpClient) : ConsultationR
             else Resource.Error(res.message)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Failed to join call")
+        }
+    }
+
+    override suspend fun inviteToCall(otherUserId: String, isVideo: Boolean): Resource<CallInvite> = withContext(Dispatchers.IO) {
+        try {
+            val res = client.post("chat/$otherUserId/call/invite") {
+                setBody(InviteToCallReq(isVideo = isVideo))
+            }.body<CallInviteRes>()
+            if (res.status && res.data != null) Resource.Success(res.data.toDomain(), res.message)
+            else Resource.Error(res.message)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to start call")
+        }
+    }
+
+    override suspend fun declineCall(otherUserId: String, callId: String): Resource<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val res = client.post("chat/$otherUserId/call/decline") {
+                setBody(CallActionReq(callId = callId))
+            }.body<CallActionRes>()
+            if (res.status) Resource.Success(Unit, res.message) else Resource.Error(res.message)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to decline call")
+        }
+    }
+
+    override suspend fun cancelCall(otherUserId: String, callId: String): Resource<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val res = client.post("chat/$otherUserId/call/cancel") {
+                setBody(CallActionReq(callId = callId))
+            }.body<CallActionRes>()
+            if (res.status) Resource.Success(Unit, res.message) else Resource.Error(res.message)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to cancel call")
         }
     }
 

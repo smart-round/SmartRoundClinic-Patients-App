@@ -16,6 +16,10 @@ import ke.co.smartroundclinic.patient.common.Constants
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.core.database.entity.DoctorEntity
 import ke.co.smartroundclinic.patient.core.snackbar.SnackbarController
+import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationCallAnsweredEventData
+import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationCallCancelledEventData
+import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationCallDeclinedEventData
+import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationCallInviteEventData
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationMessageData
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationPresenceEventData
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationTypingEventData
@@ -32,8 +36,12 @@ import ke.co.smartroundclinic.patient.domain.repository.UserLocalRepository
 import ke.co.smartroundclinic.patient.domain.model.CallJoinInfo
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetMyAppointmentsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetNextAppointmentUseCase
+import ke.co.smartroundclinic.patient.core.notification.IncomingCallHandler
+import ke.co.smartroundclinic.patient.core.notification.OutgoingCallState
+import ke.co.smartroundclinic.patient.domain.usecase.consultation.CancelCallUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.DeleteConversationThreadUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.GetMergedConsultationHistoryUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.consultation.InviteToCallUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.JoinConsultationCallUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.ListConversationThreadsUseCase
 import kotlinx.coroutines.CancellationException
@@ -68,6 +76,8 @@ data class PendingFile(
 class ConsultationViewModel(
     private val consultationRepository: ConsultationRepository,
     private val joinCallUseCase: JoinConsultationCallUseCase,
+    private val inviteToCallUseCase: InviteToCallUseCase,
+    private val cancelCallUseCase: CancelCallUseCase,
     private val getMyAppointments: GetMyAppointmentsUseCase,
     private val userLocalRepository: UserLocalRepository,
     private val doctorLocalRepository: DoctorLocalRepository,
@@ -348,6 +358,35 @@ class ConsultationViewModel(
                                                 otherPartyLastSeenAt = event.lastSeenAt
                                             }
                                         }
+                                        // Low-latency ringing path — arrives here instantly whenever the other
+                                        // party has this thread open; push (see NotificationSetup.onPayloadData)
+                                        // is the fallback for backgrounded/killed apps.
+                                        "CALL_INVITE" -> {
+                                            val event = wsJson.decodeFromString<ConsultationCallInviteEventData>(raw)
+                                            withContext(Dispatchers.Main) {
+                                                IncomingCallHandler.onCallInvite(
+                                                    callId = event.callId,
+                                                    callerId = event.callerId,
+                                                    callerName = event.callerName,
+                                                    doctorId = otherUserId,
+                                                    patientId = currentUserId,
+                                                    isVideo = event.isVideo,
+                                                    ringTimeoutSeconds = event.ringTimeoutSeconds,
+                                                )
+                                            }
+                                        }
+                                        "CALL_ANSWERED" -> {
+                                            val event = wsJson.decodeFromString<ConsultationCallAnsweredEventData>(raw)
+                                            withContext(Dispatchers.Main) { IncomingCallHandler.onCallAnswered(event.callId) }
+                                        }
+                                        "CALL_DECLINED" -> {
+                                            val event = wsJson.decodeFromString<ConsultationCallDeclinedEventData>(raw)
+                                            withContext(Dispatchers.Main) { IncomingCallHandler.onCallDeclined(event.callId) }
+                                        }
+                                        "CALL_CANCELLED" -> {
+                                            val event = wsJson.decodeFromString<ConsultationCallCancelledEventData>(raw)
+                                            withContext(Dispatchers.Main) { IncomingCallHandler.onCallCancelled(event.callId) }
+                                        }
                                         else -> {
                                             val msg = wsJson.decodeFromString<ConsultationMessageData>(raw).toDomain()
                                             withContext(Dispatchers.Main) {
@@ -492,6 +531,25 @@ class ConsultationViewModel(
 
     fun clearCallState() {
         callJoinState = null
+    }
+
+    /** Rings [otherUserId] (WhatsApp-style) — does not join the meeting; see OutgoingCallState. */
+    fun startCall(otherUserId: String, isVideo: Boolean, calleeName: String?) {
+        viewModelScope.launch {
+            when (val result = inviteToCallUseCase(otherUserId, isVideo)) {
+                is Resource.Success -> {
+                    val invite = result.data ?: return@launch
+                    OutgoingCallState.calling(invite.callId, otherUserId, calleeName, isVideo)
+                }
+                is Resource.Error -> snackbarController.show(result.message ?: "Failed to start call", isError = true)
+                else -> {}
+            }
+        }
+    }
+
+    fun cancelOutgoingCall(otherUserId: String, callId: String) {
+        OutgoingCallState.clear()
+        viewModelScope.launch { cancelCallUseCase(otherUserId, callId) }
     }
 
     private fun markFailed(pending: PendingFile) {

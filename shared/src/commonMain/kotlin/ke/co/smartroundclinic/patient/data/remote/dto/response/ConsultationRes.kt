@@ -83,6 +83,37 @@ data class ConsultationPresenceEventData(
     val lastSeenAt: String? = null,
 )
 
+// Ringing-call signals, delivered over this same socket alongside push (see InviteToCallUseCase
+// on the backend) — the socket is the low-latency path while either party has the thread open;
+// push is the fallback for backgrounded/killed apps.
+@Serializable
+data class ConsultationCallInviteEventData(
+    val type: String = "CALL_INVITE",
+    val callId: String,
+    val callerId: String,
+    val callerName: String? = null,
+    val isVideo: Boolean,
+    val ringTimeoutSeconds: Long,
+)
+
+@Serializable
+data class ConsultationCallAnsweredEventData(
+    val type: String = "CALL_ANSWERED",
+    val callId: String,
+)
+
+@Serializable
+data class ConsultationCallDeclinedEventData(
+    val type: String = "CALL_DECLINED",
+    val callId: String,
+)
+
+@Serializable
+data class ConsultationCallCancelledEventData(
+    val type: String = "CALL_CANCELLED",
+    val callId: String,
+)
+
 @Serializable
 data class ConsultationFileUploadResponse(
     val data: ConsultationMessageData? = null,

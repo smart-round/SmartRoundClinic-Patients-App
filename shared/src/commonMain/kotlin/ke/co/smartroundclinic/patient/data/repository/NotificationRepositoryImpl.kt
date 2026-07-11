@@ -16,15 +16,15 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 @Serializable
-private data class RegisterDeviceTokenRequest(val deviceToken: String, val platform: String)
+private data class RegisterDeviceTokenRequest(val deviceToken: String, val platform: String, val tokenType: String)
 
 class NotificationRepositoryImpl(private val client: HttpClient) : NotificationRepository {
 
-    override suspend fun registerDeviceToken(token: String, platform: String): Resource<Unit> =
+    override suspend fun registerDeviceToken(token: String, platform: String, tokenType: String): Resource<Unit> =
         withContext(Dispatchers.IO) {
             try {
                 client.post("notification/device-token") {
-                    setBody(RegisterDeviceTokenRequest(deviceToken = token, platform = platform.uppercase()))
+                    setBody(RegisterDeviceTokenRequest(deviceToken = token, platform = platform.uppercase(), tokenType = tokenType.uppercase()))
                 }
                 Resource.Success(Unit)
             } catch (e: Exception) {

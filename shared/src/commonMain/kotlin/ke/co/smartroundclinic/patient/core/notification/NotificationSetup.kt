@@ -30,6 +30,32 @@ fun setupNotificationListener() {
             }
         }
 
+        // Data-only messages (call invite/answer/decline/cancel) — fires on receipt, including
+        // while backgrounded, unlike onNotificationClicked which only fires on tap.
+        override fun onPayloadData(data: Map<String, *>) {
+            val event = data["event"]?.toString() ?: return
+            val callId = data["callId"]?.toString() ?: return
+            Napier.d(tag = TAG, message = "Call signal received: event=$event callId=$callId")
+            when (event) {
+                "Incoming Video Call" -> {
+                    val doctorId = data["doctorId"]?.toString() ?: return
+                    val patientId = data["patientId"]?.toString() ?: return
+                    IncomingCallHandler.onCallInvite(
+                        callId = callId,
+                        callerId = data["callerId"]?.toString() ?: return,
+                        callerName = data["callerName"]?.toString(),
+                        doctorId = doctorId,
+                        patientId = patientId,
+                        isVideo = data["isVideo"]?.toString()?.toBooleanStrictOrNull() ?: true,
+                        ringTimeoutSeconds = data["ringTimeoutSeconds"]?.toString()?.toLongOrNull() ?: 45L,
+                    )
+                }
+                "Call Answered" -> IncomingCallHandler.onCallAnswered(callId)
+                "Call Declined" -> IncomingCallHandler.onCallDeclined(callId)
+                "Call Cancelled" -> IncomingCallHandler.onCallCancelled(callId)
+            }
+        }
+
         override fun onNotificationClicked(data: Map<String, Any?>) {
             val event = data["event"]?.toString()
             val appointmentId = data["appointmentId"]?.toString()
