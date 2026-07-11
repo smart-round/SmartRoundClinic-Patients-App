@@ -23,6 +23,8 @@ fun ChatRoot(
     onAtRootChanged: (Boolean) -> Unit = {},
     pendingConversation: ConsultationChat? = null,
     onPendingNavigated: () -> Unit = {},
+    pendingCall: ConsultationCall? = null,
+    onPendingCallNavigated: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
 ) {
@@ -43,6 +45,17 @@ fun ChatRoot(
             backStack.removeAll { it is ConsultationChat }
             backStack.add(pendingConversation)
             onPendingNavigated()
+        }
+    }
+
+    // Fires after the pendingConversation effect above (both are set together from the same
+    // notification event), so ConsultationChat is already on the stack for ConsultationCall's
+    // entry to read the doctor name/picture off of.
+    LaunchedEffect(pendingCall) {
+        if (pendingCall != null) {
+            backStack.removeAll { it is ConsultationCall }
+            backStack.add(pendingCall)
+            onPendingCallNavigated()
         }
     }
 
@@ -67,6 +80,7 @@ fun ChatRoot(
             entry<ConsultationChat> { dest ->
                 LaunchedEffect(dest.doctorId) {
                     vm.connectToThread(dest.doctorId)
+                    vm.loadNextAppointment(dest.doctorId)
                 }
                 // currentUserId loads asynchronously from Room — re-key on it so that if this fires
                 // before it's populated (cold start / fresh login), it retries once the id is ready
@@ -82,6 +96,8 @@ fun ChatRoot(
                 ConsultationScreen(
                     doctorName = dest.doctorName,
                     doctorPicture = doctorPicture,
+                    appointment = vm.nextAppointment,
+                    onLockedCallClick = { vm.notifyCallLocked(it) },
                     messages = vm.messages,
                     isLoadingHistory = vm.isLoadingHistory,
                     isLoadingMoreHistory = vm.isLoadingMoreHistory,

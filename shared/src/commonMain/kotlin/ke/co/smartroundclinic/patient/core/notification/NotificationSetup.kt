@@ -40,12 +40,20 @@ fun setupNotificationListener() {
 
             Napier.d(tag = TAG, message = "Notification tapped — event=$event appointmentId=$appointmentId consultationId=$consultationId ticketId=$ticketId")
 
+            suspend fun resolvedDoctorId(appointmentId: String): String? = doctorId
+                ?: component.appointmentLocalRepository.getAll().firstOrNull { it.id == appointmentId }?.doctorId
+
+            // The push payload doesn't always carry doctorId (only "New Chat Message" does today) —
+            // fall back to the locally-cached appointment so every chat-bound event can still deep-link.
             suspend fun toConsultationChat(appointmentId: String): NotificationEvent {
-                // The push payload doesn't always carry doctorId (only "New Chat Message" does today) —
-                // fall back to the locally-cached appointment so every chat-bound event can still deep-link.
-                val resolvedDoctorId = doctorId
-                    ?: component.appointmentLocalRepository.getAll().firstOrNull { it.id == appointmentId }?.doctorId
-                return if (!resolvedDoctorId.isNullOrBlank()) NotificationEvent.ToConsultationChat(resolvedDoctorId, doctorName, appointmentId)
+                val resolved = resolvedDoctorId(appointmentId)
+                return if (!resolved.isNullOrBlank()) NotificationEvent.ToConsultationChat(resolved, doctorName, appointmentId)
+                else NotificationEvent.ToNotifications
+            }
+
+            suspend fun toCall(appointmentId: String): NotificationEvent {
+                val resolved = resolvedDoctorId(appointmentId)
+                return if (!resolved.isNullOrBlank()) NotificationEvent.ToCall(resolved, doctorName, appointmentId)
                 else NotificationEvent.ToNotifications
             }
 
@@ -60,7 +68,10 @@ fun setupNotificationListener() {
                         else NotificationEvent.ToNotifications
                     }
                     "Doctor is Ready",
-                    "Doctor Joined the Call",
+                    "Doctor Joined the Call" -> {
+                        if (!appointmentId.isNullOrBlank()) toCall(appointmentId)
+                        else NotificationEvent.ToNotifications
+                    }
                     "Consultation Ended",
                     "Call Ended" -> {
                         if (!appointmentId.isNullOrBlank()) toConsultationChat(appointmentId)

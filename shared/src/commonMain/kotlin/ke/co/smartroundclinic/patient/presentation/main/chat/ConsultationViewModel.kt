@@ -25,11 +25,13 @@ import ke.co.smartroundclinic.patient.data.remote.dto.response.toDomain
 import ke.co.smartroundclinic.patient.domain.model.Appointment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
 import ke.co.smartroundclinic.patient.domain.model.ConversationThread
+import ke.co.smartroundclinic.patient.domain.model.NextAppointment
 import ke.co.smartroundclinic.patient.domain.repository.ConsultationRepository
 import ke.co.smartroundclinic.patient.domain.repository.DoctorLocalRepository
 import ke.co.smartroundclinic.patient.domain.repository.UserLocalRepository
 import ke.co.smartroundclinic.patient.domain.model.CallJoinInfo
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetMyAppointmentsUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetNextAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.DeleteConversationThreadUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.GetMergedConsultationHistoryUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.JoinConsultationCallUseCase
@@ -74,6 +76,7 @@ class ConsultationViewModel(
     private val listConversationThreadsUseCase: ListConversationThreadsUseCase,
     private val getMergedHistoryUseCase: GetMergedConsultationHistoryUseCase,
     private val deleteConversationThreadUseCase: DeleteConversationThreadUseCase,
+    private val getNextAppointmentUseCase: GetNextAppointmentUseCase,
 ) : ViewModel() {
 
     // ─── Consultation list ─────────────────────────────────────────────────
@@ -81,6 +84,9 @@ class ConsultationViewModel(
     var appointments by mutableStateOf<List<Appointment>>(emptyList())
         private set
     var isLoadingAppointments by mutableStateOf(false)
+        private set
+
+    var nextAppointment by mutableStateOf<NextAppointment?>(null)
         private set
 
     var threads by mutableStateOf<List<ConversationThread>>(emptyList())
@@ -177,6 +183,19 @@ class ConsultationViewModel(
     private fun List<Appointment>.filterConsultable() = filter {
         it.status.equals("CONFIRMED", ignoreCase = true) ||
         it.status.equals("COMPLETED", ignoreCase = true)
+    }
+
+    // Chat threads are permanent and can span many appointments over time — this is the single
+    // source of truth (backend-resolved) for whether/when the video-call option should appear,
+    // rather than picking an appointment out of the locally cached list.
+    fun loadNextAppointment(otherUserId: String) {
+        nextAppointment = null
+        viewModelScope.launch {
+            when (val result = getNextAppointmentUseCase(otherUserId)) {
+                is Resource.Success -> nextAppointment = result.data
+                else -> Unit
+            }
+        }
     }
 
     fun doctorName(doctorId: String): String =
@@ -415,6 +434,8 @@ class ConsultationViewModel(
             }
         }
     }
+
+    fun notifyCallLocked(message: String) = snackbarController.show(message)
 
     fun deleteThread(doctorId: String, patientId: String) {
         viewModelScope.launch {

@@ -48,6 +48,7 @@ import ke.co.smartroundclinic.patient.core.notification.NotificationEvent
 import ke.co.smartroundclinic.patient.presentation.main.articles.ArticlesRoot
 import ke.co.smartroundclinic.patient.presentation.main.bookings.BookingsRoot
 import ke.co.smartroundclinic.patient.presentation.main.chat.ChatRoot
+import ke.co.smartroundclinic.patient.presentation.main.chat.destinations.ConsultationCall
 import ke.co.smartroundclinic.patient.presentation.main.chat.destinations.ConsultationChat
 import ke.co.smartroundclinic.patient.presentation.main.destinations.Appointments
 import ke.co.smartroundclinic.patient.presentation.main.destinations.Articles
@@ -84,6 +85,7 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
     var pendingHomeDestinations by remember { mutableStateOf<List<NavKey>>(emptyList()) }
     var pendingBookingAppointmentId by remember { mutableStateOf<String?>(null) }
     var pendingConsultation by remember { mutableStateOf<ConsultationChat?>(null) }
+    var pendingCall by remember { mutableStateOf<ConsultationCall?>(null) }
     var pendingSupportTicketId by remember { mutableStateOf<String?>(null) }
     var pendingMedicalHistory by remember { mutableStateOf(false) }
 
@@ -111,6 +113,11 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
                 is NotificationEvent.ToConsultationChat -> {
                     selectTab(Appointments)
                     pendingConsultation = ConsultationChat(event.doctorId, event.doctorName, event.appointmentId)
+                }
+                is NotificationEvent.ToCall -> {
+                    selectTab(Appointments)
+                    pendingConsultation = ConsultationChat(event.doctorId, event.doctorName, event.appointmentId)
+                    pendingCall = ConsultationCall(event.doctorId, isVideo = true)
                 }
                 is NotificationEvent.ToSupportTicket -> {
                     selectTab(Home)
@@ -160,6 +167,8 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
                         onAtRootChanged = { isAtRoot = it },
                         pendingConversation = pendingConsultation,
                         onPendingNavigated = { pendingConsultation = null },
+                        pendingCall = pendingCall,
+                        onPendingCallNavigated = { pendingCall = null },
                         onProfileClick = { selectTab(Home); pendingHomeDestinations = listOf(UserProfile) },
                         onNotificationsClick = { selectTab(Home); pendingHomeDestinations = listOf(Notifications) },
                     )

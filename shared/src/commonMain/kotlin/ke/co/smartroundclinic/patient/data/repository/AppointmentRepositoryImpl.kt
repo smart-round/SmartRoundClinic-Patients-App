@@ -12,8 +12,10 @@ import ke.co.smartroundclinic.patient.data.remote.dto.request.BookAppointmentReq
 import ke.co.smartroundclinic.patient.data.remote.dto.request.CancelAppointmentReq
 import ke.co.smartroundclinic.patient.data.remote.dto.response.AppointmentRes
 import ke.co.smartroundclinic.patient.data.remote.dto.response.AppointmentsListRes
+import ke.co.smartroundclinic.patient.data.remote.dto.response.NextAppointmentRes
 import ke.co.smartroundclinic.patient.data.remote.dto.response.toDomain
 import ke.co.smartroundclinic.patient.domain.model.Appointment
+import ke.co.smartroundclinic.patient.domain.model.NextAppointment
 import ke.co.smartroundclinic.patient.domain.repository.AppointmentRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -86,4 +88,14 @@ class AppointmentRepositoryImpl(private val client: HttpClient) : AppointmentRep
                 Resource.Error(e.message ?: "An unknown error occurred")
             }
         }
+
+    override suspend fun getNextAppointment(otherUserId: String): Resource<NextAppointment?> = withContext(Dispatchers.IO) {
+        try {
+            val response = client.get("scheduling/appointments/next") { parameter("otherUserId", otherUserId) }.body<NextAppointmentRes>()
+            if (response.status) Resource.Success(response.data?.toDomain())
+            else Resource.Error(response.message.ifBlank { "Failed to load next appointment" })
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "An unknown error occurred")
+        }
+    }
 }

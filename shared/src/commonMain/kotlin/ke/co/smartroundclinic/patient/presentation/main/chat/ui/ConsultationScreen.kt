@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -52,17 +53,21 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -87,6 +92,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -95,9 +101,12 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
 import ke.co.smartroundclinic.patient.data.remote.dto.response.MedicalRecordData
+import ke.co.smartroundclinic.patient.domain.model.NextAppointment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationFileAttachment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
 import ke.co.smartroundclinic.patient.presentation.main.chat.PendingFile
+import ke.co.smartroundclinic.patient.presentation.main.chat.util.CallAvailability
+import ke.co.smartroundclinic.patient.presentation.main.chat.util.callAvailability
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 import ke.co.smartroundclinic.patient.presentation.theme.Tertiary20
 import ke.co.smartroundclinic.patient.presentation.theme.Tertiary90
@@ -111,6 +120,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
@@ -133,6 +143,8 @@ internal fun ConsultationScreen(
     otherPartyOnline: Boolean = false,
     otherPartyLastSeenAt: String? = null,
     onTyping: (Boolean) -> Unit = {},
+    appointment: NextAppointment? = null,
+    onLockedCallClick: (String) -> Unit = {},
     onBack: () -> Unit,
     onVideoCall: () -> Unit,
     onSendText: (String) -> Unit,
@@ -140,6 +152,14 @@ internal fun ConsultationScreen(
     modifier: Modifier = Modifier,
 ) {
     var inputText by remember { mutableStateOf("") }
+    var now by remember { mutableStateOf(Clock.System.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000)
+            now = Clock.System.now()
+        }
+    }
+    val callAvailability = remember(appointment, now) { callAvailability(appointment, now) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var viewerFile by remember { mutableStateOf<ConsultationFileAttachment?>(null) }
@@ -266,8 +286,47 @@ internal fun ConsultationScreen(
                 },
                 actions = {
                     if (isConnected) {
-                        IconButton(onClick = onVideoCall) {
-                            Icon(imageVector = Icons.Filled.Videocam, contentDescription = "Video call", tint = Primary40)
+                        when (callAvailability) {
+                            is CallAvailability.Available -> IconButton(onClick = onVideoCall) {
+                                Icon(imageVector = Icons.Filled.Videocam, contentDescription = "Video call", tint = Primary40)
+                            }
+                            is CallAvailability.Locked -> appointment?.let { appt ->
+                                OutlinedIconButton(
+                                    onClick = { onLockedCallClick("Video call ${formatCallOpensLabel(appt.date, appt.slotStart, now).replaceFirstChar { it.lowercase() }}") },
+                                    shape = MaterialTheme.shapes.medium,
+                                    colors = IconButtonDefaults.outlinedIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.background,
+                                        contentColor = Primary40,
+                                    ),
+                                    border = BorderStroke(1.dp, Primary40),
+                                    modifier = Modifier.padding(end = 8.dp),
+                                ) {
+                                    Box(modifier = Modifier.padding(horizontal = 8.dp)) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Videocam,
+                                            contentDescription = "Video call locked",
+                                            tint = Primary40,
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .offset(x = 2.dp, y = 2.dp)
+                                                .size(14.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.background),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Lock,
+                                                contentDescription = null,
+                                                tint = Primary40,
+                                                modifier = Modifier.size(10.dp),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            CallAvailability.Hidden -> Unit
                         }
                     }
                 },
@@ -397,6 +456,17 @@ private fun formatLastSeen(iso: String): String = try {
     if (dateTime.date == today) "today at $time"
     else "${dateTime.date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} ${dateTime.date.dayOfMonth} at $time"
 } catch (_: Exception) { "recently" }
+
+// date is "yyyy-MM-dd", slotStart is "HH:mm" — appointment times are clinic-local (Africa/Nairobi) and
+// displayed as-is throughout this app, matching how the Time field reads elsewhere on the detail screen.
+private fun formatCallOpensLabel(date: String, slotStart: String, now: Instant): String = try {
+    val zone = TimeZone.of("Africa/Nairobi")
+    val today = now.toLocalDateTime(zone).date
+    val (year, month, day) = date.split("-").map { it.toInt() }
+    val apptDate = LocalDate(year, month, day)
+    if (apptDate == today) "Opens at $slotStart"
+    else "Opens on ${apptDate.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }} $day at $slotStart"
+} catch (_: Exception) { "Opens at $slotStart on $date" }
 
 // This is a permanent, ongoing conversation (not scoped to any one visit) — insert a WhatsApp-style
 // day divider whenever the calendar date changes, rather than grouping by visit/consultation.
