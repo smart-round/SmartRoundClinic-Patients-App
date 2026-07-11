@@ -33,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -104,7 +105,13 @@ fun PatientDashboardHeader(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = if (isGreeting) "Hello${if (firstName.isNotBlank()) " $firstName" else ""} 👋" else title,
-                    style = if (isGreeting) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    // FontFamily.Default (not the brand Montserrat/Raleway fonts, which carry no
+                    // emoji glyphs or fallback chain) — needed for the 👋 to render on iOS.
+                    style = if (isGreeting) {
+                        MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Default)
+                    } else {
+                        MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                    },
                     color = Color.White,
                     modifier = Modifier.weight(1f),
                 )

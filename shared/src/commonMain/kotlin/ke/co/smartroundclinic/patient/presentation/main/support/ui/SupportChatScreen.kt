@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -264,7 +265,9 @@ private fun ChatBubble(
             }
         } else {
             Box(modifier = Modifier.widthIn(max = 280.dp).clip(bubbleShape).background(bgColor).padding(horizontal = 12.dp, vertical = 8.dp)) {
-                Text(message.message ?: "", style = MaterialTheme.typography.bodyMedium, color = textColor)
+                // FontFamily.Default (not the brand Montserrat/Raleway fonts, which carry no
+                // emoji glyphs or fallback chain) — needed for emoji to render on iOS.
+                Text(message.message ?: "", style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Default), color = textColor)
             }
             Text(formatChatTime(message.createdAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp))
         }

@@ -15,8 +15,10 @@ sealed class CallAvailability {
 }
 
 /** The video-call icon is only ever shown for a CONFIRMED appointment, and only becomes joinable
- * from 10 minutes before its slotStart onward (no upper bound — it stays joinable for as long as
- * the appointment remains CONFIRMED, mirroring the backend's hasJoinableConfirmedAppointment check). */
+ * from 10 minutes before its slotStart onward. There's no local upper-bound check here — once an
+ * appointment is more than 24h past its slotStart, the backend's GET /scheduling/appointments/next
+ * simply stops returning it (mirroring hasJoinableConfirmedAppointment's own 24h expiry), so
+ * [appointment] arrives as null and this naturally falls through to [CallAvailability.Hidden]. */
 fun callAvailability(appointment: NextAppointment?, now: Instant): CallAvailability {
     if (appointment == null || appointment.status != "CONFIRMED") return CallAvailability.Hidden
     val slotStartInstant = parseAppointmentInstant(appointment.date, appointment.slotStart) ?: return CallAvailability.Hidden

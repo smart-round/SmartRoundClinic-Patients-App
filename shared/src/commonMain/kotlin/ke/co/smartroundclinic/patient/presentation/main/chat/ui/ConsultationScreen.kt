@@ -88,6 +88,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -965,7 +966,9 @@ private fun TextBubble(text: String, fromMe: Boolean, time: String) {
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Column {
-            Text(text = text, style = MaterialTheme.typography.bodyMedium, color = textColor)
+            // FontFamily.Default (not the brand Montserrat/Raleway fonts, which carry no emoji
+            // glyphs or fallback chain) — needed for emoji typed by either party to render on iOS.
+            Text(text = text, style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Default), color = textColor)
             Text(
                 text = time,
                 style = MaterialTheme.typography.labelSmall,
