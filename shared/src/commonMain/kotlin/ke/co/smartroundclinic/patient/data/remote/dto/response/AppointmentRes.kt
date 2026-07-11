@@ -2,6 +2,7 @@ package ke.co.smartroundclinic.patient.data.remote.dto.response
 
 import ke.co.smartroundclinic.patient.domain.model.Appointment
 import ke.co.smartroundclinic.patient.domain.model.NextAppointment
+import ke.co.smartroundclinic.patient.domain.model.Refund
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -37,6 +38,28 @@ data class AppointmentData(
     val cancellationReason: String? = null,
     val cancelledBy: String? = null,
     val updatedAt: String? = null,
+    val refund: RefundData? = null,
+)
+
+@Serializable
+data class RefundData(
+    val id: String,
+    val amount: Double,
+    val currency: String,
+    val status: String,
+    val reason: String? = null,
+    val createdAt: String,
+    val updatedAt: String? = null,
+)
+
+fun RefundData.toDomain() = Refund(
+    id = id,
+    amount = amount,
+    currency = currency,
+    status = status,
+    reason = reason,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
 )
 
 @Serializable
@@ -81,4 +104,5 @@ fun AppointmentData.toDomain() = Appointment(
     cancellationReason = cancellationReason,
     cancelledBy = cancelledBy,
     updatedAt = updatedAt,
+    refund = refund?.toDomain(),
 )

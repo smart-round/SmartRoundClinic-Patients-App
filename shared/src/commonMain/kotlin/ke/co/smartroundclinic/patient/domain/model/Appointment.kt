@@ -16,4 +16,5 @@ data class Appointment(
     val cancellationReason: String?,
     val cancelledBy: String?,
     val updatedAt: String?,
+    val refund: Refund? = null,
 )

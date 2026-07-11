@@ -3,6 +3,7 @@ package ke.co.smartroundclinic.patient.core.database.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import ke.co.smartroundclinic.patient.domain.model.Appointment
+import ke.co.smartroundclinic.patient.domain.model.Refund
 
 @Entity(tableName = "appointments")
 data class AppointmentEntity(
@@ -21,6 +22,13 @@ data class AppointmentEntity(
     val cancellationReason: String?,
     val cancelledBy: String?,
     val updatedAt: String?,
+    val refundId: String? = null,
+    val refundAmount: Double? = null,
+    val refundCurrency: String? = null,
+    val refundStatus: String? = null,
+    val refundReason: String? = null,
+    val refundCreatedAt: String? = null,
+    val refundUpdatedAt: String? = null,
 )
 
 fun AppointmentEntity.toDomain() = Appointment(
@@ -39,6 +47,19 @@ fun AppointmentEntity.toDomain() = Appointment(
     cancellationReason = cancellationReason,
     cancelledBy = cancelledBy,
     updatedAt = updatedAt,
+    refund = if (refundId != null && refundAmount != null && refundCurrency != null && refundStatus != null && refundCreatedAt != null) {
+        Refund(
+            id = refundId,
+            amount = refundAmount,
+            currency = refundCurrency,
+            status = refundStatus,
+            reason = refundReason,
+            createdAt = refundCreatedAt,
+            updatedAt = refundUpdatedAt,
+        )
+    } else {
+        null
+    },
 )
 
 fun Appointment.toEntity() = AppointmentEntity(
@@ -57,4 +78,11 @@ fun Appointment.toEntity() = AppointmentEntity(
     cancellationReason = cancellationReason,
     cancelledBy = cancelledBy,
     updatedAt = updatedAt,
+    refundId = refund?.id,
+    refundAmount = refund?.amount,
+    refundCurrency = refund?.currency,
+    refundStatus = refund?.status,
+    refundReason = refund?.reason,
+    refundCreatedAt = refund?.createdAt,
+    refundUpdatedAt = refund?.updatedAt,
 )

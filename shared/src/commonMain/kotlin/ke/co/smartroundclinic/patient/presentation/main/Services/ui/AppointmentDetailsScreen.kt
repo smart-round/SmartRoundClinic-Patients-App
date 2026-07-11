@@ -337,6 +337,24 @@ fun AppointmentDetailsScreen(
                 }
             }
 
+            // Refund info — only present when a completed payment was cancelled
+            appointment.refund?.let { refund ->
+                DetailCard(title = "Refund") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = formatRefundAmount(refund.amount, refund.currency),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        RefundStatusPill(status = refund.status)
+                    }
+                }
+            }
+
             // Prescription & Notes
             PrescriptionSection(
                 medicalRecord = medicalRecord,
@@ -723,6 +741,20 @@ private fun StatusPill(status: String) {
 }
 
 @Composable
+private fun RefundStatusPill(status: String) {
+    val (text, label) = when (status.lowercase()) {
+        "completed" -> StatusSuccess to "Refunded"
+        "failed" -> StatusSuspended to "Failed"
+        else -> StatusPending to "Pending"
+    }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+        color = text,
+    )
+}
+
+@Composable
 private fun DetailCard(
     title: String,
     content: @Composable () -> Unit,
@@ -771,6 +803,12 @@ private fun DetailRow(
             color = MaterialTheme.colorScheme.onSurface,
         )
     }
+}
+
+private fun formatRefundAmount(amount: Double, currency: String): String {
+    val whole = amount.toLong()
+    val cents = ((amount - whole) * 100).toLong()
+    return "$currency $whole.${cents.toString().padStart(2, '0')}"
 }
 
 private fun formatTimeRange(start: String, end: String): String {

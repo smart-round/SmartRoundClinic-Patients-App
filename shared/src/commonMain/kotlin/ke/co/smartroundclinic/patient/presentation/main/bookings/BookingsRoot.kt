@@ -608,6 +608,18 @@ private fun AppointmentCard(appointment: Appointment, onClick: () -> Unit) {
                         color = Primary40,
                     )
                 }
+                appointment.refund?.let { refund ->
+                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Refund: ${refund.currency} ${refund.amount.toAmountString()}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        RefundStatusBadge(status = refund.status)
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
@@ -668,6 +680,20 @@ private fun StatusBadge(status: String) {
             color = fg,
         )
     }
+}
+
+@Composable
+private fun RefundStatusBadge(status: String) {
+    val (fg, label) = when (status.lowercase()) {
+        "completed" -> StatusSuccess to "Refunded"
+        "failed" -> StatusSuspended to "Refund Failed"
+        else -> StatusPending to "Refund Pending"
+    }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+        color = fg,
+    )
 }
 
 private fun formatDoctorName(name: String): String {
