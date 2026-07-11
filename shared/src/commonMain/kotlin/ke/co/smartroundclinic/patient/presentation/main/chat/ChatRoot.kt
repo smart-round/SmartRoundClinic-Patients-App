@@ -94,8 +94,6 @@ fun ChatRoot(
                     otherPartyTyping = vm.otherPartyTyping,
                     otherPartyOnline = vm.otherPartyOnline,
                     otherPartyLastSeenAt = vm.otherPartyLastSeenAt,
-                    otherPartyLastReadAt = vm.otherPartyLastReadAt,
-                    otherPartyLastDeliveredAt = vm.otherPartyLastDeliveredAt,
                     onTyping = vm::sendTypingEvent,
                     onBack = {
                         vm.disconnect()

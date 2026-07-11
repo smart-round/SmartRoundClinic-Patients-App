@@ -49,8 +49,6 @@ import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Done
-import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -134,8 +132,6 @@ internal fun ConsultationScreen(
     otherPartyTyping: Boolean = false,
     otherPartyOnline: Boolean = false,
     otherPartyLastSeenAt: String? = null,
-    otherPartyLastReadAt: String? = null,
-    otherPartyLastDeliveredAt: String? = null,
     onTyping: (Boolean) -> Unit = {},
     onBack: () -> Unit,
     onVideoCall: () -> Unit,
@@ -162,20 +158,38 @@ internal fun ConsultationScreen(
         if (totalItems > 0) listState.animateScrollToItem(totalItems - 1)
     }
 
-    LaunchedEffect(listState, hasMoreHistory) {
+    // Prefetch well before the user hits the physical top — firing at 2 made the list visibly stall
+    // as they reached the last item and waited for the network. Triggering this early instead loads
+    // the next page while there's still a runway of unseen messages above, so it feels endless.
+    // isLoadingMoreHistory must be a key here, not just read inside collect: LaunchedEffect only
+    // restarts (and re-captures fresh parameter values) when a key changes — hasMoreHistory alone
+    // rarely changes between pages, so without this the running coroutine kept checking against a
+    // stale, frozen isLoadingMoreHistory from whenever it last started, and the next page only
+    // fetched once some unrelated scroll produced a new firstVisibleItemIndex value (the "scroll
+    // down then up to trigger it" symptom). Restarting on every loading-state flip re-checks the
+    // current scroll position the instant a fetch finishes, so back-to-back pages load with no
+    // extra scroll needed.
+    // canScrollForward is required too — without it, opening a short conversation (whose first,
+    // small page already fits on one screen after the initial scroll-to-bottom) satisfies
+    // "index <= 5" immediately, cascading through every older page on open instead of loading only
+    // the latest messages. canScrollForward is false right at the bottom (nothing rendered below the
+    // viewport yet) and only becomes true once the user actually scrolls up away from it, so this
+    // keeps prefetching tied to a real upward scroll rather than where the initial page happens to rest.
+    LaunchedEffect(listState, hasMoreHistory, isLoadingMoreHistory) {
         snapshotFlow { listState.firstVisibleItemIndex }.collect { index ->
-            if (hasMoreHistory && !isLoadingMoreHistory && index <= 2) {
+            if (hasMoreHistory && !isLoadingMoreHistory && index <= 5 && listState.canScrollForward) {
                 onLoadMoreHistory()
             }
         }
     }
 
-    // Notify the other party while the input has text; stop after a few seconds of inactivity or
-    // once it's cleared (send / manual clear) — mirrors the debounce already done in the ViewModel.
+    // Fires on every keystroke (LaunchedEffect restarts each time inputText changes, cancelling
+    // the previous delay); stop is sent 1s after the last keystroke, or immediately once cleared
+    // (send / manual clear). onTyping itself only pushes a live WS frame — no DB write involved.
     LaunchedEffect(inputText) {
         if (inputText.isNotBlank()) {
             onTyping(true)
-            delay(3_000L)
+            delay(1_000L)
             onTyping(false)
         } else {
             onTyping(false)
@@ -315,9 +329,6 @@ internal fun ConsultationScreen(
                                         MessageBubble(
                                             message = item.message,
                                             fromMe = fromMe,
-                                            receiptStatus = if (fromMe) {
-                                                receiptStatusFor(item.message, otherPartyLastReadAt, otherPartyLastDeliveredAt)
-                                            } else null,
                                             onFileClick = { viewerFile = it },
                                         )
                                     }
@@ -373,21 +384,6 @@ internal fun ConsultationScreen(
 private sealed class ConversationItem {
     data class DateDivider(val label: String, val dateKey: String) : ConversationItem()
     data class MessageItem(val message: ConsultationMessage) : ConversationItem()
-}
-
-// Read-receipt watermark model: a message is READ if its timestamp is at or before the other
-// party's last-read watermark, DELIVERED if at or before their last-delivered watermark, else
-// just SENT. ISO-8601 UTC timestamp strings compare correctly with plain string ordering.
-private enum class ReadReceiptStatus { SENT, DELIVERED, READ }
-
-private fun receiptStatusFor(
-    message: ConsultationMessage,
-    otherPartyLastReadAt: String?,
-    otherPartyLastDeliveredAt: String?,
-): ReadReceiptStatus = when {
-    otherPartyLastReadAt != null && message.createdAt <= otherPartyLastReadAt -> ReadReceiptStatus.READ
-    otherPartyLastDeliveredAt != null && message.createdAt <= otherPartyLastDeliveredAt -> ReadReceiptStatus.DELIVERED
-    else -> ReadReceiptStatus.SENT
 }
 
 private fun formatLastSeen(iso: String): String = try {
@@ -715,7 +711,6 @@ private fun MessageBubble(
     message: ConsultationMessage,
     fromMe: Boolean,
     onFileClick: (ConsultationFileAttachment) -> Unit,
-    receiptStatus: ReadReceiptStatus? = null,
     modifier: Modifier = Modifier,
 ) {
     val isFile = message.messageType.uppercase() == "FILE"
@@ -737,38 +732,20 @@ private fun MessageBubble(
                 )
             }
             when {
-                isPrescription -> PrescriptionCard(json = message.message ?: "", time = formatTime(message.createdAt), receiptStatus = receiptStatus)
+                isPrescription -> PrescriptionCard(json = message.message ?: "", time = formatTime(message.createdAt))
                 isFile -> FileBubble(message = message, fromMe = fromMe, onFileClick = onFileClick)
-                else -> TextBubble(text = message.message ?: "", fromMe = fromMe, time = formatTime(message.createdAt), receiptStatus = receiptStatus)
+                else -> TextBubble(text = message.message ?: "", fromMe = fromMe, time = formatTime(message.createdAt))
             }
             if (isFile) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp)) {
-                    Text(
-                        text = formatTime(message.createdAt),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (receiptStatus != null) {
-                        ReadReceiptTicks(status = receiptStatus, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
+                Text(
+                    text = formatTime(message.createdAt),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp, start = 4.dp, end = 4.dp),
+                )
             }
         }
     }
-}
-
-@Composable
-private fun ReadReceiptTicks(status: ReadReceiptStatus, tint: Color, modifier: Modifier = Modifier) {
-    Icon(
-        imageVector = if (status == ReadReceiptStatus.SENT) Icons.Filled.Done else Icons.Filled.DoneAll,
-        contentDescription = when (status) {
-            ReadReceiptStatus.SENT -> "Sent"
-            ReadReceiptStatus.DELIVERED -> "Delivered"
-            ReadReceiptStatus.READ -> "Read"
-        },
-        tint = if (status == ReadReceiptStatus.READ) Color(0xFF4FC3F7) else tint,
-        modifier = modifier.size(14.dp),
-    )
 }
 
 @Composable
@@ -810,7 +787,7 @@ private fun TypingDots(modifier: Modifier = Modifier) {
 private val prescriptionJson = Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false }
 
 @Composable
-private fun PrescriptionCard(json: String, time: String, receiptStatus: ReadReceiptStatus? = null, modifier: Modifier = Modifier) {
+private fun PrescriptionCard(json: String, time: String, modifier: Modifier = Modifier) {
     val record = remember(json) {
         runCatching { prescriptionJson.decodeFromString<MedicalRecordData>(json) }.getOrNull()
     }
@@ -889,25 +866,17 @@ private fun PrescriptionCard(json: String, time: String, receiptStatus: ReadRece
         }
 
         Spacer(Modifier.height(4.dp))
-        Row(
+        Text(
+            text = time,
+            style = MaterialTheme.typography.labelSmall,
+            color = Tertiary40.copy(alpha = 0.7f),
             modifier = Modifier.align(Alignment.End),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = time,
-                style = MaterialTheme.typography.labelSmall,
-                color = Tertiary40.copy(alpha = 0.7f),
-            )
-            if (receiptStatus != null) {
-                ReadReceiptTicks(status = receiptStatus, tint = Tertiary40.copy(alpha = 0.7f))
-            }
-        }
+        )
     }
 }
 
 @Composable
-private fun TextBubble(text: String, fromMe: Boolean, time: String, receiptStatus: ReadReceiptStatus? = null) {
+private fun TextBubble(text: String, fromMe: Boolean, time: String) {
     val bubbleColor = if (fromMe) Primary40 else MaterialTheme.colorScheme.surfaceVariant
     val textColor = if (fromMe) Color.White else MaterialTheme.colorScheme.onSurface
     val timeColor = if (fromMe) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
@@ -927,16 +896,12 @@ private fun TextBubble(text: String, fromMe: Boolean, time: String, receiptStatu
     ) {
         Column {
             Text(text = text, style = MaterialTheme.typography.bodyMedium, color = textColor)
-            Row(
+            Text(
+                text = time,
+                style = MaterialTheme.typography.labelSmall,
+                color = timeColor,
                 modifier = Modifier.align(Alignment.End).padding(top = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(text = time, style = MaterialTheme.typography.labelSmall, color = timeColor)
-                if (receiptStatus != null) {
-                    ReadReceiptTicks(status = receiptStatus, tint = timeColor)
-                }
-            }
+            )
         }
     }
 }
@@ -1244,12 +1209,11 @@ private fun String.isImageFile() =
     endsWith(".gif", ignoreCase = true)
 
 private fun formatTime(iso: String): String = try {
-    val parts = iso.split("T").lastOrNull()?.split(":") ?: return iso
-    val hour = parts[0].toIntOrNull() ?: return iso
-    val minute = parts.getOrNull(1) ?: "00"
+    val dateTime = Instant.parse(iso).toLocalDateTime(TimeZone.currentSystemDefault())
+    val hour = dateTime.hour
     val ampm = if (hour < 12) "AM" else "PM"
     val h = if (hour % 12 == 0) 12 else hour % 12
-    "$h:$minute $ampm"
+    "$h:${dateTime.minute.toString().padStart(2, '0')} $ampm"
 } catch (_: Exception) { iso }
 
 private fun formatFileSize(bytes: Long): String = when {

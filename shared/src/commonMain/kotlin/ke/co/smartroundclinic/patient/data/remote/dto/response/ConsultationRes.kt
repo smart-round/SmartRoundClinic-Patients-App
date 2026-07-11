@@ -84,15 +84,6 @@ data class ConsultationPresenceEventData(
 )
 
 @Serializable
-data class ConsultationReadReceiptEventData(
-    val type: String = "READ",
-    val doctorId: String,
-    val patientId: String,
-    val readerId: String,
-    val lastReadAt: String,
-)
-
-@Serializable
 data class ConsultationFileUploadResponse(
     val data: ConsultationMessageData? = null,
     val httpStatusCode: Int,
@@ -172,6 +163,4 @@ data class ConversationThreadMessagesResponse(
 data class ConversationThreadMessagesData(
     val items: List<ConsultationMessageData> = emptyList(),
     val nextCursor: String? = null,
-    val counterpartLastReadAt: String? = null,
-    val counterpartLastDeliveredAt: String? = null,
 )

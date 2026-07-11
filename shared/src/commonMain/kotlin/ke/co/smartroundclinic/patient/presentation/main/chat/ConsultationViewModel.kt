@@ -6,12 +6,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.webSocket
-import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
 import io.ktor.websocket.DefaultWebSocketSession
-import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import ke.co.smartroundclinic.patient.common.Constants
 import ke.co.smartroundclinic.patient.common.Resource
@@ -19,7 +18,6 @@ import ke.co.smartroundclinic.patient.core.database.entity.DoctorEntity
 import ke.co.smartroundclinic.patient.core.snackbar.SnackbarController
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationMessageData
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationPresenceEventData
-import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationReadReceiptEventData
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationTypingEventData
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationWsEventPeek
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationWsOutgoing
@@ -49,8 +47,10 @@ import kotlinx.serialization.json.Json
 private val wsJson = Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false }
 
 // Keep the initial/each older-page fetch small — the full history loads incrementally as the
-// patient scrolls up, rather than pulling an entire multi-consultation thread up front.
-private const val HISTORY_PAGE_SIZE = 5
+// patient scrolls up, rather than pulling an entire multi-consultation thread up front. Needs to be
+// large enough to fill the screen on open (a handful of short bubbles fit easily), otherwise the
+// list has no scroll room at all and the user can never trigger the next page.
+private const val HISTORY_PAGE_SIZE = 20
 
 data class PendingFile(
     val localId: String,
@@ -111,16 +111,12 @@ class ConsultationViewModel(
         private set
     private var nextHistoryCursor: String? = null
 
-    // ─── Typing / presence / read-receipts for the currently open conversation ─────────────
+    // ─── Typing / presence for the currently open conversation ─────────────
     var otherPartyTyping by mutableStateOf(false)
         private set
     var otherPartyOnline by mutableStateOf(false)
         private set
     var otherPartyLastSeenAt by mutableStateOf<String?>(null)
-        private set
-    var otherPartyLastReadAt by mutableStateOf<String?>(null)
-        private set
-    var otherPartyLastDeliveredAt by mutableStateOf<String?>(null)
         private set
     private var typingClearJob: Job? = null
     private var lastTypingSentTrue = false
@@ -253,8 +249,6 @@ class ConsultationViewModel(
                         messages.addAll(page?.items.orEmpty().asReversed())
                         nextHistoryCursor = page?.nextCursor
                         hasMoreHistory = page?.nextCursor != null
-                        otherPartyLastReadAt = page?.counterpartLastReadAt
-                        otherPartyLastDeliveredAt = page?.counterpartLastDeliveredAt
                     }
                     is Resource.Error -> snackbarController.show(result.message ?: "Failed to load conversation", isError = true)
                     else -> {}
@@ -313,18 +307,11 @@ class ConsultationViewModel(
                         withContext(Dispatchers.Main) { isConnected = true }
                         attempt = 0
 
-                        // Ping every 25 s; close the session on failure so the reconnect loop fires
-                        launch {
-                            while (isActive) {
-                                delay(25_000L)
-                                try {
-                                    send(Frame.Ping(ByteArray(0)))
-                                } catch (_: Exception) {
-                                    try { close(CloseReason(CloseReason.Codes.GOING_AWAY, "")) } catch (_: Exception) {}
-                                    break
-                                }
-                            }
-                        }
+                        // Liveness is handled by the server's own WebSocket ping/pong (see
+                        // configureSockets() — pingPeriod/timeout) plus the underlying engine's
+                        // automatic pong replies. A manual Frame.Ping here isn't reliably supported
+                        // across Ktor's OkHttp/Darwin client engines and was closing this socket
+                        // every ~25s when send() failed on it, producing a constant reconnect loop.
 
                         for (frame in incoming) {
                             if (frame is Frame.Text) {
@@ -342,10 +329,6 @@ class ConsultationViewModel(
                                                 otherPartyLastSeenAt = event.lastSeenAt
                                             }
                                         }
-                                        "READ" -> {
-                                            val event = wsJson.decodeFromString<ConsultationReadReceiptEventData>(raw)
-                                            withContext(Dispatchers.Main) { otherPartyLastReadAt = event.lastReadAt }
-                                        }
                                         else -> {
                                             val msg = wsJson.decodeFromString<ConsultationMessageData>(raw).toDomain()
                                             withContext(Dispatchers.Main) {
@@ -357,15 +340,13 @@ class ConsultationViewModel(
                                                             msg.files.any { it.fileName == p.fileName }
                                                         }
                                                     }
-                                                    // This screen is open right now — acknowledge the other party's
-                                                    // message immediately instead of waiting for the next time the
-                                                    // conversation is (re)opened, which is the only other read trigger.
-                                                    if (msg.senderId != currentUserId) sendReadReceipt()
                                                 }
                                             }
                                         }
                                     }
-                                } catch (_: Exception) {}
+                                } catch (e: Exception) {
+                                    Napier.w(tag = "ChatTyping", message = "Failed to decode frame: ${e.message}")
+                                }
                             }
                         }
                     }
@@ -419,23 +400,19 @@ class ConsultationViewModel(
 
     /** Debounced — only sends isTyping=true once per burst of typing; isTyping=false always sends immediately. */
     fun sendTypingEvent(isTyping: Boolean) {
-        val session = wsSession ?: return
+        val session = wsSession
+        if (session == null) {
+            Napier.w(tag = "ChatTyping", message = "sendTypingEvent(isTyping=$isTyping) dropped — no open wsSession (isConnected=$isConnected)")
+            return
+        }
         if (isTyping && lastTypingSentTrue) return
         lastTypingSentTrue = isTyping
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 session.send(Frame.Text(wsJson.encodeToString(ConsultationWsOutgoing(type = "TYPING", isTyping = isTyping))))
-            } catch (_: Exception) {}
-        }
-    }
-
-    /** Tells the backend we've just seen the other party's latest message, live, while this screen is open. */
-    private fun sendReadReceipt() {
-        val session = wsSession ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                session.send(Frame.Text(wsJson.encodeToString(ConsultationWsOutgoing(type = "READ"))))
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Napier.w(tag = "ChatTyping", message = "Failed to send TYPING isTyping=$isTyping: ${e.message}")
+            }
         }
     }
 
@@ -514,8 +491,6 @@ class ConsultationViewModel(
         otherPartyTyping = false
         otherPartyOnline = false
         otherPartyLastSeenAt = null
-        otherPartyLastReadAt = null
-        otherPartyLastDeliveredAt = null
         lastTypingSentTrue = false
         loadThreads() // refresh list previews now that this thread may have new messages
     }

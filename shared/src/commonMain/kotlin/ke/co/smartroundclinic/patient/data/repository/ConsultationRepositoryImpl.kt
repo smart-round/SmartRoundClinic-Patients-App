@@ -92,8 +92,6 @@ class ConsultationRepositoryImpl(private val client: HttpClient) : ConsultationR
                 val page = MergedHistoryPage(
                     items = response.data?.items?.map(ConsultationMessageData::toDomain) ?: emptyList(),
                     nextCursor = response.data?.nextCursor,
-                    counterpartLastReadAt = response.data?.counterpartLastReadAt,
-                    counterpartLastDeliveredAt = response.data?.counterpartLastDeliveredAt,
                 )
                 Resource.Success(page, response.message)
             } else Resource.Error(response.message)
