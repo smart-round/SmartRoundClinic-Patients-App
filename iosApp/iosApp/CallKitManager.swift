@@ -82,9 +82,13 @@ extension CallKitManager: PKPushRegistryDelegate {
 
     func pushRegistry(_ registry: PKPushRegistry, didInvalidatePushTokenFor type: PKPushType) {}
 
-    // Apple requires CXProvider.reportNewIncomingCall to be called before this function returns
-    // (or the app gets killed/throttled) — IncomingCallHandler.onCallInvite is fully synchronous
-    // through to CallKitBridge.onIncomingCall -> reportIncomingCall(...) above, so that holds.
+    // Apple requires CallKit to be told about every VoIP push received in this callback (or the
+    // app risks losing its VoIP push entitlement) — for a new invite that means
+    // reportNewIncomingCall (via onCallInvite -> reportIncomingCall below); for the other three
+    // events it means updating the already-reported call via provider.reportCall(endedAt:) (see
+    // endCall(callId:), reached through onCallCancelled). This handler used to only understand
+    // the invite shape, so a caller hanging up before the callee answered — the exact case VoIP
+    // push exists to handle reliably — silently left the ringing screen stuck on-screen.
     func pushRegistry(
         _ registry: PKPushRegistry,
         didReceiveIncomingPushWith payload: PKPushPayload,
@@ -95,28 +99,45 @@ extension CallKitManager: PKPushRegistryDelegate {
         guard type == .voIP else { return }
         let data = payload.dictionaryPayload
 
-        guard
-            let callId = data["callId"] as? String,
-            let callerId = data["callerId"] as? String,
-            let doctorId = data["doctorId"] as? String,
-            let patientId = data["patientId"] as? String
-        else { return }
+        guard let callId = data["callId"] as? String, let event = data["event"] as? String else { return }
 
-        let callerName = data["callerName"] as? String
-        let isVideo = (data["isVideo"] as? String) != "false"
-        let ringTimeoutSeconds = Int64((data["ringTimeoutSeconds"] as? String) ?? "") ?? 45
+        switch event {
+        case "Incoming Video Call":
+            guard
+                let callerId = data["callerId"] as? String,
+                let doctorId = data["doctorId"] as? String,
+                let patientId = data["patientId"] as? String
+            else { return }
 
-        callerInfoByCallId[callId] = (callerId: callerId, callerName: callerName)
+            let callerName = data["callerName"] as? String
+            let isVideo = (data["isVideo"] as? String) == "true"
+            let ringTimeoutSeconds = Int64((data["ringTimeoutSeconds"] as? String) ?? "") ?? 45
 
-        IncomingCallHandler.shared.onCallInvite(
-            callId: callId,
-            callerId: callerId,
-            callerName: callerName,
-            doctorId: doctorId,
-            patientId: patientId,
-            isVideo: isVideo,
-            ringTimeoutSeconds: ringTimeoutSeconds
-        )
+            callerInfoByCallId[callId] = (callerId: callerId, callerName: callerName)
+
+            IncomingCallHandler.shared.onCallInvite(
+                callId: callId,
+                callerId: callerId,
+                callerName: callerName,
+                doctorId: doctorId,
+                patientId: patientId,
+                isVideo: isVideo,
+                ringTimeoutSeconds: ringTimeoutSeconds
+            )
+        // Sent to the caller once the callee answers/declines elsewhere — this device never had
+        // a CallKit session for its own outgoing call, so there's nothing to report here beyond
+        // updating the in-app "Calling…" state.
+        case "Call Answered":
+            IncomingCallHandler.shared.onCallAnswered(callId: callId)
+        case "Call Declined":
+            IncomingCallHandler.shared.onCallDeclined(callId: callId)
+        // Sent to the callee when the caller hangs up before answering — dismisses the CallKit
+        // ringing screen via IncomingCallHandler.onCallCancelled -> CallKitBridge.onEndCall -> endCall(callId:).
+        case "Call Cancelled":
+            IncomingCallHandler.shared.onCallCancelled(callId: callId)
+        default:
+            break
+        }
     }
 }
 
