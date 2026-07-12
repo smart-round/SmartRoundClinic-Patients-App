@@ -17,6 +17,13 @@ final class CallKitManager: NSObject {
     private var uuidByCallId: [String: UUID] = [:]
     private var callIdByUuid: [UUID: String] = [:]
     private var callerInfoByCallId: [String: (callerId: String, callerName: String?)] = [:]
+    // Only calls CallKit actually confirmed presenting to the user land here. iOS can silently
+    // filter/reject a reported call — Focus Mode, Do Not Disturb, "Silence Unknown Callers"
+    // screening our generic (non-phone-number) CXHandle — with no UI ever shown, yet still tear
+    // it down internally via the same CXEndCallAction delegate method a real user Decline tap
+    // uses. Without this guard, that silent system rejection was being forwarded to the backend
+    // as if the callee had explicitly declined.
+    private var reportedCallIds: Set<String> = []
 
     private override init() {
         let config = CXProviderConfiguration()
@@ -51,9 +58,16 @@ final class CallKitManager: NSObject {
         update.supportsUngrouping = false
         update.supportsDTMF = false
 
-        provider.reportNewIncomingCall(with: uuid, update: update) { error in
+        provider.reportNewIncomingCall(with: uuid, update: update) { [weak self] error in
+            guard let self = self else { return }
             if let error = error {
                 print("CallKitManager: failed to report incoming call — \(error.localizedDescription)")
+                // Never actually shown to the user — clear it now so a later CXEndCallAction for
+                // this UUID (iOS tearing down the call it silently rejected) can't be mistaken
+                // for a real decline.
+                self.cleanup(callId: callId, uuid: uuid)
+            } else {
+                self.reportedCallIds.insert(callId)
             }
         }
     }
@@ -68,6 +82,7 @@ final class CallKitManager: NSObject {
         uuidByCallId.removeValue(forKey: callId)
         callIdByUuid.removeValue(forKey: uuid)
         callerInfoByCallId.removeValue(forKey: callId)
+        reportedCallIds.remove(callId)
     }
 }
 
@@ -148,6 +163,7 @@ extension CallKitManager: CXProviderDelegate {
         uuidByCallId.removeAll()
         callIdByUuid.removeAll()
         callerInfoByCallId.removeAll()
+        reportedCallIds.removeAll()
     }
 
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
@@ -168,7 +184,10 @@ extension CallKitManager: CXProviderDelegate {
             action.fulfill()
             return
         }
-        if let info = callerInfoByCallId[callId] {
+        // Only forward as a real decline if CallKit actually confirmed presenting this call to
+        // the user — otherwise this is the system tearing down a call it silently filtered
+        // (see reportedCallIds), and the backend/caller should never hear about it as a decline.
+        if reportedCallIds.contains(callId), let info = callerInfoByCallId[callId] {
             CallActionDispatcher.shared.decline(otherUserId: info.callerId, callId: callId)
         }
         cleanup(callId: callId, uuid: action.callUUID)
