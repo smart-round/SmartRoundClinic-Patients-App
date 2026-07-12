@@ -123,8 +123,22 @@ private fun ActiveCall(
     val isVideoEnabled by controller.isVideoEnabled
     val remote by controller.remoteParticipant
 
+    // Tapping "End call" fires onEnd() immediately (so the screen dismisses without waiting on
+    // leaveRoom()'s network round trip) — but that same round trip's onSuccess/onFailure also
+    // flips connectionState to Ended shortly after, which would fire onEnd() a second time via
+    // the LaunchedEffect below (confirmed via a duplicate POST /call/end in the wild). onEnd()
+    // isn't idempotent — it pops the nav back stack — so a second call pops one screen too many.
+    // Guard so onEnd() only ever runs once per call, no matter which path reaches it first.
+    var hasEnded by remember { mutableStateOf(false) }
+    val endOnce = {
+        if (!hasEnded) {
+            hasEnded = true
+            onEnd()
+        }
+    }
+
     LaunchedEffect(connectionState) {
-        if (connectionState is CallConnectionState.Ended) onEnd()
+        if (connectionState is CallConnectionState.Ended) endOnce()
     }
 
     // Persistent call-duration timer — starts ticking once connected, keeps running
@@ -144,7 +158,7 @@ private fun ActiveCall(
 
     when (val state = connectionState) {
         is CallConnectionState.Connecting -> CallConnecting(doctorName)
-        is CallConnectionState.Failed -> CallStatus("Call failed: ${state.message}") { onEnd() }
+        is CallConnectionState.Failed -> CallStatus("Call failed: ${state.message}") { endOnce() }
         is CallConnectionState.Ended -> Unit // onEnd() fired above; avoid flashing content while popping
         is CallConnectionState.Connected -> {
             val remoteName = remote?.name ?: "Dr. $doctorName"
@@ -162,6 +176,21 @@ private fun ActiveCall(
             // tile just shows a muted avatar state through the blip instead of disappearing.
             var everHadRemote by remember { mutableStateOf(false) }
             if (hasRemote) everHadRemote = true
+
+            // A 1:1 consultation call has no reason to keep running once the other side is
+            // genuinely gone — rather than leave this side staring at a frozen last frame /
+            // "camera off" placeholder indefinitely, end the call for this side too shortly
+            // after they leave. Waits out a short grace period first so a transient reconnect
+            // blip (network hiccup reported as leave-then-rejoin, see the note above on
+            // everHadRemote) doesn't end the call — LaunchedEffect(hasRemote) automatically
+            // cancels this countdown the moment `remote` comes back within the window.
+            LaunchedEffect(hasRemote) {
+                if (everHadRemote && !hasRemote) {
+                    delay(8_000L)
+                    controller.leaveRoom()
+                    endOnce()
+                }
+            }
 
             // If the doctor hasn't joined yet, self is always shown full-screen — there's
             // nothing to flip to. Once they join, `selfIsPrimary` takes over.
@@ -239,7 +268,7 @@ private fun ActiveCall(
                     onSwitchCamera = controller::switchCamera,
                     onEndCall = {
                         controller.leaveRoom()
-                        onEnd()
+                        endOnce()
                     },
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
