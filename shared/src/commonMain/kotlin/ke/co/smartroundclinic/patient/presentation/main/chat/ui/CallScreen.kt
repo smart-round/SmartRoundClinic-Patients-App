@@ -170,12 +170,18 @@ private fun ActiveCall(
             val fullScreenModifier = Modifier.fillMaxSize()
 
             Box(modifier = Modifier.fillMaxSize()) {
+                // No .clip() here — RealtimeKit's video surface is backed by WebRTC's
+                // SurfaceViewRenderer (a hardware-overlay SurfaceView on Android), which
+                // renders through a separate compositing layer that ignores Compose/View clip
+                // paths entirely. Clipping this container rounds everything else correctly but
+                // makes the video itself render blank/white. Square corners on the small tile
+                // is the trade-off until/unless RealtimeKit exposes a TextureView-backed
+                // renderer option.
                 val smallTileModifier = Modifier
                     .statusBarsPadding()
                     .padding(16.dp)
                     .align(Alignment.TopEnd)
                     .size(width = 110.dp, height = 150.dp)
-                    .clip(RoundedCornerShape(12.dp))
 
                 // Both participants' video views are mounted exactly once and stay mounted
                 // for the rest of the call — RealtimeKit hands back the same underlying
@@ -189,7 +195,7 @@ private fun ActiveCall(
                     label = "You",
                     audioEnabled = isAudioEnabled,
                     showVideo = isVideoEnabled,
-                    videoContent = { LocalVideoPreview(controller, it) },
+                    videoContent = { LocalVideoPreview(controller, isFrontmost = !effectiveSelfPrimary, modifier = it) },
                     avatarSize = if (effectiveSelfPrimary) 112.dp else 56.dp,
                     modifier = (if (effectiveSelfPrimary) fullScreenModifier else smallTileModifier)
                         .zIndex(if (effectiveSelfPrimary) 0f else 1f)
@@ -202,7 +208,7 @@ private fun ActiveCall(
                         label = remoteName,
                         audioEnabled = remoteAudioEnabled,
                         showVideo = remoteHasVideo,
-                        videoContent = { RemoteVideoView(controller, it) },
+                        videoContent = { RemoteVideoView(controller, isFrontmost = effectiveSelfPrimary, modifier = it) },
                         avatarSize = if (effectiveSelfPrimary) 56.dp else 112.dp,
                         modifier = (if (effectiveSelfPrimary) smallTileModifier else fullScreenModifier)
                             .zIndex(if (effectiveSelfPrimary) 1f else 0f)

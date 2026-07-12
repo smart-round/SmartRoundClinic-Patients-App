@@ -25,18 +25,40 @@ import platform.UIKit.UIView
 private val videoInteropProperties =
     UIKitInteropProperties(isInteractive = false, isNativeAccessibilityEnabled = false)
 
+// Both participants' video surfaces share the same interop container Compose uses for all
+// UIKitViews, added in first-composed order — self is always composed before remote in
+// CallScreen, so self's native view permanently sits behind remote's in the real UIKit view
+// hierarchy, regardless of Compose's Modifier.zIndex (which only reorders Compose's own
+// canvas-drawn content, not interop-hosted UIViews). Without this, whichever participant is
+// demoted to the small floating tile renders behind the other's full-screen video. Bring the
+// tile's own view to the front of its superview whenever it becomes the small tile so the real
+// view order always matches which one visually needs to be on top.
+private fun UIView.bringToFrontOfSuperview() {
+    superview?.bringSubviewToFront(this)
+}
+
+private fun UIView.sendToBackOfSuperview() {
+    superview?.sendSubviewToBack(this)
+}
+
 @Composable
-actual fun LocalVideoPreview(controller: RtkCallController, modifier: Modifier) {
+actual fun LocalVideoPreview(controller: RtkCallController, isFrontmost: Boolean, modifier: Modifier) {
+    val isVideoEnabled by controller.isVideoEnabled
     val view = controller.session?.localVideoView() ?: return
     UIKitView(
         factory = { view },
         modifier = modifier,
+        // Only bring this view forward while it's actually showing real video — otherwise
+        // send it to the back so the avatar-card overlay ParticipantView draws in its place
+        // (normal Compose-drawn content, not an interop view) reliably covers it instead of a
+        // frozen last frame staying visible on top of the "camera off" placeholder.
+        update = { if (isFrontmost && isVideoEnabled) it.bringToFrontOfSuperview() else it.sendToBackOfSuperview() },
         properties = videoInteropProperties,
     )
 }
 
 @Composable
-actual fun RemoteVideoView(controller: RtkCallController, modifier: Modifier) {
+actual fun RemoteVideoView(controller: RtkCallController, isFrontmost: Boolean, modifier: Modifier) {
     // Mirrors the Android actual's fix: wait for the SDK to confirm the remote participant's
     // video is actually enabled (driven by RtkCallController's onVideoUpdate) before mounting
     // the UIKitView at all, then latch permanently — don't rely solely on remoteVideoView()'s
@@ -51,6 +73,10 @@ actual fun RemoteVideoView(controller: RtkCallController, modifier: Modifier) {
     UIKitView(
         factory = { view },
         modifier = modifier,
+        // Same reasoning as LocalVideoPreview above — also covers the participant leaving
+        // entirely (remote becomes null, videoEnabled reads false): without this, their last
+        // frame stays visible on top of the "gone" placeholder instead of being covered by it.
+        update = { if (isFrontmost && remote?.videoEnabled == true) it.bringToFrontOfSuperview() else it.sendToBackOfSuperview() },
         properties = videoInteropProperties,
     )
 }
