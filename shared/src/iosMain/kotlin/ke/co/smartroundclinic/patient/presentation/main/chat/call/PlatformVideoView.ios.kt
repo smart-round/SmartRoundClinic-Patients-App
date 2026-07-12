@@ -1,6 +1,10 @@
 package ke.co.smartroundclinic.patient.presentation.main.chat.call
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.UIKitInteropProperties
 import androidx.compose.ui.viewinterop.UIKitView
@@ -33,6 +37,16 @@ actual fun LocalVideoPreview(controller: RtkCallController, modifier: Modifier) 
 
 @Composable
 actual fun RemoteVideoView(controller: RtkCallController, modifier: Modifier) {
+    // Mirrors the Android actual's fix: wait for the SDK to confirm the remote participant's
+    // video is actually enabled (driven by RtkCallController's onVideoUpdate) before mounting
+    // the UIKitView at all, then latch permanently — don't rely solely on remoteVideoView()'s
+    // own null-vs-non-null behavior at join time, since RealtimeKit can hand back a view before
+    // its track is actually bound, and UIKitView's factory only runs once per node's lifetime.
+    val remote by controller.remoteParticipant
+    var everHadVideo by remember { mutableStateOf(false) }
+    if (remote?.videoEnabled == true) everHadVideo = true
+    if (!everHadVideo) return
+
     val view = controller.session?.remoteVideoView() ?: return
     UIKitView(
         factory = { view },

@@ -152,9 +152,20 @@ private fun ActiveCall(
             val remoteAudioEnabled = remote?.audioEnabled ?: false
             val hasRemote = remote != null
 
+            // Once the remote participant has joined at least once, keep their tile mounted
+            // for the rest of the call — RealtimeKit hands back the same underlying native
+            // video view on every call, so removing/re-adding this ParticipantView (and
+            // therefore its video content) if `remote` ever transiently drops to null (e.g. a
+            // brief reconnect reported as leave-then-rejoin) crashes when Compose tries to
+            // re-parent that view mid-detach. `remoteHasVideo`/`remoteAudioEnabled` above
+            // already fall back to sane defaults when `remote` is momentarily null, so the
+            // tile just shows a muted avatar state through the blip instead of disappearing.
+            var everHadRemote by remember { mutableStateOf(false) }
+            if (hasRemote) everHadRemote = true
+
             // If the doctor hasn't joined yet, self is always shown full-screen — there's
             // nothing to flip to. Once they join, `selfIsPrimary` takes over.
-            val effectiveSelfPrimary = selfIsPrimary || !hasRemote
+            val effectiveSelfPrimary = selfIsPrimary || !everHadRemote
 
             val fullScreenModifier = Modifier.fillMaxSize()
 
@@ -185,7 +196,7 @@ private fun ActiveCall(
                         .then(if (!effectiveSelfPrimary) Modifier.clickable { selfIsPrimary = true } else Modifier),
                 )
 
-                if (hasRemote) {
+                if (everHadRemote) {
                     ParticipantView(
                         picture = doctorPicture,
                         label = remoteName,

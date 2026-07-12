@@ -1,6 +1,10 @@
 package ke.co.smartroundclinic.patient.presentation.main.chat.call
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.cloudflare.realtimekit.platform.VideoView
@@ -29,6 +33,19 @@ actual fun LocalVideoPreview(controller: RtkCallController, modifier: Modifier) 
 
 @Composable
 actual fun RemoteVideoView(controller: RtkCallController, modifier: Modifier) {
+    // getVideoView() returns null (per RealtimeKit's own contract) until the participant's
+    // video track actually exists — onParticipantJoin fires with videoEnabled still false, so
+    // reading it at that exact moment permanently captures the `?: VideoView(context)` blank
+    // fallback below, since AndroidView's `factory` runs exactly once for this node's lifetime
+    // and is never re-invoked on recomposition. Wait for the SDK to confirm video is enabled
+    // (driven by RtkCallController's onVideoUpdate listener) before ever creating the
+    // AndroidView node at all, then latch permanently — once mounted, never gate it again (see
+    // the note above on LocalVideoPreview for why toggling mount state crashes).
+    val remote by controller.remoteParticipant
+    var everHadVideo by remember { mutableStateOf(false) }
+    if (remote?.videoEnabled == true) everHadVideo = true
+    if (!everHadVideo) return
+
     AndroidView(
         factory = { context ->
             controller.client?.participants?.joined?.firstOrNull()?.getVideoView() ?: VideoView(context)
