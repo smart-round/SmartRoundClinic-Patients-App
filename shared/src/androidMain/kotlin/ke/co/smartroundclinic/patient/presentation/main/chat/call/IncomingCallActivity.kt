@@ -58,6 +58,9 @@ import ke.co.smartroundclinic.patient.presentation.theme.SnackbarSuccess
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
+// Must match IncomingCallHandler.android.kt / IncomingCallActionReceiver.kt.
+private const val CALL_NOTIFICATION_ID = 9001
+
 /**
  * Full-screen ringing UI launched from a full-screen-intent notification (see
  * IncomingCallHandler.android.kt) — shows over the lock screen, plays the device's default
@@ -84,6 +87,13 @@ class IncomingCallActivity : ComponentActivity() {
         val callerName = intent.getStringExtra(EXTRA_CALLER_NAME)
         val isVideo = intent.getBooleanExtra(EXTRA_IS_VIDEO, true)
 
+        // Tapped "Answer" directly on the notification (the fallback path when the OS didn't
+        // grant full-screen-intent launch and this Activity only opened via that action button).
+        if (intent.getBooleanExtra(EXTRA_AUTO_ACCEPT, false)) {
+            acceptCall(callId, callerId, callerName)
+            return
+        }
+
         startRinging()
 
         setContent {
@@ -98,25 +108,31 @@ class IncomingCallActivity : ComponentActivity() {
                     isVideo = isVideo,
                     onAccept = {
                         stopRinging()
-                        NotificationDeepLink.signal(NotificationEvent.ToCall(doctorId = callerId, doctorName = callerName ?: "Doctor", appointmentId = ""))
-                        packageManager.getLaunchIntentForPackage(packageName)?.let { launchIntent ->
-                            launchIntent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
-                                android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                                android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
-                            startActivity(launchIntent)
-                        }
-                        IncomingCallState.clear(callId)
-                        finish()
+                        acceptCall(callId, callerId, callerName)
                     },
                     onDecline = {
                         stopRinging()
                         lifecycleScope.launch { declineCallUseCase(callerId, callId) }
                         IncomingCallState.clear(callId)
+                        androidx.core.app.NotificationManagerCompat.from(this@IncomingCallActivity).cancel(CALL_NOTIFICATION_ID)
                         finish()
                     },
                 )
             }
         }
+    }
+
+    private fun acceptCall(callId: String, callerId: String, callerName: String?) {
+        NotificationDeepLink.signal(NotificationEvent.ToCall(doctorId = callerId, doctorName = callerName ?: "Doctor", appointmentId = ""))
+        packageManager.getLaunchIntentForPackage(packageName)?.let { launchIntent ->
+            launchIntent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+            startActivity(launchIntent)
+        }
+        IncomingCallState.clear(callId)
+        androidx.core.app.NotificationManagerCompat.from(this).cancel(CALL_NOTIFICATION_ID)
+        finish()
     }
 
     private fun showOverLockScreen() {
@@ -184,6 +200,7 @@ class IncomingCallActivity : ComponentActivity() {
         const val EXTRA_DOCTOR_ID = "doctorId"
         const val EXTRA_PATIENT_ID = "patientId"
         const val EXTRA_IS_VIDEO = "isVideo"
+        const val EXTRA_AUTO_ACCEPT = "autoAccept"
     }
 }
 

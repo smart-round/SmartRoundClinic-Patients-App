@@ -1,9 +1,12 @@
 package ke.co.smartroundclinic.patient.android
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
@@ -39,6 +42,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         NotifierManager.onCreateOrOnNewIntent(intent)
         requestNotificationPermission()
+        requestFullScreenIntentPermissionIfNeeded()
         setContent {
             App()
         }
@@ -48,6 +52,23 @@ class MainActivity : FragmentActivity() {
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    // Android 14+ treats full-screen incoming-call notifications as a special permission the
+    // user must separately grant in Settings — without it, IncomingCallActivity's ringing UI
+    // (see IncomingCallHandler) only shows as a plain heads-up banner. Notification action
+    // buttons (Answer/Decline) still work either way; this just gets the fuller call-app UX.
+    private fun requestFullScreenIntentPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+        val notificationManager = getSystemService(NotificationManager::class.java) ?: return
+        if (notificationManager.canUseFullScreenIntent()) return
+        runCatching {
+            startActivity(
+                Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+            )
         }
     }
 

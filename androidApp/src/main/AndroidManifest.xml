@@ -59,6 +59,12 @@
             android:launchMode="singleTop"
             android:showOnLockScreen="true"
             android:theme="@style/Theme.SmartRoundClinic" />
+
+        <!-- Handles the notification's Decline action button — the fallback path when the OS
+             only shows a plain heads-up banner instead of launching IncomingCallActivity. -->
+        <receiver
+            android:name="ke.co.smartroundclinic.patient.presentation.main.chat.call.IncomingCallActionReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

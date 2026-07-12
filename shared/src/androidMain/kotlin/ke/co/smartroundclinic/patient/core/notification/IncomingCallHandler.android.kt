@@ -10,7 +10,9 @@ import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.Person
 import ke.co.smartroundclinic.patient.domain.model.IncomingCall
+import ke.co.smartroundclinic.patient.presentation.main.chat.call.IncomingCallActionReceiver
 import ke.co.smartroundclinic.patient.presentation.main.chat.call.IncomingCallActivity
 import org.koin.core.context.GlobalContext
 
@@ -86,15 +88,53 @@ actual object IncomingCallHandler {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+        // Fallback action buttons — Android 14+ treats USE_FULL_SCREEN_INTENT as a special
+        // permission the user must separately grant (see MainActivity), so setFullScreenIntent
+        // silently downgrades to a plain heads-up banner unless it's been granted. These give a
+        // working Answer/Decline either way, not just when the full-screen launch succeeds.
+        val answerIntent = Intent(context, IncomingCallActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(IncomingCallActivity.EXTRA_CALL_ID, callId)
+            putExtra(IncomingCallActivity.EXTRA_CALLER_ID, callerId)
+            putExtra(IncomingCallActivity.EXTRA_CALLER_NAME, callerName)
+            putExtra(IncomingCallActivity.EXTRA_DOCTOR_ID, doctorId)
+            putExtra(IncomingCallActivity.EXTRA_PATIENT_ID, patientId)
+            putExtra(IncomingCallActivity.EXTRA_IS_VIDEO, isVideo)
+            putExtra(IncomingCallActivity.EXTRA_AUTO_ACCEPT, true)
+        }
+        val answerPendingIntent = PendingIntent.getActivity(
+            context,
+            (callId + "_answer").hashCode(),
+            answerIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val declineIntent = Intent(context, IncomingCallActionReceiver::class.java).apply {
+            action = IncomingCallActionReceiver.ACTION_DECLINE
+            putExtra(IncomingCallActionReceiver.EXTRA_CALL_ID, callId)
+            putExtra(IncomingCallActionReceiver.EXTRA_CALLER_ID, callerId)
+        }
+        val declinePendingIntent = PendingIntent.getBroadcast(
+            context,
+            (callId + "_decline").hashCode(),
+            declineIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        // CallStyle renders the system's native incoming-call layout — filled green Answer /
+        // red Decline buttons — instead of the plain text buttons a normal addAction() gives.
+        val caller = Person.Builder().setName(callerName ?: "Doctor").setImportant(true).build()
+        val callStyle = NotificationCompat.CallStyle.forIncomingCall(caller, declinePendingIntent, answerPendingIntent)
+
         val notification = NotificationCompat.Builder(context, CALL_CHANNEL_ID)
             .setSmallIcon(context.applicationInfo.icon)
-            .setContentTitle(if (isVideo) "Incoming video call" else "Incoming call")
-            .setContentText(callerName ?: "Someone is calling you")
+            .setContentTitle(callerName ?: "Doctor")
+            .setContentText(if (isVideo) "Incoming video call" else "Incoming call")
+            .setStyle(callStyle)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setFullScreenIntent(fullScreenPendingIntent, true)
-            .setContentIntent(fullScreenPendingIntent)
-            .setAutoCancel(true)
+            .setContentIntent(answerPendingIntent)
             .setOngoing(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
