@@ -90,6 +90,9 @@ struct iOSApp: App {
         CallKitBridge.shared.onEndCall = { callId in
             CallKitManager.shared.endCall(callId: callId)
         }
+        CallKitBridge.shared.onEndActiveCall = {
+            CallKitManager.shared.endActiveCall()
+        }
     }
 }
 

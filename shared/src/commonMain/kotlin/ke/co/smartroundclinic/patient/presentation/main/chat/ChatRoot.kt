@@ -195,7 +195,7 @@ fun ChatRoot(
                     joinState = vm.callJoinState,
                     onJoin = { vm.joinCall(dest.otherUserId) },
                     onEnd = {
-                        vm.clearCallState()
+                        vm.endCall()
                         backStack.removeLastOrNull()
                     },
                 )

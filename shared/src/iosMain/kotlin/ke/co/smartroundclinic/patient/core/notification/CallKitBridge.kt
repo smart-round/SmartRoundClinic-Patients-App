@@ -9,4 +9,10 @@ package ke.co.smartroundclinic.patient.core.notification
 object CallKitBridge {
     var onIncomingCall: ((callId: String, callerName: String?, isVideo: Boolean) -> Unit)? = null
     var onEndCall: ((callId: String) -> Unit)? = null
+
+    /** Ends whichever call CallKit currently has active (answered), if any — see
+     * CallKitManager.endActiveCall(). Invoked via [ActiveCallNotifier] once the in-app Call
+     * screen ends, so CallKit's system call state (status bar indicator, Recents, Dynamic
+     * Island) doesn't linger after our own UI has already moved on. */
+    var onEndActiveCall: (() -> Unit)? = null
 }

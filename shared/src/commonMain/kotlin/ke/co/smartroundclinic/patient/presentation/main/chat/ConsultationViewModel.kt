@@ -36,6 +36,7 @@ import ke.co.smartroundclinic.patient.domain.repository.UserLocalRepository
 import ke.co.smartroundclinic.patient.domain.model.CallJoinInfo
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetMyAppointmentsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetNextAppointmentUseCase
+import ke.co.smartroundclinic.patient.core.notification.ActiveCallNotifier
 import ke.co.smartroundclinic.patient.core.notification.IncomingCallHandler
 import ke.co.smartroundclinic.patient.core.notification.OutgoingCallState
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.CancelCallUseCase
@@ -531,6 +532,13 @@ class ConsultationViewModel(
 
     fun clearCallState() {
         callJoinState = null
+    }
+
+    /** Call once the in-app Call screen tears down, so CallKit's own call state (status bar
+     * indicator, Recents, Dynamic Island) doesn't linger after our UI has already moved on. */
+    fun endCall() {
+        ActiveCallNotifier.notifyCallEnded()
+        clearCallState()
     }
 
     /** Rings [otherUserId] (WhatsApp-style) — does not join the meeting; see OutgoingCallState. */

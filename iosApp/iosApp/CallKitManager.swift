@@ -17,6 +17,11 @@ final class CallKitManager: NSObject {
     private var uuidByCallId: [String: UUID] = [:]
     private var callIdByUuid: [UUID: String] = [:]
     private var callerInfoByCallId: [String: (callerId: String, callerName: String?)] = [:]
+    // The call this device has actually answered and is now in, if any — lets
+    // endActiveCall() (called from Kotlin once the in-app Call screen ends, see
+    // ActiveCallNotifier/CallKitBridge.onEndActiveCall) tell CallKit the call is over
+    // without the Kotlin side needing to plumb callId through the whole call-screen stack.
+    private var activeCallId: String?
     // Only calls CallKit actually confirmed presenting to the user land here. iOS can silently
     // filter/reject a reported call — Focus Mode, Do Not Disturb, "Silence Unknown Callers"
     // screening our generic (non-phone-number) CXHandle — with no UI ever shown, yet still tear
@@ -78,11 +83,21 @@ final class CallKitManager: NSObject {
         cleanup(callId: callId, uuid: uuid)
     }
 
+    /// Called once the in-app Call screen tears down (hangup tap, remote leaving, connection
+    /// ending — see ConsultationViewModel.endCall() / ActiveCallNotifier). Without this, CallKit
+    /// still thinks the call it reported is ongoing even after our own UI has moved on, so its
+    /// call state (status bar indicator, Recents entry, Dynamic Island) never clears.
+    func endActiveCall() {
+        guard let callId = activeCallId else { return }
+        endCall(callId: callId)
+    }
+
     private func cleanup(callId: String, uuid: UUID) {
         uuidByCallId.removeValue(forKey: callId)
         callIdByUuid.removeValue(forKey: uuid)
         callerInfoByCallId.removeValue(forKey: callId)
         reportedCallIds.remove(callId)
+        if activeCallId == callId { activeCallId = nil }
     }
 }
 
@@ -164,6 +179,7 @@ extension CallKitManager: CXProviderDelegate {
         callIdByUuid.removeAll()
         callerInfoByCallId.removeAll()
         reportedCallIds.removeAll()
+        activeCallId = nil
     }
 
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
@@ -171,6 +187,7 @@ extension CallKitManager: CXProviderDelegate {
             action.fail()
             return
         }
+        activeCallId = callId
         // Same deep-link the tap-to-join notification flow already uses — lands the user in
         // ConsultationChat/ConsultationCall once MainRoot picks up the pending event.
         NotificationDeepLink.shared.signal(
