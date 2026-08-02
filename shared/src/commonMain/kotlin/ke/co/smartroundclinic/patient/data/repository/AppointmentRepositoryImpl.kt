@@ -29,10 +29,11 @@ class AppointmentRepositoryImpl(private val client: HttpClient) : AppointmentRep
         slotStart: String,
         notes: String?,
         transactionRef: String?,
+        referralId: String?,
     ): Resource<Appointment> = withContext(Dispatchers.IO) {
         try {
             val response = client.post("scheduling/appointments") {
-                setBody(BookAppointmentReq(doctorId = doctorId, date = date, slotStart = slotStart, notes = notes, transactionRef = transactionRef))
+                setBody(BookAppointmentReq(doctorId = doctorId, date = date, slotStart = slotStart, notes = notes, transactionRef = transactionRef, referralId = referralId))
             }.body<AppointmentRes>()
             if (response.status) {
                 val data = response.data?.toDomain() ?: return@withContext Resource.Error("No appointment data")

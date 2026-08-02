@@ -53,6 +53,8 @@ data class PendingBookingPayment(
     val date: String,
     val slotStart: String,
     val transactionRef: String,
+    val invoiceId: String? = null,
+    val referralId: String? = null,
 )
 
 private const val ALREADY_RATED_MESSAGE = "You have already rated this appointment"
@@ -79,6 +81,10 @@ class ServicesViewModel(
 
     var selectedArticle by mutableStateOf<Article?>(null)
     var pendingDoctor by mutableStateOf<Doctor?>(null)
+    // Handed off from a Bookings > Referrals "Accept & Book"/"Book Now" tap (only ever non-null for
+    // an ACCEPTED referral — see BookingsRoot's ReferralsTab) so the eventual booking request can
+    // tag the resulting appointment with it. Read once at BookAppointment entry, then cleared.
+    var pendingReferralId by mutableStateOf<String?>(null)
 
     private val doctorCache = mutableMapOf<String, Doctor>()
 
@@ -122,11 +128,14 @@ class ServicesViewModel(
         private set
 
     private var pollJob: Job? = null
+    private var calendarJob: Job? = null
+    private var slotsJob: Job? = null
 
     // Held while the STK push sheet is open; consumed when booking is confirmed
     private var pendingDoctorId: String? = null
     private var pendingDate: String? = null
     private var pendingSlot: String? = null
+    private var pendingReferralIdForBooking: String? = null
 
     var isBooking by mutableStateOf(false)
         private set
@@ -197,7 +206,8 @@ class ServicesViewModel(
         specialityDoctors.find { it.id == id } ?: doctorCache[id]
 
     fun loadCalendarView(doctorId: String, yearMonth: String) {
-        viewModelScope.launch {
+        calendarJob?.cancel()
+        calendarJob = viewModelScope.launch {
             calendarView = null
             when (val result = getCalendarViewUseCase(doctorId, view = "month", date = "$yearMonth-01")) {
                 is Resource.Success -> calendarView = result.data
@@ -207,7 +217,8 @@ class ServicesViewModel(
     }
 
     fun loadSlots(doctorId: String, date: String) {
-        viewModelScope.launch { fetchAvailableSlots(doctorId, date) }
+        slotsJob?.cancel()
+        slotsJob = viewModelScope.launch { fetchAvailableSlots(doctorId, date) }
     }
 
     private suspend fun fetchAvailableSlots(doctorId: String, date: String) {
@@ -227,6 +238,7 @@ class ServicesViewModel(
         phoneNumber: String,
         isRebooking: Boolean = false,
         previousAppointmentId: String? = null,
+        referralId: String? = null,
     ) {
         val normalizedPhone = normalizePhone(phoneNumber)
         viewModelScope.launch {
@@ -248,6 +260,7 @@ class ServicesViewModel(
                     pendingDoctorId = doctorId
                     pendingDate = date
                     pendingSlot = slotStart
+                    pendingReferralIdForBooking = referralId
                     stkPushData = StkPushResult(
                         invoiceId = data.invoiceId,
                         transactionRef = data.transactionRef,
@@ -283,7 +296,7 @@ class ServicesViewModel(
                                 // Wait for the IntaSend webhook to update the backend DB
                                 // before booking; without this the booking returns 402 PENDING.
                                 delay(2_000)
-                                confirmBookingAfterPayment(transactionRef)
+                                confirmBookingAfterPayment(transactionRef, invoiceId)
                                 return@launch
                             }
                             "FAILED" -> {
@@ -306,14 +319,14 @@ class ServicesViewModel(
         }
     }
 
-    private fun confirmBookingAfterPayment(transactionRef: String?) {
+    private fun confirmBookingAfterPayment(transactionRef: String?, invoiceId: String?) {
         val doctorId = pendingDoctorId ?: return
         val date = pendingDate ?: return
         val slot = pendingSlot ?: return
         val ref = transactionRef ?: return
         viewModelScope.launch {
-            persistPendingBookingPayment(doctorId, date, slot, ref)
-            attemptBooking(doctorId, date, slot, ref)
+            persistPendingBookingPayment(doctorId, date, slot, ref, invoiceId, pendingReferralIdForBooking)
+            attemptBooking(doctorId, date, slot, ref, pendingReferralIdForBooking)
         }
     }
 
@@ -327,14 +340,22 @@ class ServicesViewModel(
         pendingDoctorId = pending.doctorId
         pendingDate = date
         pendingSlot = slot
+        pendingReferralIdForBooking = pending.referralId
         viewModelScope.launch {
-            persistPendingBookingPayment(pending.doctorId, date, slot, pending.transactionRef)
-            attemptBooking(pending.doctorId, date, slot, pending.transactionRef)
+            persistPendingBookingPayment(pending.doctorId, date, slot, pending.transactionRef, pending.invoiceId, pending.referralId)
+            attemptBooking(pending.doctorId, date, slot, pending.transactionRef, pending.referralId)
         }
     }
 
-    /** On process restart, resumes any payment that completed but never turned into a booking. */
+    /**
+     * On ViewModel/process restart, resumes any payment that completed but never turned into
+     * a booking. Guards against re-entering the booking screen mid-burst (which would otherwise
+     * create a fresh ViewModel and fire an overlapping retry burst), and re-checks the invoice
+     * with IntaSend first rather than blindly hammering the booking endpoint again — a payment
+     * left pending across an app restart may genuinely still be unresolved or have failed.
+     */
     private suspend fun resumePendingBookingPayment() {
+        if (isBooking) return
         val stored = getKeyUseCase(PENDING_BOOKING_PAYMENT_KEY) ?: return
         val pending = runCatching { Json.decodeFromString<PendingBookingPayment>(stored) }.getOrNull()
         if (pending == null) {
@@ -345,11 +366,45 @@ class ServicesViewModel(
         pendingDoctorId = pending.doctorId
         pendingDate = pending.date
         pendingSlot = pending.slotStart
-        attemptBooking(pending.doctorId, pending.date, pending.slotStart, pending.transactionRef)
+        pendingReferralIdForBooking = pending.referralId
+
+        val invoiceId = pending.invoiceId
+        if (invoiceId == null) {
+            // Persisted before invoiceId was tracked — fall back to the old blind-retry behavior.
+            attemptBooking(pending.doctorId, pending.date, pending.slotStart, pending.transactionRef, pending.referralId)
+            return
+        }
+        when (val result = getStkPushStatusUseCase(invoiceId)) {
+            is Resource.Success -> {
+                when (result.data?.invoice?.state?.uppercase()) {
+                    "COMPLETE" -> attemptBooking(pending.doctorId, pending.date, pending.slotStart, pending.transactionRef, pending.referralId)
+                    "FAILED" -> {
+                        val reason = result.data?.invoice?.failedReason
+                            ?: "Payment was not completed. Please try again."
+                        bookingError = reason
+                        snackbarController.show(reason, isError = true)
+                        clearPendingBookingPayment()
+                        pendingDoctorId = null
+                        pendingDate = null
+                        pendingSlot = null
+                        pendingReferralIdForBooking = null
+                    }
+                    else -> startPolling(invoiceId) // still PENDING/PROCESSING at IntaSend — keep waiting
+                }
+            }
+            else -> attemptBooking(pending.doctorId, pending.date, pending.slotStart, pending.transactionRef, pending.referralId)
+        }
     }
 
-    private suspend fun persistPendingBookingPayment(doctorId: String, date: String, slotStart: String, transactionRef: String) {
-        val pending = PendingBookingPayment(doctorId, date, slotStart, transactionRef)
+    private suspend fun persistPendingBookingPayment(
+        doctorId: String,
+        date: String,
+        slotStart: String,
+        transactionRef: String,
+        invoiceId: String? = null,
+        referralId: String? = null,
+    ) {
+        val pending = PendingBookingPayment(doctorId, date, slotStart, transactionRef, invoiceId, referralId)
         pendingBookingPayment = pending
         setKeyUseCase(PENDING_BOOKING_PAYMENT_KEY, Json.encodeToString(pending))
     }
@@ -366,19 +421,20 @@ class ServicesViewModel(
      * transactionRef — it refreshes availability and leaves [pendingBookingPayment] intact so
      * the patient can pick another time without paying again.
      */
-    private suspend fun attemptBooking(doctorId: String, date: String, slot: String, transactionRef: String) {
+    private suspend fun attemptBooking(doctorId: String, date: String, slot: String, transactionRef: String, referralId: String? = null) {
         isBooking = true
         bookedAppointment = null
         bookingError = null
         repeat(4) { attempt ->
             if (attempt > 0) delay(3_000)
-            when (val result = bookAppointmentUseCase(doctorId, date, slot, transactionRef = transactionRef)) {
+            when (val result = bookAppointmentUseCase(doctorId, date, slot, transactionRef = transactionRef, referralId = referralId)) {
                 is Resource.Success -> {
                     bookedAppointment = result.data
                     clearPendingBookingPayment()
                     pendingDoctorId = null
                     pendingDate = null
                     pendingSlot = null
+                    pendingReferralIdForBooking = null
                     isBooking = false
                     return
                 }
@@ -401,6 +457,7 @@ class ServicesViewModel(
                             pendingDoctorId = null
                             pendingDate = null
                             pendingSlot = null
+                            pendingReferralIdForBooking = null
                             isBooking = false
                             return
                         }

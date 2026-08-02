@@ -33,6 +33,7 @@ fun ServicesRoot(
     onNotificationsClick: () -> Unit = {},
     pendingDoctorProfile: Doctor? = null,
     onPendingDoctorProfileNavigated: () -> Unit = {},
+    pendingReferralId: String? = null,
 ) {
     val backStack = retain { mutableStateListOf<NavKey>(ServicesList) }
     val isAtRoot = backStack.size == 1
@@ -42,10 +43,14 @@ fun ServicesRoot(
 
     // Cross-tab entry point (e.g. "Accept & Book" from a Bookings > Referrals card) — feeds the
     // same pendingDoctor hook ServicesViewModel already exposes for jumping straight to a doctor's
-    // profile, bypassing the normal category-browse flow.
+    // profile, bypassing the normal category-browse flow. pendingReferralId rides along so the
+    // eventual booking request can be tagged with it — it outlives vm.pendingDoctor (which is
+    // consumed by the very next LaunchedEffect below) since it's only actually needed once the
+    // patient reaches BookAppointment, a step or two later.
     LaunchedEffect(pendingDoctorProfile) {
         val doctor = pendingDoctorProfile ?: return@LaunchedEffect
         vm.pendingDoctor = doctor
+        vm.pendingReferralId = pendingReferralId
         onPendingDoctorProfileNavigated()
     }
 
@@ -152,7 +157,13 @@ fun ServicesRoot(
                             phoneNumber = phoneNumber,
                             isRebooking = dest.previousAppointmentId != null,
                             previousAppointmentId = dest.previousAppointmentId,
+                            referralId = vm.pendingReferralId,
                         )
+                        // One-shot handoff, same as vm.pendingDoctor — initiateStkPush has now
+                        // captured it into its own booking-flow-scoped state, so clear it here to
+                        // avoid leaking into an unrelated booking if this doctor is booked again
+                        // normally later in the same session.
+                        vm.pendingReferralId = null
                     },
                     onRetryBooking = { date, slotStart -> vm.retryBooking(date, slotStart) },
                     onDismissStkPush = { vm.dismissStkPush() },

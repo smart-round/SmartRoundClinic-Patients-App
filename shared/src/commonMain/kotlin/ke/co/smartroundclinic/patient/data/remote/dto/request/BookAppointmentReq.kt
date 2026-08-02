@@ -9,4 +9,5 @@ data class BookAppointmentReq(
     val slotStart: String,
     val notes: String? = null,
     val transactionRef: String? = null,
+    val referralId: String? = null,
 )

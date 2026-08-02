@@ -11,6 +11,7 @@ interface AppointmentRepository {
         slotStart: String,
         notes: String?,
         transactionRef: String? = null,
+        referralId: String? = null,
     ): Resource<Appointment>
     suspend fun getMyAppointments(): Resource<List<Appointment>>
     suspend fun getAppointment(id: String): Resource<Appointment>

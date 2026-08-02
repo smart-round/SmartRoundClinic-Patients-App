@@ -107,7 +107,7 @@ fun BookingsRoot(
     onPendingNavigated: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
-    onBookReferredDoctor: (Doctor) -> Unit = {},
+    onBookReferredDoctor: (Doctor, String?) -> Unit = { _, _ -> },
 ) {
     val backStack = retain { mutableStateListOf<NavKey>(BookingsList) }
     val isAtRoot = backStack.size == 1
@@ -209,7 +209,7 @@ private fun BookingsListScreen(
     onAppointmentClick: (String) -> Unit,
     onProfileClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
-    onBookReferredDoctor: (Doctor) -> Unit = {},
+    onBookReferredDoctor: (Doctor, String?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -269,7 +269,7 @@ private fun BookingsListScreen(
 // ─── Referrals tab ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun ReferralsTab(onBookReferredDoctor: (Doctor) -> Unit) {
+private fun ReferralsTab(onBookReferredDoctor: (Doctor, String?) -> Unit) {
     val getReferralHistory: GetReferralHistoryUseCase = koinInject()
     val acceptReferral: AcceptReferralUseCase = koinInject()
     val declineReferral: DeclineReferralUseCase = koinInject()
@@ -300,8 +300,15 @@ private fun ReferralsTab(onBookReferredDoctor: (Doctor) -> Unit) {
             when (val doctorResult = getDoctorById(referral.receivingDoctorId)) {
                 is Resource.Success -> {
                     val doctor = doctorResult.data
-                    if (doctor != null) onBookReferredDoctor(doctor)
-                    else snackbarController.show("Couldn't load Dr. ${referral.receivingDoctorName ?: ""}'s profile", isError = true)
+                    if (doctor != null) {
+                        // The backend only accepts a referralId on the booking request while the
+                        // referral is still ACCEPTED and unused — a DECLINED referral's "Book
+                        // Anyway" is a normal, untagged booking with this doctor.
+                        val referralIdForBooking = referral.id.takeIf { referral.status == ReferralStatus.ACCEPTED }
+                        onBookReferredDoctor(doctor, referralIdForBooking)
+                    } else {
+                        snackbarController.show("Couldn't load Dr. ${referral.receivingDoctorName ?: ""}'s profile", isError = true)
+                    }
                 }
                 is Resource.Error -> snackbarController.show(doctorResult.message ?: "Couldn't load the doctor's profile", isError = true)
                 else -> {}
@@ -319,7 +326,7 @@ private fun ReferralsTab(onBookReferredDoctor: (Doctor) -> Unit) {
                     when (val doctorResult = getDoctorById(referral.receivingDoctorId)) {
                         is Resource.Success -> {
                             val doctor = doctorResult.data
-                            if (doctor != null) onBookReferredDoctor(doctor)
+                            if (doctor != null) onBookReferredDoctor(doctor, referral.id)
                             else snackbarController.show("Referral accepted, but couldn't load Dr. ${referral.receivingDoctorName ?: ""}'s profile", isError = true)
                         }
                         is Resource.Error -> snackbarController.show(doctorResult.message ?: "Referral accepted, but couldn't load the doctor's profile", isError = true)

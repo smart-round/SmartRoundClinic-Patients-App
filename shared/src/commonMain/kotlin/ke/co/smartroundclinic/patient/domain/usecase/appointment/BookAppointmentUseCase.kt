@@ -11,5 +11,6 @@ class BookAppointmentUseCase(private val repository: AppointmentRepository) {
         slotStart: String,
         notes: String? = null,
         transactionRef: String? = null,
-    ): Resource<Appointment> = repository.bookAppointment(doctorId, date, slotStart, notes, transactionRef)
+        referralId: String? = null,
+    ): Resource<Appointment> = repository.bookAppointment(doctorId, date, slotStart, notes, transactionRef, referralId)
 }

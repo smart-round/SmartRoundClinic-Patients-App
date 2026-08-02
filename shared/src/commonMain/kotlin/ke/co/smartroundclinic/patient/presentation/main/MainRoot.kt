@@ -90,6 +90,7 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
     var pendingSupportTicketId by remember { mutableStateOf<String?>(null) }
     var pendingMedicalHistory by remember { mutableStateOf(false) }
     var pendingDoctorProfile by remember { mutableStateOf<Doctor?>(null) }
+    var pendingReferralId by remember { mutableStateOf<String?>(null) }
 
     fun selectTab(dest: NavKey) {
         if (currentTab != dest) {
@@ -185,6 +186,7 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
                         onNotificationsClick = { selectTab(Home); pendingHomeDestinations = listOf(Notifications) },
                         pendingDoctorProfile = pendingDoctorProfile,
                         onPendingDoctorProfileNavigated = { pendingDoctorProfile = null },
+                        pendingReferralId = pendingReferralId,
                     )
                 }
                 entry<Articles> {
@@ -201,8 +203,9 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
                         onPendingNavigated = { pendingBookingAppointmentId = null },
                         onProfileClick = { selectTab(Home); pendingHomeDestinations = listOf(UserProfile) },
                         onNotificationsClick = { selectTab(Home); pendingHomeDestinations = listOf(Notifications) },
-                        onBookReferredDoctor = { doctor ->
+                        onBookReferredDoctor = { doctor, referralId ->
                             pendingDoctorProfile = doctor
+                            pendingReferralId = referralId
                             selectTab(Doctors)
                         },
                     )
