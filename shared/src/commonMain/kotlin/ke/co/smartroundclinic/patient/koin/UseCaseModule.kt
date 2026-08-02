@@ -47,8 +47,12 @@ import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorProfileUseC
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorsBySpecializationUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetRecommendedDoctorsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.servicecategory.GetServiceCategoriesUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorByIdUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.payments.GetPaymentHistoryByIdUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.payments.GetPaymentHistoryUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.referral.AcceptReferralUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.referral.DeclineReferralUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.referral.GetPendingReferralsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.payments.GetStkPushStatusUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.payments.StkPushPreBookingUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.speciality.GetSpecialitiesUseCase
@@ -124,6 +128,12 @@ val useCaseModule = module {
     single { GetStkPushStatusUseCase(get()) }
     single { GetPaymentHistoryUseCase(get()) }
     single { GetPaymentHistoryByIdUseCase(get()) }
+
+    // Referral use cases
+    single { GetPendingReferralsUseCase(get()) }
+    single { AcceptReferralUseCase(get()) }
+    single { DeclineReferralUseCase(get()) }
+    single { GetDoctorByIdUseCase(get()) }
 
     // Appointment use cases
     single { BookAppointmentUseCase(get()) }

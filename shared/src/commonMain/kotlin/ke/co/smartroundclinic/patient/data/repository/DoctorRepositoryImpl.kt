@@ -8,6 +8,7 @@ import io.ktor.http.parameters
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.data.remote.dto.response.GetDoctorArticlesRes
 import ke.co.smartroundclinic.patient.data.remote.dto.response.GetDoctorBySpecializationRes
+import ke.co.smartroundclinic.patient.data.remote.dto.response.GetDoctorByIdRes
 import ke.co.smartroundclinic.patient.data.remote.dto.response.GetDoctorsProfileRes
 import ke.co.smartroundclinic.patient.data.remote.dto.response.GetDoctorsRecommendationRes
 import ke.co.smartroundclinic.patient.domain.repository.DoctorRepository
@@ -54,6 +55,15 @@ class DoctorRepositoryImpl(private val client: HttpClient) : DoctorRepository {
             } catch (e: Exception) {
                 Resource.Error(e.message ?: "An unknown error occurred")
             }
+        }
+    }
+
+    override suspend fun getDoctorById(doctorId: String): Resource<GetDoctorByIdRes> = withContext(Dispatchers.IO) {
+        try {
+            val response = client.get("doctor/recommendations/$doctorId").body<GetDoctorByIdRes>()
+            Resource.Success(data = response, message = response.message)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "An unknown error occurred")
         }
     }
 

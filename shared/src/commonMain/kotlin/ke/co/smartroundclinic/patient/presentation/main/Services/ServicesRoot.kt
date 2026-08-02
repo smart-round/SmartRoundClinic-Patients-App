@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.presentation.main.Services.destinations.AppointmentDetails
 import ke.co.smartroundclinic.patient.presentation.main.Services.destinations.BookAppointment
 import ke.co.smartroundclinic.patient.presentation.main.Services.destinations.DoctorArticleDetail
@@ -30,12 +31,23 @@ fun ServicesRoot(
     onAtRootChanged: (Boolean) -> Unit = {},
     onProfileClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
+    pendingDoctorProfile: Doctor? = null,
+    onPendingDoctorProfileNavigated: () -> Unit = {},
 ) {
     val backStack = retain { mutableStateListOf<NavKey>(ServicesList) }
     val isAtRoot = backStack.size == 1
     SideEffect { onAtRootChanged(isAtRoot) }
 
     val vm: ServicesViewModel = koinViewModel()
+
+    // Cross-tab entry point (e.g. "Accept & Book" from a Bookings > Referrals card) — feeds the
+    // same pendingDoctor hook ServicesViewModel already exposes for jumping straight to a doctor's
+    // profile, bypassing the normal category-browse flow.
+    LaunchedEffect(pendingDoctorProfile) {
+        val doctor = pendingDoctorProfile ?: return@LaunchedEffect
+        vm.pendingDoctor = doctor
+        onPendingDoctorProfileNavigated()
+    }
 
     LaunchedEffect(vm.pendingDoctor) {
         val doctor = vm.pendingDoctor ?: return@LaunchedEffect

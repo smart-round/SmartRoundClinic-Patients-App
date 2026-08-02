@@ -54,6 +54,7 @@ import ke.co.smartroundclinic.patient.presentation.main.destinations.Appointment
 import ke.co.smartroundclinic.patient.presentation.main.destinations.Articles
 import ke.co.smartroundclinic.patient.presentation.main.destinations.Bookings
 import ke.co.smartroundclinic.patient.presentation.main.destinations.Doctors
+import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.presentation.main.destinations.Home
 import ke.co.smartroundclinic.patient.presentation.main.Services.ServicesRoot
 import ke.co.smartroundclinic.patient.presentation.main.home.HomeRoot
@@ -88,6 +89,7 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
     var pendingCall by remember { mutableStateOf<ConsultationCall?>(null) }
     var pendingSupportTicketId by remember { mutableStateOf<String?>(null) }
     var pendingMedicalHistory by remember { mutableStateOf(false) }
+    var pendingDoctorProfile by remember { mutableStateOf<Doctor?>(null) }
 
     fun selectTab(dest: NavKey) {
         if (currentTab != dest) {
@@ -178,6 +180,8 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
                         onAtRootChanged = { isAtRoot = it },
                         onProfileClick = { selectTab(Home); pendingHomeDestinations = listOf(UserProfile) },
                         onNotificationsClick = { selectTab(Home); pendingHomeDestinations = listOf(Notifications) },
+                        pendingDoctorProfile = pendingDoctorProfile,
+                        onPendingDoctorProfileNavigated = { pendingDoctorProfile = null },
                     )
                 }
                 entry<Articles> {
@@ -194,6 +198,10 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
                         onPendingNavigated = { pendingBookingAppointmentId = null },
                         onProfileClick = { selectTab(Home); pendingHomeDestinations = listOf(UserProfile) },
                         onNotificationsClick = { selectTab(Home); pendingHomeDestinations = listOf(Notifications) },
+                        onBookReferredDoctor = { doctor ->
+                            pendingDoctorProfile = doctor
+                            selectTab(Doctors)
+                        },
                     )
                 }
             },

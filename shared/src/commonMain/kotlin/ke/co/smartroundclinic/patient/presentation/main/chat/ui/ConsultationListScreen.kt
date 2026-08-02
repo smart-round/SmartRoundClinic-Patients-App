@@ -1,5 +1,9 @@
 package ke.co.smartroundclinic.patient.presentation.main.chat.ui
 
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,18 +23,23 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +47,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,6 +60,7 @@ import ke.co.smartroundclinic.patient.domain.model.ConversationThread
 import ke.co.smartroundclinic.patient.presentation.common.composables.PatientDashboardHeader
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 import ke.co.smartroundclinic.patient.presentation.theme.Primary90
+import ke.co.smartroundclinic.patient.presentation.theme.ShapePill
 import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -66,6 +79,14 @@ internal fun ConsultationListScreen(
     modifier: Modifier = Modifier,
 ) {
     var threadPendingDelete by remember { mutableStateOf<ConversationThread?>(null) }
+    var isSearching by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val visibleThreads = if (searchQuery.isNotBlank()) {
+        threads.filter { it.counterpartName.contains(searchQuery, ignoreCase = true) }
+    } else {
+        threads
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         PatientDashboardHeader(
@@ -73,6 +94,15 @@ internal fun ConsultationListScreen(
             onProfileClick = onProfileClick,
             onNotificationsClick = onNotificationsClick,
         )
+
+        ChatSearchHeaderRow(
+            isSearching = isSearching,
+            onToggleSearch = { isSearching = !isSearching; if (!isSearching) searchQuery = "" },
+            searchQuery = searchQuery,
+            onSearchQueryChange = { searchQuery = it },
+            hintText = "Your conversations with doctors",
+        )
+        HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
         PullToRefreshBox(
             isRefreshing = isLoading,
@@ -83,7 +113,7 @@ internal fun ConsultationListScreen(
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-            } else if (threads.isEmpty()) {
+            } else if (visibleThreads.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize().navigationBarsPadding(),
                     contentAlignment = Alignment.Center,
@@ -96,21 +126,26 @@ internal fun ConsultationListScreen(
                             Icon(imageVector = Icons.Filled.ChatBubbleOutline, contentDescription = null, tint = Primary40, modifier = Modifier.size(40.dp))
                         }
                         Spacer(Modifier.height(16.dp))
-                        Text(text = "No Conversations Yet", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                        Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "Conversations with your doctors will appear here\nonce you have a confirmed appointment.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
+                            text = if (searchQuery.isNotBlank()) "No doctors found" else "No Conversations Yet",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         )
+                        if (searchQuery.isBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = "Conversations with your doctors will appear here\nonce you have a confirmed appointment.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().navigationBarsPadding(),
                 ) {
-                    items(threads, key = { it.threadId }) { thread ->
+                    items(visibleThreads, key = { it.threadId }) { thread ->
                         ConsultationThreadRow(
                             thread = thread,
                             onClick = { onThreadClick(thread) },
@@ -234,5 +269,86 @@ internal fun DoctorAvatar(picture: String?, size: Int, modifier: Modifier = Modi
                 modifier = Modifier.size((size * 0.6).dp),
             )
         }
+    }
+}
+
+/** Mirrors the doctor app's chat search design: a compact pill field that expands from the
+ * search icon's position rather than springing in at full width all at once. */
+@Composable
+private fun ChatSearchHeaderRow(
+    isSearching: Boolean,
+    onToggleSearch: () -> Unit,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    hintText: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.weight(1f)) {
+            androidx.compose.animation.AnimatedVisibility(visible = !isSearching, enter = fadeIn(), exit = fadeOut()) {
+                Text(
+                    text = hintText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isSearching,
+                enter = expandHorizontally(expandFrom = Alignment.End) + fadeIn(),
+                exit = shrinkHorizontally(shrinkTowards = Alignment.End) + fadeOut(),
+            ) {
+                CompactChatSearchField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        Spacer(Modifier.size(4.dp))
+        IconButton(onClick = onToggleSearch) {
+            Icon(
+                imageVector = if (isSearching) Icons.Filled.Close else Icons.Filled.Search,
+                contentDescription = if (isSearching) "Close search" else "Search doctors",
+                tint = Primary40,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactChatSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    Box(
+        modifier = modifier
+            .height(36.dp)
+            .clip(ShapePill)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        if (value.isEmpty()) {
+            Text(
+                text = "Search doctors...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
+            cursorBrush = SolidColor(Primary40),
+            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+        )
     }
 }

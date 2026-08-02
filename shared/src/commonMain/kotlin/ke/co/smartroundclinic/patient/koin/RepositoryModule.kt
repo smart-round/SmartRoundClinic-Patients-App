@@ -38,10 +38,12 @@ import ke.co.smartroundclinic.patient.data.repository.MedicalRecordRepositoryImp
 import ke.co.smartroundclinic.patient.data.repository.PaymentsRepositoryImpl
 import ke.co.smartroundclinic.patient.data.repository.PersonalInformationRepositoryImpl
 import ke.co.smartroundclinic.patient.data.repository.RatingRepositoryImpl
+import ke.co.smartroundclinic.patient.data.repository.ReferralRepositoryImpl
 import ke.co.smartroundclinic.patient.data.repository.SupportRepositoryImpl
 import ke.co.smartroundclinic.patient.domain.repository.MedicalRecordRepository
 import ke.co.smartroundclinic.patient.domain.repository.PersonalInformationRepository
 import ke.co.smartroundclinic.patient.domain.repository.RatingRepository
+import ke.co.smartroundclinic.patient.domain.repository.ReferralRepository
 import ke.co.smartroundclinic.patient.domain.repository.SupportRepository
 import ke.co.smartroundclinic.patient.domain.repository.PaymentsRepository
 import ke.co.smartroundclinic.patient.domain.repository.UserLocalRepository
@@ -70,4 +72,5 @@ val repositoryModule = module {
     single<MedicalRecordRepository> { MedicalRecordRepositoryImpl(get()) }
     single<PersonalInformationRepository> { PersonalInformationRepositoryImpl(get()) }
     single<RatingRepository> { RatingRepositoryImpl(get()) }
+    single<ReferralRepository> { ReferralRepositoryImpl(get()) }
 }

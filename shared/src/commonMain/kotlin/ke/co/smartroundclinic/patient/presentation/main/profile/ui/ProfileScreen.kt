@@ -27,8 +27,8 @@ import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LocalHospital
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.QuestionAnswer
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,12 +60,12 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun ProfileScreen(
     onPersonalInfo: () -> Unit = {},
+    onPayments: () -> Unit = {},
     onMedicalInfo: () -> Unit = {},
     onMedicalHistory: () -> Unit = {},
     onSecuritySettings: () -> Unit = {},
     onSupport: () -> Unit = {},
-    onFaqs: () -> Unit = {},
-    onTerms: () -> Unit = {},
+    onAbout: () -> Unit = {},
     onSignOut: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -164,6 +164,12 @@ fun ProfileScreen(
                 )
                 MenuDivider()
                 ProfileMenuItem(
+                    icon = Icons.Outlined.Payments,
+                    label = "Payments",
+                    onClick = onPayments,
+                )
+                MenuDivider()
+                ProfileMenuItem(
                     icon = Icons.Outlined.LocalHospital,
                     label = "Medical Information",
                     onClick = onMedicalInfo,
@@ -195,15 +201,9 @@ fun ProfileScreen(
 
             ProfileSection {
                 ProfileMenuItem(
-                    icon = Icons.Outlined.QuestionAnswer,
-                    label = "FAQs",
-                    onClick = onFaqs,
-                )
-                MenuDivider()
-                ProfileMenuItem(
                     icon = Icons.Outlined.Gavel,
-                    label = "T&Cs & Privacy Policy",
-                    onClick = onTerms,
+                    label = "About",
+                    onClick = onAbout,
                 )
             }
 

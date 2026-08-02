@@ -26,11 +26,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,19 +68,21 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import coil3.compose.AsyncImage
 import ke.co.smartroundclinic.patient.common.Resource
-import ke.co.smartroundclinic.patient.data.remote.dto.response.GetPaymentHistoryItem
+import ke.co.smartroundclinic.patient.core.snackbar.SnackbarController
 import ke.co.smartroundclinic.patient.domain.model.Appointment
+import ke.co.smartroundclinic.patient.domain.model.Doctor
+import ke.co.smartroundclinic.patient.domain.model.Referral
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetMyAppointmentsUseCase
-import ke.co.smartroundclinic.patient.domain.usecase.payments.GetPaymentHistoryUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorByIdUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.referral.AcceptReferralUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.referral.DeclineReferralUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.referral.GetPendingReferralsUseCase
 import ke.co.smartroundclinic.patient.presentation.main.Services.ServicesViewModel
 import ke.co.smartroundclinic.patient.presentation.main.Services.ui.AppointmentDetailsScreen
 import ke.co.smartroundclinic.patient.presentation.main.Services.ui.BookAppointmentScreen
 import ke.co.smartroundclinic.patient.presentation.main.bookings.destinations.BookingAppointmentDetail
 import ke.co.smartroundclinic.patient.presentation.main.bookings.destinations.BookingsList
-import ke.co.smartroundclinic.patient.presentation.main.bookings.destinations.PaymentHistoryDetail
 import ke.co.smartroundclinic.patient.presentation.main.bookings.destinations.RebookFromBookings
-import ke.co.smartroundclinic.patient.presentation.main.bookings.ui.PaymentHistoryDetailScreen
-import ke.co.smartroundclinic.patient.presentation.main.bookings.ui.PaymentStatusChip
 import ke.co.smartroundclinic.patient.presentation.common.composables.PatientDashboardHeader
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
@@ -90,11 +94,7 @@ import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
 import ke.co.smartroundclinic.patient.presentation.theme.StatusPending
 import ke.co.smartroundclinic.patient.presentation.theme.StatusSuccess
 import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
-import ke.co.smartroundclinic.patient.generated.resources.Res
-import ke.co.smartroundclinic.patient.generated.resources.card_payment
-import ke.co.smartroundclinic.patient.generated.resources.mpesa
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -106,6 +106,7 @@ fun BookingsRoot(
     onPendingNavigated: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
+    onBookReferredDoctor: (Doctor) -> Unit = {},
 ) {
     val backStack = retain { mutableStateListOf<NavKey>(BookingsList) }
     val isAtRoot = backStack.size == 1
@@ -129,9 +130,9 @@ fun BookingsRoot(
             entry<BookingsList> {
                 BookingsListScreen(
                     onAppointmentClick = { backStack.add(BookingAppointmentDetail(it)) },
-                    onPaymentClick = { backStack.add(PaymentHistoryDetail(it)) },
                     onProfileClick = onProfileClick,
                     onNotificationsClick = onNotificationsClick,
+                    onBookReferredDoctor = onBookReferredDoctor,
                 )
             }
             entry<BookingAppointmentDetail> { dest ->
@@ -198,12 +199,6 @@ fun BookingsRoot(
                     onBack = { backStack.removeLastOrNull() },
                 )
             }
-            entry<PaymentHistoryDetail> { dest ->
-                PaymentHistoryDetailScreen(
-                    paymentId = dest.paymentId,
-                    onBack = { backStack.removeLastOrNull() },
-                )
-            }
         },
     )
 }
@@ -211,13 +206,13 @@ fun BookingsRoot(
 @Composable
 private fun BookingsListScreen(
     onAppointmentClick: (String) -> Unit,
-    onPaymentClick: (String) -> Unit,
     onProfileClick: () -> Unit = {},
     onNotificationsClick: () -> Unit = {},
+    onBookReferredDoctor: (Doctor) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Appointments", "Payments")
+    val tabs = listOf("Appointments", "Referrals")
 
     Column(modifier = modifier.fillMaxSize()) {
         PatientDashboardHeader(
@@ -265,7 +260,208 @@ private fun BookingsListScreen(
 
         when (selectedTab) {
             0 -> AppointmentsTab(onAppointmentClick = onAppointmentClick)
-            1 -> PaymentsTab(onPaymentClick = onPaymentClick)
+            1 -> ReferralsTab(onBookReferredDoctor = onBookReferredDoctor)
+        }
+    }
+}
+
+// ─── Referrals tab ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun ReferralsTab(onBookReferredDoctor: (Doctor) -> Unit) {
+    val getPendingReferrals: GetPendingReferralsUseCase = koinInject()
+    val acceptReferral: AcceptReferralUseCase = koinInject()
+    val declineReferral: DeclineReferralUseCase = koinInject()
+    val getDoctorById: GetDoctorByIdUseCase = koinInject()
+    val snackbarController: SnackbarController = koinInject()
+
+    var referrals by remember { mutableStateOf<List<Referral>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var processingReferralId by remember { mutableStateOf<String?>(null) }
+    var referralPendingDecline by remember { mutableStateOf<Referral?>(null) }
+    val scope = rememberCoroutineScope()
+
+    suspend fun load() {
+        isLoading = true
+        when (val result = getPendingReferrals()) {
+            is Resource.Success -> referrals = result.data ?: emptyList()
+            is Resource.Error -> snackbarController.show(result.message ?: "Failed to load referrals", isError = true)
+            else -> {}
+        }
+        isLoading = false
+    }
+
+    LaunchedEffect(Unit) { load() }
+
+    fun acceptAndBook(referral: Referral) {
+        scope.launch {
+            processingReferralId = referral.id
+            when (val acceptResult = acceptReferral(referral.id)) {
+                is Resource.Success -> {
+                    referrals = referrals.filterNot { it.id == referral.id }
+                    when (val doctorResult = getDoctorById(referral.receivingDoctorId)) {
+                        is Resource.Success -> {
+                            val doctor = doctorResult.data
+                            if (doctor != null) onBookReferredDoctor(doctor)
+                            else snackbarController.show("Referral accepted, but couldn't load Dr. ${referral.receivingDoctorName ?: ""}'s profile", isError = true)
+                        }
+                        is Resource.Error -> snackbarController.show(doctorResult.message ?: "Referral accepted, but couldn't load the doctor's profile", isError = true)
+                        else -> {}
+                    }
+                }
+                is Resource.Error -> snackbarController.show(acceptResult.message ?: "Failed to accept referral", isError = true)
+                else -> {}
+            }
+            processingReferralId = null
+        }
+    }
+
+    fun decline(referral: Referral) {
+        scope.launch {
+            processingReferralId = referral.id
+            when (val result = declineReferral(referral.id)) {
+                is Resource.Success -> referrals = referrals.filterNot { it.id == referral.id }
+                is Resource.Error -> snackbarController.show(result.message ?: "Failed to decline referral", isError = true)
+                else -> {}
+            }
+            processingReferralId = null
+        }
+    }
+
+    PullToRefreshBox(
+        isRefreshing = isLoading,
+        onRefresh = { scope.launch { load() } },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        if (isLoading && referrals.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else if (referrals.isEmpty()) {
+            EmptyState(
+                icon = { Icon(Icons.AutoMirrored.Filled.Forward, null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) },
+                title = "No referrals yet",
+                subtitle = "When another doctor refers you\nto a specialist, it'll show up here.",
+            )
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+            ) {
+                items(referrals, key = { it.id }) { referral ->
+                    ReferralCard(
+                        referral = referral,
+                        isProcessing = processingReferralId == referral.id,
+                        onAcceptAndBook = { acceptAndBook(referral) },
+                        onDecline = { referralPendingDecline = referral },
+                    )
+                }
+            }
+        }
+    }
+
+    referralPendingDecline?.let { referral ->
+        AlertDialog(
+            onDismissRequest = { referralPendingDecline = null },
+            title = { Text("Decline this referral?") },
+            text = {
+                Text(
+                    "Dr. ${referral.referringDoctorName ?: "Your doctor"}'s referral to " +
+                        "Dr. ${referral.receivingDoctorName ?: "the specialist"} will be declined. This can't be undone.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { decline(referral); referralPendingDecline = null }) {
+                    Text("Decline", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { referralPendingDecline = null }) { Text("Cancel") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun ReferralCard(
+    referral: Referral,
+    isProcessing: Boolean,
+    onAcceptAndBook: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = ShapeCard,
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Brush.verticalGradient(listOf(GradientStart, GradientEnd))),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (referral.referringDoctorPicture != null) {
+                        AsyncImage(
+                            model = referral.referringDoctorPicture,
+                            contentDescription = referral.referringDoctorName,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                        )
+                    } else {
+                        Icon(Icons.Filled.Person, null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(20.dp))
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Dr. ${referral.referringDoctorName ?: "Unknown"} referred you",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    )
+                    Text(
+                        text = "to Dr. ${referral.receivingDoctorName ?: "a specialist"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Primary40,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = referral.reason,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = onDecline,
+                    enabled = !isProcessing,
+                    modifier = Modifier.weight(1f),
+                    shape = ShapePill,
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                ) {
+                    Text("Decline", style = MaterialTheme.typography.labelMedium)
+                }
+                androidx.compose.material3.Button(
+                    onClick = onAcceptAndBook,
+                    enabled = !isProcessing,
+                    modifier = Modifier.weight(1f),
+                    shape = ShapePill,
+                ) {
+                    if (isProcessing) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                    } else {
+                        Text("Accept & Book", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
         }
     }
 }
@@ -319,220 +515,6 @@ private fun AppointmentsTab(onAppointmentClick: (String) -> Unit) {
                 }
             }
         }
-    }
-}
-
-// ─── Payments tab ─────────────────────────────────────────────────────────────
-
-@Composable
-private fun PaymentsTab(onPaymentClick: (String) -> Unit) {
-    val getHistory: GetPaymentHistoryUseCase = koinInject()
-    var payments by remember { mutableStateOf<List<GetPaymentHistoryItem>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(false) }
-    var isLoadingMore by remember { mutableStateOf(false) }
-    var hasMore by remember { mutableStateOf(false) }
-    var nextPageToFetch by remember { mutableStateOf(0) }
-    val scope = rememberCoroutineScope()
-    val listState = rememberLazyListState()
-
-    val nearBottom by remember {
-        derivedStateOf {
-            val info = listState.layoutInfo
-            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
-            lastVisible >= info.totalItemsCount - 3
-        }
-    }
-
-    LaunchedEffect(nearBottom) {
-        if (nearBottom && hasMore && !isLoadingMore) {
-            isLoadingMore = true
-            when (val result = getHistory(page = nextPageToFetch)) {
-                is Resource.Success -> {
-                    val items = result.data?.data?.items ?: emptyList()
-                    payments = (payments + items).sortedByDescending { it.createdAt }
-                    nextPageToFetch--
-                    hasMore = nextPageToFetch > 1
-                }
-                else -> {}
-            }
-            isLoadingMore = false
-        }
-    }
-
-    suspend fun loadInitial() {
-        isLoading = true
-        payments = emptyList()
-        hasMore = false
-        nextPageToFetch = 0
-
-        when (val discovery = getHistory(page = 1)) {
-            is Resource.Success -> {
-                val data = discovery.data?.data ?: run { isLoading = false; return }
-                val total = data.pages.coerceAtLeast(1)
-                val page1Items = data.items
-
-                if (total == 1) {
-                    payments = page1Items.sortedByDescending { it.createdAt }
-                } else {
-                    // Load newest page before revealing content — avoids flash of oldest payments
-                    when (val newest = getHistory(page = total)) {
-                        is Resource.Success -> {
-                            val newestItems = newest.data?.data?.items ?: emptyList()
-                            payments = (page1Items + newestItems).sortedByDescending { it.createdAt }
-                            nextPageToFetch = total - 1
-                            hasMore = nextPageToFetch > 1
-                        }
-                        else -> payments = page1Items.sortedByDescending { it.createdAt }
-                    }
-                }
-            }
-            else -> {}
-        }
-        isLoading = false
-    }
-
-    LaunchedEffect(Unit) { loadInitial() }
-
-    PullToRefreshBox(
-        isRefreshing = isLoading,
-        onRefresh = { scope.launch { loadInitial() } },
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        if (isLoading && payments.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else if (payments.isEmpty()) {
-            EmptyState(
-                icon = { Icon(Icons.Filled.Receipt, null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) },
-                title = "No payments yet",
-                subtitle = "Your payment history will\nappear here after your first booking.",
-            )
-        } else {
-            LazyColumn(
-                state = listState,
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize().navigationBarsPadding(),
-            ) {
-                items(payments, key = { it.id }) { payment ->
-                    PaymentCard(
-                        payment = payment,
-                        onClick = { onPaymentClick(payment.id) },
-                    )
-                }
-                when {
-                    isLoadingMore -> item(key = "loading_more") {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                        }
-                    }
-                    !hasMore -> item(key = "end_of_list") {
-                        Text(
-                            text = "· All payments loaded ·",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 20.dp),
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PaymentCard(payment: GetPaymentHistoryItem, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
-        elevation = CardDefaults.cardElevation(2.dp),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Payment method icon
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surface),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    val painter = if (payment.paymentMethod.contains("MPESA", ignoreCase = true) ||
-                        payment.paymentMethod.contains("M-PESA", ignoreCase = true))
-                        painterResource(Res.drawable.mpesa)
-                    else
-                        painterResource(Res.drawable.card_payment)
-                    androidx.compose.foundation.Image(
-                        painter = painter,
-                        contentDescription = payment.paymentMethod,
-                        modifier = Modifier.size(36.dp),
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = payment.paymentMethod,
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    )
-                    Text(
-                        text = formatPaymentDate(payment.createdAt),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "${payment.currency} ${payment.amount.toAmountString()}",
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    PaymentStatusChip(status = payment.status)
-                }
-            }
-
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 10.dp),
-                thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant,
-            )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                val ref = payment.mpesaReference?.takeIf { it.isNotBlank() }
-                    ?: payment.invoiceId?.takeIf { it.isNotBlank() }
-                    ?: "—"
-                InfoChip(label = "Ref", value = ref)
-                payment.netAmount?.let { InfoChip(label = "Net", value = "${payment.currency} $it") }
-            }
-        }
-    }
-}
-
-@Composable
-private fun InfoChip(label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = "$label: ",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onSurface,
-        )
     }
 }
 
@@ -718,14 +700,3 @@ private fun Double.toAmountString(): String {
     val cents = ((this - whole) * 100).toLong()
     return "$whole.${cents.toString().padStart(2, '0')}"
 }
-
-private fun formatPaymentDate(iso: String): String = try {
-    val date = iso.substringBefore("T")
-    val time = iso.substringAfter("T").substringBefore(".").substringBefore("Z")
-    val parts = time.split(":")
-    val hour = parts[0].toInt()
-    val min = parts.getOrElse(1) { "00" }
-    val ampm = if (hour < 12) "AM" else "PM"
-    val h = if (hour % 12 == 0) 12 else hour % 12
-    "$date · $h:$min $ampm"
-} catch (e: Exception) { iso }

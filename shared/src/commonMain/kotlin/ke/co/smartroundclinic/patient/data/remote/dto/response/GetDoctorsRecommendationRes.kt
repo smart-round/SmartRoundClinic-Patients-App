@@ -13,6 +13,14 @@ data class GetDoctorsRecommendationRes(
 )
 
 @Serializable
+data class GetDoctorByIdRes(
+    val `data`: DoctorItem?,
+    val httpStatusCode: Int,
+    val message: String,
+    val status: Boolean,
+)
+
+@Serializable
 data class DoctorData(
     val items: List<DoctorItem>,
     val page: Int, // 1
