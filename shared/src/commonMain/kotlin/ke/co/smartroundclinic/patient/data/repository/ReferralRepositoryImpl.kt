@@ -6,6 +6,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.patch
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.data.remote.dto.response.GetPendingReferralsRes
+import ke.co.smartroundclinic.patient.data.remote.dto.response.GetReferralHistoryRes
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ReferralActionRes
 import ke.co.smartroundclinic.patient.domain.repository.ReferralRepository
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,16 @@ class ReferralRepositoryImpl(private val client: HttpClient) : ReferralRepositor
                 Resource.Success(response, response.message)
             } catch (e: Exception) {
                 Resource.Error(e.message ?: "Failed to load referrals")
+            }
+        }
+
+    override suspend fun getReferralHistory(): Resource<GetReferralHistoryRes> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = client.get("referral/history").body<GetReferralHistoryRes>()
+                Resource.Success(response, response.message)
+            } catch (e: Exception) {
+                Resource.Error(e.message ?: "Failed to load referral history")
             }
         }
 

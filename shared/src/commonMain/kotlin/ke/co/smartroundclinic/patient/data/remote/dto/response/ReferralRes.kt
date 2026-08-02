@@ -13,6 +13,14 @@ data class GetPendingReferralsRes(
 )
 
 @Serializable
+data class GetReferralHistoryRes(
+    val `data`: List<ReferralItem>?,
+    val httpStatusCode: Int,
+    val message: String,
+    val status: Boolean,
+)
+
+@Serializable
 data class ReferralActionRes(
     val `data`: ReferralItem?,
     val httpStatusCode: Int,

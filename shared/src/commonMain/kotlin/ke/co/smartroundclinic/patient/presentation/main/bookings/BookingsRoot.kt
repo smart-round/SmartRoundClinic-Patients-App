@@ -72,11 +72,12 @@ import ke.co.smartroundclinic.patient.core.snackbar.SnackbarController
 import ke.co.smartroundclinic.patient.domain.model.Appointment
 import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.domain.model.Referral
+import ke.co.smartroundclinic.patient.domain.model.ReferralStatus
 import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetMyAppointmentsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorByIdUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.referral.AcceptReferralUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.referral.DeclineReferralUseCase
-import ke.co.smartroundclinic.patient.domain.usecase.referral.GetPendingReferralsUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.referral.GetReferralHistoryUseCase
 import ke.co.smartroundclinic.patient.presentation.main.Services.ServicesViewModel
 import ke.co.smartroundclinic.patient.presentation.main.Services.ui.AppointmentDetailsScreen
 import ke.co.smartroundclinic.patient.presentation.main.Services.ui.BookAppointmentScreen
@@ -269,7 +270,7 @@ private fun BookingsListScreen(
 
 @Composable
 private fun ReferralsTab(onBookReferredDoctor: (Doctor) -> Unit) {
-    val getPendingReferrals: GetPendingReferralsUseCase = koinInject()
+    val getReferralHistory: GetReferralHistoryUseCase = koinInject()
     val acceptReferral: AcceptReferralUseCase = koinInject()
     val declineReferral: DeclineReferralUseCase = koinInject()
     val getDoctorById: GetDoctorByIdUseCase = koinInject()
@@ -283,7 +284,7 @@ private fun ReferralsTab(onBookReferredDoctor: (Doctor) -> Unit) {
 
     suspend fun load() {
         isLoading = true
-        when (val result = getPendingReferrals()) {
+        when (val result = getReferralHistory()) {
             is Resource.Success -> referrals = result.data ?: emptyList()
             is Resource.Error -> snackbarController.show(result.message ?: "Failed to load referrals", isError = true)
             else -> {}
@@ -293,12 +294,28 @@ private fun ReferralsTab(onBookReferredDoctor: (Doctor) -> Unit) {
 
     LaunchedEffect(Unit) { load() }
 
+    fun bookDoctor(referral: Referral) {
+        scope.launch {
+            processingReferralId = referral.id
+            when (val doctorResult = getDoctorById(referral.receivingDoctorId)) {
+                is Resource.Success -> {
+                    val doctor = doctorResult.data
+                    if (doctor != null) onBookReferredDoctor(doctor)
+                    else snackbarController.show("Couldn't load Dr. ${referral.receivingDoctorName ?: ""}'s profile", isError = true)
+                }
+                is Resource.Error -> snackbarController.show(doctorResult.message ?: "Couldn't load the doctor's profile", isError = true)
+                else -> {}
+            }
+            processingReferralId = null
+        }
+    }
+
     fun acceptAndBook(referral: Referral) {
         scope.launch {
             processingReferralId = referral.id
             when (val acceptResult = acceptReferral(referral.id)) {
                 is Resource.Success -> {
-                    referrals = referrals.filterNot { it.id == referral.id }
+                    referrals = referrals.map { if (it.id == referral.id) it.copy(status = ReferralStatus.ACCEPTED) else it }
                     when (val doctorResult = getDoctorById(referral.receivingDoctorId)) {
                         is Resource.Success -> {
                             val doctor = doctorResult.data
@@ -320,7 +337,7 @@ private fun ReferralsTab(onBookReferredDoctor: (Doctor) -> Unit) {
         scope.launch {
             processingReferralId = referral.id
             when (val result = declineReferral(referral.id)) {
-                is Resource.Success -> referrals = referrals.filterNot { it.id == referral.id }
+                is Resource.Success -> referrals = referrals.map { if (it.id == referral.id) it.copy(status = ReferralStatus.DECLINED) else it }
                 is Resource.Error -> snackbarController.show(result.message ?: "Failed to decline referral", isError = true)
                 else -> {}
             }
@@ -355,6 +372,7 @@ private fun ReferralsTab(onBookReferredDoctor: (Doctor) -> Unit) {
                         isProcessing = processingReferralId == referral.id,
                         onAcceptAndBook = { acceptAndBook(referral) },
                         onDecline = { referralPendingDecline = referral },
+                        onBookDoctor = { bookDoctor(referral) },
                     )
                 }
             }
@@ -368,7 +386,7 @@ private fun ReferralsTab(onBookReferredDoctor: (Doctor) -> Unit) {
             text = {
                 Text(
                     "Dr. ${referral.referringDoctorName ?: "Your doctor"}'s referral to " +
-                        "Dr. ${referral.receivingDoctorName ?: "the specialist"} will be declined. This can't be undone.",
+                        "Dr. ${referral.receivingDoctorName ?: "the specialist"} will be declined. You can still book with this doctor later if you change your mind.",
                 )
             },
             confirmButton = {
@@ -389,6 +407,7 @@ private fun ReferralCard(
     isProcessing: Boolean,
     onAcceptAndBook: () -> Unit,
     onDecline: () -> Unit,
+    onBookDoctor: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -398,36 +417,26 @@ private fun ReferralCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Brush.verticalGradient(listOf(GradientStart, GradientEnd))),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (referral.referringDoctorPicture != null) {
-                        AsyncImage(
-                            model = referral.referringDoctorPicture,
-                            contentDescription = referral.referringDoctorName,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape),
-                        )
-                    } else {
-                        Icon(Icons.Filled.Person, null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(20.dp))
-                    }
-                }
+                ReferralDoctorAvatar(picture = referral.referringDoctorPicture, size = 40)
                 Spacer(Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Dr. ${referral.referringDoctorName ?: "Unknown"} referred you",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                     )
-                    Text(
-                        text = "to Dr. ${referral.receivingDoctorName ?: "a specialist"}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Primary40,
-                    )
                 }
+                ReferralStatusBadge(status = referral.status)
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ReferralDoctorAvatar(picture = referral.receivingDoctorPicture, size = 28)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "to Dr. ${referral.receivingDoctorName ?: "a specialist"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Primary40,
+                )
             }
 
             Spacer(Modifier.height(10.dp))
@@ -438,31 +447,98 @@ private fun ReferralCard(
             )
 
             Spacer(Modifier.height(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick = onDecline,
-                    enabled = !isProcessing,
-                    modifier = Modifier.weight(1f),
-                    shape = ShapePill,
-                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
-                ) {
-                    Text("Decline", style = MaterialTheme.typography.labelMedium)
+            when (referral.status) {
+                ReferralStatus.PENDING -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(
+                            onClick = onDecline,
+                            enabled = !isProcessing,
+                            modifier = Modifier.weight(1f),
+                            shape = ShapePill,
+                            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                        ) {
+                            Text("Decline", style = MaterialTheme.typography.labelMedium)
+                        }
+                        androidx.compose.material3.Button(
+                            onClick = onAcceptAndBook,
+                            enabled = !isProcessing,
+                            modifier = Modifier.weight(1f),
+                            shape = ShapePill,
+                        ) {
+                            if (isProcessing) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                            } else {
+                                Text("Accept & Book", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
                 }
-                androidx.compose.material3.Button(
-                    onClick = onAcceptAndBook,
-                    enabled = !isProcessing,
-                    modifier = Modifier.weight(1f),
-                    shape = ShapePill,
-                ) {
-                    if (isProcessing) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
-                    } else {
-                        Text("Accept & Book", style = MaterialTheme.typography.labelMedium)
+                else -> {
+                    // Already responded to — accepting/declining doesn't block booking, so a
+                    // patient who changes their mind can still go book with this doctor.
+                    OutlinedButton(
+                        onClick = onBookDoctor,
+                        enabled = !isProcessing,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = ShapePill,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Primary40),
+                    ) {
+                        if (isProcessing) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Primary40)
+                        } else {
+                            Text(
+                                text = if (referral.status == ReferralStatus.ACCEPTED) "Book Now" else "Book Anyway",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Primary40,
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ReferralDoctorAvatar(picture: String?, size: Int) {
+    Box(
+        modifier = Modifier
+            .size(size.dp)
+            .clip(CircleShape)
+            .background(Brush.verticalGradient(listOf(GradientStart, GradientEnd))),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (picture != null) {
+            AsyncImage(
+                model = picture,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().clip(CircleShape),
+            )
+        } else {
+            Icon(Icons.Filled.Person, null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size((size * 0.55).dp))
+        }
+    }
+}
+
+@Composable
+private fun ReferralStatusBadge(status: ReferralStatus) {
+    val (bg, fg, label) = when (status) {
+        ReferralStatus.ACCEPTED -> Triple(StatusConfirmed.copy(alpha = 0.15f), StatusConfirmed, "Accepted")
+        ReferralStatus.DECLINED -> Triple(StatusSuspended.copy(alpha = 0.15f), StatusSuspended, "Declined")
+        else -> Triple(StatusPending.copy(alpha = 0.15f), StatusPending, "Pending")
+    }
+    Box(
+        modifier = Modifier
+            .background(bg, RoundedCornerShape(20.dp))
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = fg,
+        )
     }
 }
 
