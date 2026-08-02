@@ -166,7 +166,7 @@ extension CallKitManager: PKPushRegistryDelegate {
         case "Call Cancelled":
             IncomingCallHandler.shared.onCallCancelled(callId: callId)
         default:
-            break
+            print("CallKitManager: unrecognized VoIP push event '\(event)' — no handler for it")
         }
     }
 }

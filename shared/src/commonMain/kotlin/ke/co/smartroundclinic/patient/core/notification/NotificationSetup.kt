@@ -53,33 +53,35 @@ fun setupNotificationListener() {
                 "Call Answered" -> IncomingCallHandler.onCallAnswered(callId)
                 "Call Declined" -> IncomingCallHandler.onCallDeclined(callId)
                 "Call Cancelled" -> IncomingCallHandler.onCallCancelled(callId)
+                else -> Napier.w(tag = TAG, message = "onPayloadData: unrecognized event '$event' — no call-signal handler for it")
             }
         }
 
         override fun onNotificationClicked(data: Map<String, Any?>) {
             val event = data["event"]?.toString()
             val appointmentId = data["appointmentId"]?.toString()
-            val consultationId = data["consultationId"]?.toString()
             val ticketId = data["ticketId"]?.toString()
             val doctorId = data["doctorId"]?.toString()
             val doctorName = (data["doctorName"] ?: data["senderName"])?.toString() ?: "Doctor"
 
-            Napier.d(tag = TAG, message = "Notification tapped — event=$event appointmentId=$appointmentId consultationId=$consultationId ticketId=$ticketId")
+            Napier.d(tag = TAG, message = "Notification tapped — event=$event appointmentId=$appointmentId doctorId=$doctorId ticketId=$ticketId")
 
-            suspend fun resolvedDoctorId(appointmentId: String): String? = doctorId
-                ?: component.appointmentLocalRepository.getAll().firstOrNull { it.id == appointmentId }?.doctorId
+            // Call/chat lifecycle events (Doctor Joined the Call, Call Ended, New Chat Message for a
+            // consultation thread) never carry appointmentId on the backend — they carry doctorId
+            // directly. Resolving via a locally-cached appointment lookup is only a fallback for the
+            // rare case doctorId itself is missing; it must never be the gate that blocks routing.
+            suspend fun resolvedDoctorId(appointmentId: String?): String? = doctorId
+                ?: appointmentId?.let { id -> component.appointmentLocalRepository.getAll().firstOrNull { it.id == id }?.doctorId }
 
-            // The push payload doesn't always carry doctorId (only "New Chat Message" does today) —
-            // fall back to the locally-cached appointment so every chat-bound event can still deep-link.
-            suspend fun toConsultationChat(appointmentId: String): NotificationEvent {
+            suspend fun toConsultationChat(appointmentId: String?): NotificationEvent {
                 val resolved = resolvedDoctorId(appointmentId)
-                return if (!resolved.isNullOrBlank()) NotificationEvent.ToConsultationChat(resolved, doctorName, appointmentId)
+                return if (!resolved.isNullOrBlank()) NotificationEvent.ToConsultationChat(resolved, doctorName, appointmentId.orEmpty())
                 else NotificationEvent.ToNotifications
             }
 
-            suspend fun toCall(appointmentId: String): NotificationEvent {
+            suspend fun toCall(appointmentId: String?): NotificationEvent {
                 val resolved = resolvedDoctorId(appointmentId)
-                return if (!resolved.isNullOrBlank()) NotificationEvent.ToCall(resolved, doctorName, appointmentId)
+                return if (!resolved.isNullOrBlank()) NotificationEvent.ToCall(resolved, doctorName, appointmentId.orEmpty())
                 else NotificationEvent.ToNotifications
             }
 
@@ -94,17 +96,11 @@ fun setupNotificationListener() {
                         else NotificationEvent.ToNotifications
                     }
                     "Doctor is Ready",
-                    "Doctor Joined the Call" -> {
-                        if (!appointmentId.isNullOrBlank()) toCall(appointmentId)
-                        else NotificationEvent.ToNotifications
-                    }
+                    "Doctor Joined the Call" -> toCall(appointmentId)
                     "Consultation Ended",
-                    "Call Ended" -> {
-                        if (!appointmentId.isNullOrBlank()) toConsultationChat(appointmentId)
-                        else NotificationEvent.ToNotifications
-                    }
+                    "Call Ended" -> toConsultationChat(appointmentId)
                     "New Chat Message" -> when {
-                        !appointmentId.isNullOrBlank() -> toConsultationChat(appointmentId)
+                        doctorId != null || !appointmentId.isNullOrBlank() -> toConsultationChat(appointmentId)
                         !ticketId.isNullOrBlank() -> NotificationEvent.ToSupportTicket(ticketId)
                         else -> NotificationEvent.ToNotifications
                     }
@@ -113,7 +109,12 @@ fun setupNotificationListener() {
                         else NotificationEvent.ToNotifications
                     }
                     "Medical Record Updated" -> NotificationEvent.ToMedicalHistory
-                    else -> NotificationEvent.ToNotifications
+                    "You've Been Referred" -> NotificationEvent.ToReferrals
+                    null -> NotificationEvent.ToNotifications
+                    else -> {
+                        Napier.w(tag = TAG, message = "onNotificationClicked: unrecognized event '$event' — falling back to Notifications")
+                        NotificationEvent.ToNotifications
+                    }
                 }
 
                 NotificationDeepLink.signal(notifEvent)

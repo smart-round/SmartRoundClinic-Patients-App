@@ -129,6 +129,9 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
                     selectTab(Home)
                     pendingMedicalHistory = true
                 }
+                is NotificationEvent.ToReferrals -> {
+                    selectTab(Bookings)
+                }
             }
         }
     }

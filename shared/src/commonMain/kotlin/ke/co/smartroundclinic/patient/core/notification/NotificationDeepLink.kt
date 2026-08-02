@@ -10,6 +10,7 @@ sealed class NotificationEvent {
     data class ToConsultationChat(val doctorId: String, val doctorName: String, val appointmentId: String) : NotificationEvent()
     data class ToCall(val doctorId: String, val doctorName: String, val appointmentId: String) : NotificationEvent()
     data class ToSupportTicket(val ticketId: String) : NotificationEvent()
+    data object ToReferrals : NotificationEvent()
 }
 
 object NotificationDeepLink {
