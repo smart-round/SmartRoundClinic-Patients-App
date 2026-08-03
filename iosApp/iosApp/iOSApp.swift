@@ -4,6 +4,7 @@ import FirebaseCore
 import FirebaseMessaging
 import UserNotifications
 import RealtimeKit
+import RTKWebRTC
 
 class AppDelegate: NSObject, UIApplicationDelegate {
 
@@ -105,11 +106,33 @@ struct iOSApp: App {
 private final class RtkCallSessionImpl: NSObject, RtkMeetingRoomEventListener, RtkSelfEventListener, RtkParticipantsEventListener, IosCallSession {
     private let client: RealtimeKitClient
     private let listener: IosCallSessionListener
+    // Set only when this call activated RTCAudioSession itself in init() below (outgoing calls —
+    // see the comment there) so dispose() knows to balance that with a matching deactivate.
+    // Incoming calls are activated/deactivated by CallKitManager's didActivate/didDeactivate
+    // instead, so leaving this false there avoids double-counting RTCAudioSession's balanced
+    // activation bookkeeping.
+    private var didActivateAudioSession = false
+    // Stashed so toggleAudio() can re-arm RTCAudioSession with the right mode (see toggleAudio()
+    // below) — the mic/speaker button doubles as a manual "retry audio" affordance for the case
+    // where automatic activation on CallKit answer silently failed to start the AURemoteIO unit.
+    private let isVideoCall: Bool
 
     init(authToken: String, enableAudio: Bool, enableVideo: Bool, listener: IosCallSessionListener) {
         client = RealtimeKitiOSClientBuilder().build()
         self.listener = listener
+        self.isVideoCall = enableVideo
         super.init()
+
+        // Outgoing calls never go through CallKit in this app (no CXStartCallAction reporting),
+        // so nothing else will ever activate RTCAudioSession or flip isAudioEnabled for them now
+        // that CallKitManager has put RTCAudioSession in manual mode — drive it directly here.
+        // Incoming calls are answered via CXAnswerCallAction first, so CallKitManager.shared's
+        // didActivate (CallKitManager.swift) already owns that job for those by the time this
+        // runs — skip it here to avoid an unbalanced double-activation.
+        if enableAudio && !CallKitManager.shared.isCallKitCallActive {
+            configureAndActivateWebRTCAudioSession(isVideo: enableVideo)
+            didActivateAudioSession = true
+        }
 
         client.addMeetingRoomEventListener(meetingRoomEventListener: self)
         client.addSelfEventListener(selfEventListener: self)
@@ -133,6 +156,12 @@ private final class RtkCallSessionImpl: NSObject, RtkMeetingRoomEventListener, R
         } else {
             client.localUser.enableAudio(onResult: { _ in })
         }
+        // Manual recovery path: if the CallKit-triggered activation on answer silently failed to
+        // start the AURemoteIO unit (both directions end up silent, no error anywhere — see
+        // CallKitManager.swift's configureAndActivateWebRTCAudioSession), re-running it here gives
+        // the user a way to retry by tapping the mic button, instead of being stuck for the call's
+        // whole duration with no in-app affordance to recover.
+        configureAndActivateWebRTCAudioSession(isVideo: isVideoCall)
     }
 
     func toggleVideo() {
@@ -152,6 +181,10 @@ private final class RtkCallSessionImpl: NSObject, RtkMeetingRoomEventListener, R
         client.removeSelfEventListener(selfEventListener: self)
         client.removeParticipantsEventListener(participantsEventListener: self)
         client.release(onSuccess: {}, onFailure: { _ in })
+
+        if didActivateAudioSession {
+            deactivateWebRTCAudioSession()
+        }
     }
 
     func localVideoView() -> UIView? {
