@@ -14,6 +14,7 @@ import RTKWebRTC
 /// the phone isn't held to the caller's ear, which it normally isn't during a video call. This is
 /// the fix for "video connects but I can't hear the other person talk."
 func configureAndActivateWebRTCAudioSession(isVideo: Bool) {
+    NSLog("SRC-AUDIO: configureAndActivateWebRTCAudioSession start, isVideo=\(isVideo)")
     let rtcAudioSession = RTKRTCAudioSession.sharedInstance()
     let configuration = RTKRTCAudioSessionConfiguration.webRTC()
     configuration.category = AVAudioSession.Category.playAndRecord.rawValue
@@ -23,11 +24,14 @@ func configureAndActivateWebRTCAudioSession(isVideo: Bool) {
     rtcAudioSession.lockForConfiguration()
     do {
         try rtcAudioSession.setConfiguration(configuration, active: true)
+        NSLog("SRC-AUDIO: setConfiguration succeeded")
     } catch {
-        print("CallKitManager: failed to configure WebRTC audio session — \(error.localizedDescription)")
+        NSLog("SRC-AUDIO: setConfiguration FAILED — \(error.localizedDescription)")
     }
     rtcAudioSession.unlockForConfiguration()
     rtcAudioSession.isAudioEnabled = true
+    let session = AVAudioSession.sharedInstance()
+    NSLog("SRC-AUDIO: isAudioEnabled set true, sampleRate=\(session.sampleRate), category=\(session.category.rawValue), route=\(session.currentRoute.outputs.map { $0.portName })")
 }
 
 func deactivateWebRTCAudioSession() {
@@ -250,6 +254,7 @@ extension CallKitManager: CXProviderDelegate {
     }
 
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
+        NSLog("SRC-AUDIO: CXAnswerCallAction perform")
         guard let callId = callIdByUuid[action.callUUID], let info = callerInfoByCallId[callId] else {
             action.fail()
             return
@@ -262,6 +267,7 @@ extension CallKitManager: CXProviderDelegate {
             event: NotificationEvent.ToCall(doctorId: info.callerId, doctorName: info.callerName ?? "Doctor", appointmentId: "")
         )
         action.fulfill()
+        NSLog("SRC-AUDIO: CXAnswerCallAction fulfilled")
     }
 
     func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
@@ -285,10 +291,12 @@ extension CallKitManager: CXProviderDelegate {
     // configureAndActivateWebRTCAudioSession above) on top of it, which is also what actually
     // turns RTCAudioSession's audio unit on now that it's in manual mode (see CallKitManager.init).
     func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
+        NSLog("SRC-AUDIO: CXProvider didActivate — sampleRate=\(audioSession.sampleRate), category=\(audioSession.category.rawValue)")
         configureAndActivateWebRTCAudioSession(isVideo: activeCallIsVideo)
     }
 
     func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
+        NSLog("SRC-AUDIO: CXProvider didDeactivate")
         deactivateWebRTCAudioSession()
     }
 }

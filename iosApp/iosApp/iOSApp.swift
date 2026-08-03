@@ -129,6 +129,7 @@ private final class RtkCallSessionImpl: NSObject, RtkMeetingRoomEventListener, R
         // Incoming calls are answered via CXAnswerCallAction first, so CallKitManager.shared's
         // didActivate (CallKitManager.swift) already owns that job for those by the time this
         // runs — skip it here to avoid an unbalanced double-activation.
+        NSLog("SRC-AUDIO: RtkCallSessionImpl.init enableAudio=\(enableAudio) isCallKitCallActive=\(CallKitManager.shared.isCallKitCallActive)")
         if enableAudio && !CallKitManager.shared.isCallKitCallActive {
             configureAndActivateWebRTCAudioSession(isVideo: enableVideo)
             didActivateAudioSession = true
@@ -139,6 +140,7 @@ private final class RtkCallSessionImpl: NSObject, RtkMeetingRoomEventListener, R
         client.addParticipantsEventListener(participantsEventListener: self)
 
         let meetingInfo = RtkMeetingInfo(authToken: authToken, enableAudio: enableAudio, enableVideo: enableVideo)
+        NSLog("SRC-AUDIO: calling client.doInit now")
         client.doInit(meetingInfo: meetingInfo, onSuccess: {}, onFailure: { [weak self] error in
             self?.listener.onFailed(message: error.message)
         })
@@ -161,6 +163,7 @@ private final class RtkCallSessionImpl: NSObject, RtkMeetingRoomEventListener, R
         // CallKitManager.swift's configureAndActivateWebRTCAudioSession), re-running it here gives
         // the user a way to retry by tapping the mic button, instead of being stuck for the call's
         // whole duration with no in-app affordance to recover.
+        NSLog("SRC-AUDIO: toggleAudio tapped, forcing re-arm")
         configureAndActivateWebRTCAudioSession(isVideo: isVideoCall)
     }
 
