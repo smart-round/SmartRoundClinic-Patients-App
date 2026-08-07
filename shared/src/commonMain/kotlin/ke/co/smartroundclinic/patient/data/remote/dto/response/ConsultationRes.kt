@@ -3,6 +3,7 @@ package ke.co.smartroundclinic.patient.data.remote.dto.response
 import ke.co.smartroundclinic.patient.domain.model.ConsultationFileAttachment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
 import ke.co.smartroundclinic.patient.domain.model.ConversationThread
+import ke.co.smartroundclinic.patient.domain.model.ThreadPreviewKind
 import kotlinx.serialization.Serializable
 
 // ─── Messages ──────────────────────────────────────────────────────────────
@@ -167,6 +168,8 @@ data class ConversationThreadData(
     val latestAppointmentId: String,
     val isOnline: Boolean = false,
     val lastSeenAt: String? = null,
+    /** Absent on older API builds — defaults to TEXT, i.e. show the preview with no icon. */
+    val lastMessageKind: String? = null,
 )
 
 fun ConversationThreadData.toDomain() = ConversationThread(
@@ -180,6 +183,12 @@ fun ConversationThreadData.toDomain() = ConversationThread(
     latestAppointmentId = latestAppointmentId,
     isOnline = isOnline,
     lastSeenAt = lastSeenAt,
+    lastMessageKind = when (lastMessageKind?.uppercase()) {
+        "PHOTO" -> ThreadPreviewKind.PHOTO
+        "FILE" -> ThreadPreviewKind.FILE
+        "PRESCRIPTION" -> ThreadPreviewKind.PRESCRIPTION
+        else -> ThreadPreviewKind.TEXT
+    },
 )
 
 @Serializable
@@ -194,4 +203,38 @@ data class ConversationThreadMessagesResponse(
 data class ConversationThreadMessagesData(
     val items: List<ConsultationMessageData> = emptyList(),
     val nextCursor: String? = null,
+)
+
+// ─── Pre-signed direct-to-storage upload ────────────────────────────────────
+
+@Serializable
+data class PresignUploadReq(
+    val fileName: String,
+    val contentType: String,
+    val sizeBytes: Long,
+)
+
+@Serializable
+data class PresignUploadData(
+    val messageId: String,
+    val key: String,
+    val uploadUrl: String,
+    val contentType: String,
+)
+
+@Serializable
+data class PresignUploadResponse(
+    val data: PresignUploadData? = null,
+    val httpStatusCode: Int,
+    val message: String,
+    val status: Boolean,
+)
+
+@Serializable
+data class CompleteUploadReq(
+    val messageId: String,
+    val key: String,
+    val fileName: String,
+    val contentType: String,
+    val sizeBytes: Long,
 )

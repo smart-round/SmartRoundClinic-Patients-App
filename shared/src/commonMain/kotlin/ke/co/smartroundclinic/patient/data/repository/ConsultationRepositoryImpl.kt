@@ -1,22 +1,30 @@
 package ke.co.smartroundclinic.patient.data.repository
 
+import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.delete
-import io.ktor.client.request.forms.MultiPartFormDataContent
-import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
-import io.ktor.http.Headers
-import io.ktor.http.HttpHeaders
+import io.ktor.http.ContentType
+import io.ktor.http.content.ByteArrayContent
+import io.ktor.http.contentType
+import io.ktor.http.isSuccess
+import kotlinx.datetime.Clock
+import ke.co.smartroundclinic.patient.common.Constants
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.data.remote.dto.request.CallActionReq
 import ke.co.smartroundclinic.patient.data.remote.dto.request.InviteToCallReq
 import ke.co.smartroundclinic.patient.data.remote.dto.response.CallActionRes
 import ke.co.smartroundclinic.patient.data.remote.dto.response.CallInviteRes
+import ke.co.smartroundclinic.patient.data.remote.dto.response.CompleteUploadReq
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationFileUploadResponse
+import ke.co.smartroundclinic.patient.data.remote.dto.response.PresignUploadReq
+import ke.co.smartroundclinic.patient.data.remote.dto.response.PresignUploadResponse
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConsultationMessageData
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConversationThreadMessagesResponse
 import ke.co.smartroundclinic.patient.data.remote.dto.response.ConversationThreadsResponse
@@ -32,7 +40,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 
-class ConsultationRepositoryImpl(private val client: HttpClient) : ConsultationRepository {
+class ConsultationRepositoryImpl(
+    private val client: HttpClient,
+    /** Auth-free client for pre-signed storage PUTs — see CoreModule.STORAGE_HTTP_CLIENT. */
+    private val storageClient: HttpClient,
+) : ConsultationRepository {
 
     override suspend fun joinCall(otherUserId: String): Resource<CallJoinInfo> = withContext(Dispatchers.IO) {
         try {
@@ -84,23 +96,56 @@ class ConsultationRepositoryImpl(private val client: HttpClient) : ConsultationR
         contentType: String,
         bytes: ByteArray,
     ): Resource<ConsultationMessage> = withContext(Dispatchers.IO) {
+        val startedAt = Clock.System.now().toEpochMilliseconds()
+        fun elapsed() = Clock.System.now().toEpochMilliseconds() - startedAt
+        Napier.i(tag = "SRC-UPLOAD", message = "start name=$fileName type=$contentType bytes=${bytes.size}")
         try {
-            val res = client.post("chat/$otherUserId/files") {
-                setBody(MultiPartFormDataContent(formData {
-                    append(
-                        key = "file",
-                        value = bytes,
-                        headers = Headers.build {
-                            append(HttpHeaders.ContentDisposition, "form-data; name=\"file\"; filename=\"$fileName\"")
-                            append(HttpHeaders.ContentType, contentType)
-                        },
-                    )
-                }))
+            // 1. Ask the API where to put it. The API also enforces its own size ceiling here,
+            //    so an oversized file is rejected before a single byte of it is sent.
+            val presign = client.post("chat/$otherUserId/files/presign") {
+                setBody(PresignUploadReq(fileName = fileName, contentType = contentType, sizeBytes = bytes.size.toLong()))
+            }.body<PresignUploadResponse>()
+            val target = presign.data
+            if (!presign.status || target == null) {
+                Napier.e(tag = "SRC-UPLOAD", message = "presign refused after ${elapsed()}ms: ${presign.message}")
+                return@withContext Resource.Error(presign.message)
+            }
+
+            // 2. Send the bytes straight to storage. Uses the auth-free client — a Bearer token
+            //    on a pre-signed URL is a signature mismatch — and the Content-Type must match
+            //    exactly what the server signed.
+            val putResponse = storageClient.put(target.uploadUrl) {
+                timeout {
+                    requestTimeoutMillis = Constants.UPLOAD_REQUEST_TIMEOUT_MS
+                    socketTimeoutMillis = Constants.UPLOAD_SOCKET_TIMEOUT_MS
+                }
+                contentType(ContentType.parse(target.contentType))
+                setBody(ByteArrayContent(bytes, ContentType.parse(target.contentType)))
+            }
+            if (!putResponse.status.isSuccess()) {
+                Napier.e(tag = "SRC-UPLOAD", message = "storage PUT failed after ${elapsed()}ms http=${putResponse.status}")
+                return@withContext Resource.Error("Failed to upload file (${putResponse.status.value})")
+            }
+            Napier.i(tag = "SRC-UPLOAD", message = "stored in ${elapsed()}ms")
+
+            // 3. Record the message now the object exists.
+            val res = client.post("chat/$otherUserId/files/complete") {
+                setBody(
+                    CompleteUploadReq(
+                        messageId = target.messageId,
+                        key = target.key,
+                        fileName = fileName,
+                        contentType = target.contentType,
+                        sizeBytes = bytes.size.toLong(),
+                    ),
+                )
             }.body<ConsultationFileUploadResponse>()
+            Napier.i(tag = "SRC-UPLOAD", message = "completed in ${elapsed()}ms status=${res.status} http=${res.httpStatusCode}")
             if (res.status && res.data != null) {
                 Resource.Success(res.data.toDomain(), res.message)
             } else Resource.Error(res.message)
         } catch (e: Exception) {
+            Napier.e(tag = "SRC-UPLOAD", message = "failed after ${elapsed()}ms ${e::class.simpleName}: ${e.message}", throwable = e)
             Resource.Error(e.message ?: "Failed to upload file")
         }
     }

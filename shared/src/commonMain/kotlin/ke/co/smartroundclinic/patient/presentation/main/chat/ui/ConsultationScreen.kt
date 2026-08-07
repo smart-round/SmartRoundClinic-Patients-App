@@ -1142,7 +1142,11 @@ private fun PendingFileBubble(pending: PendingFile) {
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = if (pending.failed) "Failed to send" else "Sending…",
+                        text = when {
+                            pending.errorText != null -> pending.errorText
+                            pending.failed -> "Failed to send"
+                            else -> "Sending…"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = if (pending.failed)
                             MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)

@@ -40,7 +40,10 @@ internal fun buildHttpClient(engine: HttpClientEngine, tokenProvider: () -> Stri
                 Napier.d(tag = "HTTP Client", message = message)
             }
         }
-        level = LogLevel.ALL
+        // Deliberately NOT LogLevel.ALL: that buffers and stringifies every request body,
+        // which made multi-MB chat uploads crawl, and wrote request payloads into device
+        // logs. Headers give us the same diagnostic value without either problem.
+        level = LogLevel.HEADERS
     }
 
     install(ResponseObserver) {

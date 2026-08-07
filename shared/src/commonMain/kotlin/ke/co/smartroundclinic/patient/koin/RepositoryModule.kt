@@ -47,6 +47,7 @@ import ke.co.smartroundclinic.patient.domain.repository.ReferralRepository
 import ke.co.smartroundclinic.patient.domain.repository.SupportRepository
 import ke.co.smartroundclinic.patient.domain.repository.PaymentsRepository
 import ke.co.smartroundclinic.patient.domain.repository.UserLocalRepository
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 val repositoryModule = module {
@@ -65,7 +66,7 @@ val repositoryModule = module {
     single<DoctorLocalRepository> { DoctorLocalRepositoryImpl(get<AppDatabase>().doctorDao) }
     single<ServiceCategoryRepository> { ServiceCategoryRepositoryImpl(get()) }
     single<ServiceCategoryLocalRepository> { ServiceCategoryLocalRepositoryImpl(get<AppDatabase>().serviceCategoryDao) }
-    single<ConsultationRepository> { ConsultationRepositoryImpl(get()) }
+    single<ConsultationRepository> { ConsultationRepositoryImpl(get(), get(named(STORAGE_HTTP_CLIENT))) }
     single<NotificationRepository> { NotificationRepositoryImpl(get()) }
     single<PaymentsRepository> { PaymentsRepositoryImpl(get()) }
     single<SupportRepository> { SupportRepositoryImpl(get()) }

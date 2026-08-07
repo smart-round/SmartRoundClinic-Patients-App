@@ -69,6 +69,8 @@ data class PendingFile(
     val contentType: String,
     val bytes: ByteArray,
     val failed: Boolean = false,
+    /** Shown beneath the attachment when it fails, e.g. the file-too-large message. */
+    val errorText: String? = null,
 ) {
     override fun equals(other: Any?) = other is PendingFile && localId == other.localId
     override fun hashCode() = localId.hashCode()
@@ -501,6 +503,13 @@ class ConsultationViewModel(
         )
         pendingFiles.add(pending)
 
+        // Reject oversized files up front rather than spending minutes on a transfer that
+        // the server will refuse anyway. The bubble stays visible carrying the reason.
+        if (bytes.size > Constants.MAX_CHAT_FILE_BYTES) {
+            markFailed(pending, Constants.FILE_TOO_LARGE_MESSAGE)
+            return
+        }
+
         viewModelScope.launch {
             when (val result = consultationRepository.uploadFile(otherUserId, fileName, contentType, bytes)) {
                 is Resource.Success -> {
@@ -560,9 +569,9 @@ class ConsultationViewModel(
         viewModelScope.launch { cancelCallUseCase(otherUserId, callId) }
     }
 
-    private fun markFailed(pending: PendingFile) {
+    private fun markFailed(pending: PendingFile, errorText: String? = null) {
         val idx = pendingFiles.indexOfFirst { it.localId == pending.localId }
-        if (idx >= 0) pendingFiles[idx] = pending.copy(failed = true)
+        if (idx >= 0) pendingFiles[idx] = pending.copy(failed = true, errorText = errorText)
     }
 
     fun disconnect() {
