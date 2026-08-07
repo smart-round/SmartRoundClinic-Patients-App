@@ -3,7 +3,6 @@ package ke.co.smartroundclinic.patient.presentation.signup.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,8 +16,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
@@ -27,26 +24,21 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Photo
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,13 +51,14 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -73,39 +66,13 @@ import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberCameraPickerLauncher
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.readBytes
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import ke.co.smartroundclinic.patient.common.isValidEmail
-import ke.co.smartroundclinic.patient.core.platform.todayDay
-import ke.co.smartroundclinic.patient.core.platform.todayMonth
-import ke.co.smartroundclinic.patient.core.platform.todayYear
-import ke.co.smartroundclinic.patient.generated.resources.Res
 import ke.co.smartroundclinic.patient.presentation.common.composables.PrimaryButton
 import ke.co.smartroundclinic.patient.presentation.signup.SignUpFilesViewModel
 import ke.co.smartroundclinic.patient.presentation.signup.SignUpFormViewModel
 import ke.co.smartroundclinic.patient.presentation.theme.ShapeInput
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import org.jetbrains.compose.resources.ExperimentalResourceApi
-
-@Serializable
-data class CountryCode(val name: String, val dialCode: String, val flag: String)
-
-val defaultCountry = CountryCode("Kenya", "+254", "🇰🇪")
-
-@OptIn(ExperimentalResourceApi::class)
-@Composable
-fun rememberCountryCodes(): List<CountryCode> {
-    var countries by remember { mutableStateOf(listOf(defaultCountry)) }
-    LaunchedEffect(Unit) {
-        runCatching {
-            val bytes = Res.readBytes("files/country_codes.json")
-            countries = Json.decodeFromString(bytes.decodeToString())
-        }
-    }
-    return countries
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,23 +81,19 @@ fun SignUpScreen(
     formViewModel: SignUpFormViewModel,
     onNext: (email: String) -> Unit,
     onSignIn: () -> Unit,
+    onOpenPrivacyPolicy: () -> Unit,
+    onOpenTermsAndConditions: () -> Unit,
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
-    var genderExpanded by remember { mutableStateOf(false) }
-    var showCountryPicker by remember { mutableStateOf(false) }
     var showPhotoPicker by remember { mutableStateOf(false) }
     var showPhotoPreview by remember { mutableStateOf(false) }
-    var countryQuery by remember { mutableStateOf("") }
 
-    val countrySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val photoSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val previewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val emailBivr = remember { BringIntoViewRequester() }
-    val phoneBivr = remember { BringIntoViewRequester() }
     val passwordBivr = remember { BringIntoViewRequester() }
-    val allCountries = rememberCountryCodes()
     val isLoading by formViewModel.isLoading.collectAsStateWithLifecycle()
 
     val galleryLauncher = rememberFilePickerLauncher(type = FileKitType.Image) { file ->
@@ -140,64 +103,12 @@ fun SignUpScreen(
         scope.launch { filesViewModel.profilePictureBytes = file?.readBytes() }
     }
 
-    val genderOptions = listOf("Male", "Female", "Other")
-
-    val filteredCountries = remember(countryQuery, allCountries) {
-        if (countryQuery.isEmpty()) allCountries
-        else allCountries.filter {
-            it.name.contains(countryQuery, ignoreCase = true) || it.dialCode.contains(countryQuery)
-        }
-    }
-
-    val dobError = when {
-        formViewModel.dob.isEmpty() -> null
-        formViewModel.dob.length < 8 -> "Enter a complete date (DD/MM/YYYY)"
-        !formViewModel.dob.isValidDate() -> "Invalid date"
-        !formViewModel.dob.isOldEnough(minAge = 0) -> "Invalid date of birth"
-        else -> null
-    }
     val emailError = if (formViewModel.email.isNotBlank() && !formViewModel.email.isValidEmail()) "Enter a valid email" else null
-    val phoneError = if (formViewModel.phoneNumber.isNotBlank()) {
-        val n = formViewModel.phoneNumber
-        val isKenya = formViewModel.countryDialCode == "+254"
-        when {
-            isKenya && n.length != 9 -> "Enter 9 digits (e.g. 712345678)"
-            isKenya && !n.startsWith("7") && !n.startsWith("1") -> "Number must start with 7 or 1"
-            !isKenya && (n.length < 5 || n.length > 12) -> "Enter a valid phone number"
-            else -> null
-        }
-    } else null
 
     val isFormValid = formViewModel.fullName.isNotBlank() &&
-            formViewModel.gender.isNotBlank() &&
-            formViewModel.dob.length == 8 && formViewModel.dob.isValidDate() &&
             formViewModel.email.isValidEmail() &&
-            formViewModel.phoneNumber.isNotBlank() &&
-            phoneError == null &&
-            formViewModel.password.length >= 8
-
-    if (showCountryPicker) {
-        CountryCodeBottomSheet(
-            sheetState = countrySheetState,
-            query = countryQuery,
-            onQueryChange = { countryQuery = it },
-            countries = filteredCountries,
-            onSelect = { country ->
-                formViewModel.countryDialCode = country.dialCode
-                formViewModel.countryFlag = country.flag
-                formViewModel.countryName = country.name
-                countryQuery = ""
-                scope.launch {
-                    countrySheetState.hide()
-                    showCountryPicker = false
-                }
-            },
-            onDismiss = {
-                showCountryPicker = false
-                countryQuery = ""
-            },
-        )
-    }
+            formViewModel.password.length >= 8 &&
+            formViewModel.agreedToTerms
 
     if (showPhotoPicker) {
         PatientPhotoPickerBottomSheet(
@@ -324,64 +235,6 @@ fun SignUpScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        ExposedDropdownMenuBox(
-            expanded = genderExpanded,
-            onExpandedChange = { genderExpanded = it },
-        ) {
-            OutlinedTextField(
-                value = formViewModel.gender,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Gender", style = MaterialTheme.typography.bodySmall) },
-                trailingIcon = {
-                    Icon(imageVector = Icons.Default.ArrowDropDown, contentDescription = null)
-                },
-                shape = ShapeInput,
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-            )
-            ExposedDropdownMenu(
-                expanded = genderExpanded,
-                onDismissRequest = { genderExpanded = false },
-                containerColor = MaterialTheme.colorScheme.background,
-            ) {
-                genderOptions.forEach { option ->
-                    DropdownMenuItem(
-                        colors = MenuDefaults.itemColors(textColor = MaterialTheme.colorScheme.onBackground),
-                        text = { Text(option, style = MaterialTheme.typography.bodySmall) },
-                        onClick = {
-                            formViewModel.gender = option
-                            genderExpanded = false
-                        },
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = formViewModel.dob,
-            onValueChange = { raw ->
-                if (raw.length <= 8 && raw.all { it.isDigit() }) formViewModel.dob = raw
-            },
-            label = { Text("Date of Birth", style = MaterialTheme.typography.bodySmall) },
-            placeholder = { Text("DD/MM/YYYY", style = MaterialTheme.typography.bodySmall) },
-            isError = dobError != null,
-            visualTransformation = DobVisualTransformation,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Next),
-            shape = ShapeInput,
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (dobError != null) {
-            Text(dobError, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 4.dp, top = 2.dp).fillMaxWidth())
-        }
-
-        Spacer(Modifier.height(12.dp))
-
         OutlinedTextField(
             value = formViewModel.email,
             onValueChange = { formViewModel.email = it },
@@ -398,55 +251,6 @@ fun SignUpScreen(
         )
         if (emailError != null) {
             Text(emailError, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 4.dp, top = 2.dp).fillMaxWidth())
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        Column(modifier = Modifier.bringIntoViewRequester(phoneBivr)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Box(modifier = Modifier.width(130.dp)) {
-                    OutlinedTextField(
-                        value = "${formViewModel.countryFlag} ${formViewModel.countryDialCode}",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Code", style = MaterialTheme.typography.bodySmall) },
-                        trailingIcon = { Icon(Icons.Default.ArrowDropDown, null) },
-                        shape = ShapeInput,
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { showCountryPicker = true },
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                OutlinedTextField(
-                    value = formViewModel.phoneNumber,
-                    onValueChange = { if (it.all { c -> c.isDigit() }) formViewModel.phoneNumber = it },
-                    label = { Text("Phone", style = MaterialTheme.typography.bodySmall) },
-                    placeholder = {
-                        Text(
-                            if (formViewModel.countryDialCode == "+254") "712345678" else "Phone number",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    },
-                    isError = phoneError != null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                    shape = ShapeInput,
-                    singleLine = true,
-                    modifier = Modifier
-                        .weight(1f)
-                        .onFocusChanged { if (it.isFocused) scope.launch { phoneBivr.bringIntoView() } },
-                )
-            }
-            if (phoneError != null) {
-                Text(phoneError, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 4.dp, top = 2.dp).fillMaxWidth())
-            }
         }
 
         Spacer(Modifier.height(12.dp))
@@ -481,6 +285,51 @@ fun SignUpScreen(
             .background(MaterialTheme.colorScheme.background)
             .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
     ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Checkbox(
+                checked = formViewModel.agreedToTerms,
+                onCheckedChange = { formViewModel.agreedToTerms = it },
+                colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary),
+            )
+            Text(
+                text = buildAnnotatedString {
+                    append("I agree to the ")
+                    val termsStart = length
+                    append("Terms and Conditions")
+                    addStyle(
+                        SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline),
+                        termsStart,
+                        length,
+                    )
+                    addLink(
+                        LinkAnnotation.Clickable(tag = "terms_and_conditions") { onOpenTermsAndConditions() },
+                        termsStart,
+                        length,
+                    )
+                    append(" / ")
+                    val privacyStart = length
+                    append("Privacy Policy")
+                    addStyle(
+                        SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline),
+                        privacyStart,
+                        length,
+                    )
+                    addLink(
+                        LinkAnnotation.Clickable(tag = "privacy_policy") { onOpenPrivacyPolicy() },
+                        privacyStart,
+                        length,
+                    )
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
         PrimaryButton(
             onClick = {
                 formViewModel.signUp(
@@ -650,90 +499,3 @@ private fun PhotoPreviewBottomSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun CountryCodeBottomSheet(
-    sheetState: androidx.compose.material3.SheetState,
-    query: String,
-    onQueryChange: (String) -> Unit,
-    countries: List<CountryCode>,
-    onSelect: (CountryCode) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    ModalBottomSheet(sheetState = sheetState, onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                label = { Text("Search", style = MaterialTheme.typography.bodySmall) },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                shape = ShapeInput,
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
-            LazyColumn {
-                items(countries) { country ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(country) }
-                            .padding(vertical = 12.dp, horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(country.flag, style = MaterialTheme.typography.bodyLarge)
-                        Spacer(Modifier.width(8.dp))
-                        Text(country.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                        Text(country.dialCode, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
-    }
-}
-
-private val DobVisualTransformation = VisualTransformation { text ->
-    val digits = text.text
-    val out = StringBuilder()
-    for (i in digits.indices) {
-        out.append(digits[i])
-        if ((i == 1 || i == 3) && i < digits.lastIndex) out.append('/')
-    }
-    val offsetMapping = object : OffsetMapping {
-        override fun originalToTransformed(offset: Int): Int {
-            return when {
-                offset <= 2 -> offset
-                offset <= 4 -> offset + 1
-                else -> offset + 2
-            }.coerceAtMost(out.length)
-        }
-        override fun transformedToOriginal(offset: Int): Int {
-            return when {
-                offset <= 2 -> offset
-                offset <= 5 -> offset - 1
-                else -> offset - 2
-            }.coerceAtMost(digits.length)
-        }
-    }
-    TransformedText(AnnotatedString(out.toString()), offsetMapping)
-}
-
-private fun String.isValidDate(): Boolean {
-    if (length != 8) return false
-    val day = substring(0, 2).toIntOrNull() ?: return false
-    val month = substring(2, 4).toIntOrNull() ?: return false
-    val year = substring(4, 8).toIntOrNull() ?: return false
-    return day in 1..31 && month in 1..12 && year in 1900..todayYear()
-}
-
-private fun String.isOldEnough(minAge: Int = 0): Boolean {
-    if (length != 8) return false
-    val day = substring(0, 2).toIntOrNull() ?: return false
-    val month = substring(2, 4).toIntOrNull() ?: return false
-    val year = substring(4, 8).toIntOrNull() ?: return false
-    val currentYear = todayYear()
-    val currentMonth = todayMonth()
-    val currentDay = todayDay()
-    val age = currentYear - year - if (month > currentMonth || (month == currentMonth && day > currentDay)) 1 else 0
-    return age >= minAge
-}

@@ -16,8 +16,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.retain.retain
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -27,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import ke.co.smartroundclinic.patient.core.legal.PrivacyPolicyScreen
+import ke.co.smartroundclinic.patient.core.legal.TermsAndConditionsScreen
 import ke.co.smartroundclinic.patient.generated.resources.Res
 import ke.co.smartroundclinic.patient.generated.resources.top_appbar_logo
 import ke.co.smartroundclinic.patient.presentation.signup.destinations.AccountVerification
@@ -46,9 +52,12 @@ fun SignUpRoot(
     val filesViewModel: SignUpFilesViewModel = koinViewModel()
     val formViewModel: SignUpFormViewModel = koinViewModel()
     val backStack = retain { mutableStateListOf<NavKey>(SignUp) }
+    var showPrivacyPolicy by remember { mutableStateOf(false) }
+    var showTermsAndConditions by remember { mutableStateOf(false) }
 
+    Box(modifier = modifier.fillMaxSize()) {
     Scaffold(
-        modifier = modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
                 modifier = Modifier.wrapContentHeight(),
@@ -121,6 +130,8 @@ fun SignUpRoot(
                                 backStack.remove(SignUp)
                             },
                             onSignIn = onSignIn,
+                            onOpenPrivacyPolicy = { showPrivacyPolicy = true },
+                            onOpenTermsAndConditions = { showTermsAndConditions = true },
                         )
                     }
                     entry<AccountVerification> { dest ->
@@ -134,5 +145,13 @@ fun SignUpRoot(
                 }
             )
         }
+    }
+
+    if (showPrivacyPolicy) {
+        PrivacyPolicyScreen(onBack = { showPrivacyPolicy = false })
+    }
+    if (showTermsAndConditions) {
+        TermsAndConditionsScreen(onBack = { showTermsAndConditions = false })
+    }
     }
 }

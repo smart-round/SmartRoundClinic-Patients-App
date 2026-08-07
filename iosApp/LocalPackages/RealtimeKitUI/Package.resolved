@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "RealtimeKit",
+        "repositoryURL": "https://github.com/cloudflare/realtimekit-ios-core.git",
+        "state": {
+          "branch": null,
+          "revision": "572d0f4a4b4dd174d69cd9d9d12383cb894d60d6",
+          "version": "2.1.0"
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -15,6 +15,7 @@ junit = "4.13.2"
 kotlin = "2.3.21"
 material3 = "1.10.0-alpha05"
 richeditorCompose = "1.0.0-rc14"
+composeWebview = "2.0.3"
 room = "2.8.4"
 sqlite = "2.6.2"
 ksp = "2.3.7"
@@ -96,6 +97,7 @@ napier = { module = "io.github.aakira:napier", version.ref = "napier"}
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 richeditor-compose = { module = "com.mohamedrejeb.richeditor:richeditor-compose", version.ref = "richeditorCompose" }
 kmpnotifier = { module = "io.github.mirzemehdi:kmpnotifier", version.ref = "kmpnotifier" }
+compose-webview = { module = "io.github.kevinnzou:compose-webview-multiplatform", version.ref = "composeWebview" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

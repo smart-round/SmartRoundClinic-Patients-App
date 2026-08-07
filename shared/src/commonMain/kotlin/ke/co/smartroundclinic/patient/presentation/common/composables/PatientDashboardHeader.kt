@@ -143,8 +143,8 @@ fun PatientDashboardHeader(
             if (isGreeting) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Your health, seamlessly\nmanaged in one place.",
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    text = "Your health, seamlessly managed in one place.",
+                    style = MaterialTheme.typography.bodySmall,
                     color = Color.White,
                 )
             }

@@ -109,6 +109,7 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.richeditor.compose)
             implementation(libs.coil.svg)
+            implementation(libs.compose.webview)
             api(libs.kmpnotifier)
         }
         commonTest.dependencies {

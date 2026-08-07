@@ -64,6 +64,12 @@ class SignInViewModel(
                     }
                 }
                 is Resource.Error -> {
+                    if (result.data?.verificationStatus?.uppercase() == "UNVERIFIED") {
+                        snackbarController.show(result.message ?: "Account not verified. Please check your email for the OTP code.", isError = true)
+                        _isSigningIn.value = false
+                        onUnverified(email)
+                        return@launch
+                    }
                     snackbarController.show(result.message ?: "Sign in failed", isError = true)
                     _isSigningIn.value = false
                 }

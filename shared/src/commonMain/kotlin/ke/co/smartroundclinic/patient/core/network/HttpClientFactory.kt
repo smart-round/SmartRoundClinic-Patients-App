@@ -22,9 +22,9 @@ import kotlinx.serialization.json.Json
 internal fun buildHttpClient(engine: HttpClientEngine, tokenProvider: () -> String? = { null }): HttpClient = HttpClient(engine) {
     install(WebSockets)
     install(HttpTimeout) {
-        requestTimeoutMillis = 120_000L
-        connectTimeoutMillis = 120_000L
-        socketTimeoutMillis = 120_000L
+        requestTimeoutMillis = 30_000L
+        connectTimeoutMillis = 15_000L
+        socketTimeoutMillis = 30_000L
     }
     install(ContentNegotiation) {
         json(Json {

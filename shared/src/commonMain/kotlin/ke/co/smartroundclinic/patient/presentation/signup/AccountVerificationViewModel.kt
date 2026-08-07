@@ -30,9 +30,26 @@ class AccountVerificationViewModel(
     val resendCooldown = _resendCooldown.asStateFlow()
 
     private var cooldownJob: Job? = null
+    private var hasSentInitialCode = false
 
-    init {
-        startCooldown()
+    /**
+     * Fires once per screen entry (guarded by [hasSentInitialCode]) so navigating here — either
+     * right after signup or when an unverified login gets redirected here — always requests a
+     * fresh OTP rather than relying on one that may already be stale or was never sent.
+     */
+    fun sendInitialCode(email: String) {
+        if (hasSentInitialCode) return
+        hasSentInitialCode = true
+        viewModelScope.launch {
+            _isResending.value = true
+            startCooldown()
+            when (val result = resendAccountUseCase(email)) {
+                is Resource.Success -> Unit
+                is Resource.Error -> snackbarController.show(result.message ?: "Failed to send verification code", isError = true)
+                is Resource.Loading -> Unit
+            }
+            _isResending.value = false
+        }
     }
 
     fun verify(email: String, otpCode: String, onSuccess: () -> Unit) {

@@ -13,7 +13,7 @@ android {
         applicationId = "ke.co.smartroundclinic.patient"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 6
+        versionCode = 17
         versionName = "1.0"
     }
     packaging {
@@ -26,6 +26,7 @@ android {
             isMinifyEnabled = false
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21

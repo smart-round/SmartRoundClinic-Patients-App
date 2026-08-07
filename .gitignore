@@ -22,3 +22,11 @@ node_modules/
 *.aab
 *.apk
 androidApp/release/
+
+# JVM crash dumps
+hs_err_pid*.log
+replay_pid*.log
+
+# Swift Package Manager build cache for locally-vendored packages (847MB of
+# generated output — Package.resolved is tracked, the cache is not)
+iosApp/LocalPackages/**/.build/

@@ -42,12 +42,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,6 +75,7 @@ import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 import ke.co.smartroundclinic.patient.presentation.theme.Primary90
 import ke.co.smartroundclinic.patient.presentation.theme.Primary95
 import ke.co.smartroundclinic.patient.presentation.theme.ShapeInput
+import ke.co.smartroundclinic.patient.presentation.theme.SnackbarError
 import ke.co.smartroundclinic.patient.presentation.theme.Tertiary40
 import ke.co.smartroundclinic.patient.presentation.theme.Tertiary90
 
@@ -82,11 +89,35 @@ private val heightOptions = listOf("CM" to "cm", "INCHES" to "in")
 fun MedicalBioScreen(
     viewModel: MedicalBioViewModel,
     onBack: () -> Unit,
+    onNavigateToPersonalInfo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(viewModel.missingInfoMessage) {
+        val message = viewModel.missingInfoMessage ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = message,
+            actionLabel = "Go to Profile",
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) onNavigateToPersonalInfo()
+        viewModel.dismissMissingInfoPrompt()
+    }
+
     Scaffold(
         modifier = modifier,
         contentWindowInsets = WindowInsets(0),
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = SnackbarError,
+                    contentColor = Color.White,
+                    actionColor = Color.White,
+                )
+            }
+        },
         topBar = {
             TopAppBar(
                 navigationIcon = {

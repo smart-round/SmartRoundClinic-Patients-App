@@ -50,6 +50,14 @@ class MedicalBioViewModel(
     var hasExistingProfile by mutableStateOf(false)
         private set
 
+    // Phone/DOB/gender are no longer collected at sign-up, so a first-time save() here can find
+    // them missing. Surfaced as a one-shot prompt (rather than a plain snackbarController.show)
+    // so the screen can offer a "Go to Profile" action instead of a dead end.
+    var missingInfoMessage by mutableStateOf<String?>(null)
+        private set
+
+    fun dismissMissingInfoPrompt() { missingInfoMessage = null }
+
     init {
         load()
     }
@@ -131,16 +139,14 @@ class MedicalBioViewModel(
                 val user = userLocalRepository.observeUser().first()
                 val phoneNumber = user?.phoneNumber
                 val dateOfBirth = user?.dateOfBirth
+                val gender = user?.gender
                 when {
                     user == null -> {
                         snackbarController.show("Could not load your profile. Please try again.", isError = true)
                         null
                     }
-                    phoneNumber.isNullOrBlank() || dateOfBirth.isNullOrBlank() -> {
-                        snackbarController.show(
-                            "Please add your phone number and date of birth in your profile first",
-                            isError = true,
-                        )
+                    phoneNumber.isNullOrBlank() || dateOfBirth.isNullOrBlank() || gender.isNullOrBlank() -> {
+                        missingInfoMessage = "Please add your phone number, date of birth, and gender in your profile first"
                         null
                     }
                     bloodGroup.isBlank() -> {
@@ -148,7 +154,7 @@ class MedicalBioViewModel(
                         null
                     }
                     else -> createPersonalInformationUseCase(
-                        gender = user.gender,
+                        gender = gender,
                         phoneNumber = phoneNumber,
                         countryCode = DEFAULT_COUNTRY_CODE,
                         bloodGroup = bloodGroup,

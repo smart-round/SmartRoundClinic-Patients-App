@@ -18,14 +18,9 @@ class SignUpFormViewModel(
 ) : ViewModel() {
 
     var fullName by mutableStateOf("")
-    var gender by mutableStateOf("")
-    var dob by mutableStateOf("")
     var email by mutableStateOf("")
-    var phoneNumber by mutableStateOf("")
-    var countryDialCode by mutableStateOf("+254")
-    var countryFlag by mutableStateOf("🇰🇪")
-    var countryName by mutableStateOf("Kenya")
     var password by mutableStateOf("")
+    var agreedToTerms by mutableStateOf(false)
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
@@ -33,17 +28,10 @@ class SignUpFormViewModel(
     fun signUp(profilePictureBytes: ByteArray?, onSuccess: (email: String) -> Unit) {
         viewModelScope.launch {
             _isLoading.value = true
-            val rawDob = dob
-            val formattedDob = if (rawDob.length == 8) {
-                "${rawDob.substring(4, 8)}-${rawDob.substring(2, 4)}-${rawDob.substring(0, 2)}"
-            } else rawDob
             when (val result = signUpUseCase(
                 fullName = fullName,
                 email = email,
                 password = password,
-                gender = gender.uppercase(),
-                phoneNumber = "$countryDialCode$phoneNumber",
-                dateOfBirth = formattedDob,
                 profilePictureBytes = profilePictureBytes,
             )) {
                 is Resource.Success -> {

@@ -178,14 +178,14 @@ private fun DoctorProfileHeader(doctor: Doctor, onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(260.dp),
+            .fillMaxHeight(0.4f),
     ) {
         if (doctor.profilePicture != null) {
             AsyncImage(
                 model = doctor.profilePicture,
                 contentDescription = doctor.name,
-                contentScale = ContentScale.Crop,
-                alignment = Alignment.TopCenter,
+                contentScale = ContentScale.FillHeight,
+                alignment = Alignment.Center,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {

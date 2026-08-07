@@ -35,9 +35,6 @@ class AuthRepositoryImpl(private val client: HttpClient) : AuthRepository {
         fullName: String,
         email: String,
         password: String,
-        gender: String,
-        phoneNumber: String,
-        dateOfBirth: String,
         profilePictureBytes: ByteArray?,
     ): Resource<SuccessRes> = withContext(Dispatchers.IO) {
         try {
@@ -49,9 +46,6 @@ class AuthRepositoryImpl(private val client: HttpClient) : AuthRepository {
                             append("fullName", fullName)
                             append("email", email)
                             append("password", password)
-                            if (gender.isNotBlank()) append("gender", gender)
-                            if (phoneNumber.isNotBlank()) append("phoneNumber", phoneNumber)
-                            if (dateOfBirth.isNotBlank()) append("dateOfBirth", dateOfBirth)
                             if (profilePictureBytes != null) {
                                 append(
                                     key = "file",
@@ -109,7 +103,7 @@ class AuthRepositoryImpl(private val client: HttpClient) : AuthRepository {
             val response = client.post("auth/user/sign-in") {
                 setBody(SignInReq(email = email, password = password))
             }.body<SignInRes>()
-            if (!response.status) return@withContext Resource.Error(message = response.message, data = null)
+            if (!response.status) return@withContext Resource.Error(message = response.message, data = response.toDomain())
             Resource.Success(data = response.toDomain(), message = response.message)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "An unknown error occurred")
