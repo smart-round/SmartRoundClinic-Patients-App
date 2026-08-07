@@ -96,6 +96,14 @@ val StatusConfirmed = Tertiary40
 val CardBackground  = Color(0xFFFEFAF8)
 val SearchBarOverlay = Color(0xFF1C1B1B).copy(alpha = 0.21f)
 
+// Referral cards — the card surface and left accent bar are tinted by referral status.
+// Pending reuses CardBackground / Primary40.
+val ReferralAcceptedSurface = Color(0xFFF4FBF3)
+val ReferralAcceptedAccent  = Color(0xFF0E9800)
+val ReferralDeclinedSurface = Color(0xFFF8E7E7)
+val ReferralDeclinedAccent  = Color(0xFFFF0000)
+val ReferralDeclineAction   = Color(0xFFEA1D25)
+
 val ServiceTileColors = listOf(
     Color(0xFFFFE4CC), // soft peach
     Color(0xFFD4EDFF), // sky blue

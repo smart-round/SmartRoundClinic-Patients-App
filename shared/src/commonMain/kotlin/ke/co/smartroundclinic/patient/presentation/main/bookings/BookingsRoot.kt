@@ -1,5 +1,6 @@
 package ke.co.smartroundclinic.patient.presentation.main.bookings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -14,11 +15,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -32,6 +35,8 @@ import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -59,10 +64,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
@@ -85,10 +96,18 @@ import ke.co.smartroundclinic.patient.presentation.main.bookings.destinations.Bo
 import ke.co.smartroundclinic.patient.presentation.main.bookings.destinations.BookingsList
 import ke.co.smartroundclinic.patient.presentation.main.bookings.destinations.RebookFromBookings
 import ke.co.smartroundclinic.patient.presentation.common.composables.PatientDashboardHeader
+import ke.co.smartroundclinic.patient.presentation.theme.ButtonGradientEnd
+import ke.co.smartroundclinic.patient.presentation.theme.ButtonGradientStart
 import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
+import ke.co.smartroundclinic.patient.presentation.theme.Neutral20
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
+import ke.co.smartroundclinic.patient.presentation.theme.ReferralAcceptedAccent
+import ke.co.smartroundclinic.patient.presentation.theme.ReferralAcceptedSurface
+import ke.co.smartroundclinic.patient.presentation.theme.ReferralDeclineAction
+import ke.co.smartroundclinic.patient.presentation.theme.ReferralDeclinedAccent
+import ke.co.smartroundclinic.patient.presentation.theme.ReferralDeclinedSurface
 import ke.co.smartroundclinic.patient.presentation.theme.ShapeCard
 import ke.co.smartroundclinic.patient.presentation.theme.ShapePill
 import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
@@ -408,6 +427,9 @@ private fun ReferralsTab(onBookReferredDoctor: (Doctor, String?) -> Unit) {
     }
 }
 
+private val ReferralButtonShape = RoundedCornerShape(5.dp)
+private val ReferralButtonHeight = 32.dp
+
 @Composable
 private fun ReferralCard(
     referral: Referral,
@@ -416,96 +438,183 @@ private fun ReferralCard(
     onDecline: () -> Unit,
     onBookDoctor: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = ShapeCard,
-        colors = CardDefaults.cardColors(containerColor = CardBackground),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    // Surface and left accent bar are tinted by status: cream/orange while the referral is
+    // still awaiting an answer, green once accepted, red once declined.
+    val (surface, accent) = when (referral.status) {
+        ReferralStatus.ACCEPTED -> ReferralAcceptedSurface to ReferralAcceptedAccent
+        ReferralStatus.DECLINED -> ReferralDeclinedSurface to ReferralDeclinedAccent
+        else -> CardBackground to Primary40
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .clip(ShapeCard)
+            .background(surface),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ReferralDoctorAvatar(picture = referral.referringDoctorPicture, size = 40)
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
+        Box(
+            modifier = Modifier
+                .width(7.dp)
+                .fillMaxHeight()
+                .background(accent),
+        )
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 21.dp, end = 10.dp, top = 13.dp, bottom = 12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.Top) {
+                ReferralDoctorAvatar(picture = referral.referringDoctorPicture, size = 47)
+                Spacer(Modifier.width(13.dp))
+                Box(
+                    modifier = Modifier.weight(1f).heightIn(min = 47.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
                     Text(
-                        text = "Dr. ${referral.referringDoctorName ?: "Unknown"} referred you",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        text = "${referral.referringDoctorName?.let { formatDoctorName(it) } ?: "A doctor"} Referred You",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = Neutral20,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
+                Spacer(Modifier.width(8.dp))
                 ReferralStatusBadge(status = referral.status)
             }
 
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 60.dp),
+            ) {
                 ReferralDoctorAvatar(picture = referral.receivingDoctorPicture, size = 28)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "to Dr. ${referral.receivingDoctorName ?: "a specialist"}",
+                    text = buildAnnotatedString {
+                        append("To ")
+                        withStyle(SpanStyle(color = Primary40)) {
+                            append(referral.receivingDoctorName?.let { formatDoctorName(it) } ?: "a specialist")
+                        }
+                    },
                     style = MaterialTheme.typography.bodySmall,
-                    color = Primary40,
+                    color = Neutral20,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
 
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = referral.reason,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(18.dp))
             when (referral.status) {
                 ReferralStatus.PENDING -> {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedButton(
-                            onClick = onDecline,
-                            enabled = !isProcessing,
-                            modifier = Modifier.weight(1f),
-                            shape = ShapePill,
-                            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
-                        ) {
-                            Text("Decline", style = MaterialTheme.typography.labelMedium)
-                        }
-                        androidx.compose.material3.Button(
+                    Row(
+                        modifier = Modifier.widthIn(max = 288.dp).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        ReferralFilledButton(
+                            text = "Accept & Book",
                             onClick = onAcceptAndBook,
                             enabled = !isProcessing,
+                            showProgress = isProcessing,
+                            container = ReferralAcceptedAccent,
                             modifier = Modifier.weight(1f),
-                            shape = ShapePill,
-                        ) {
-                            if (isProcessing) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
-                            } else {
-                                Text("Accept & Book", style = MaterialTheme.typography.labelMedium)
-                            }
-                        }
+                        )
+                        ReferralOutlinedButton(
+                            text = "Decline Referral",
+                            onClick = onDecline,
+                            enabled = !isProcessing,
+                            showProgress = false,
+                            brush = SolidColor(ReferralDeclineAction),
+                            progressColor = ReferralDeclineAction,
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
                 else -> {
                     // Already responded to — accepting/declining doesn't block booking, so a
                     // patient who changes their mind can still go book with this doctor.
-                    OutlinedButton(
-                        onClick = onBookDoctor,
-                        enabled = !isProcessing,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = ShapePill,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Primary40),
-                    ) {
-                        if (isProcessing) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Primary40)
-                        } else {
-                            Text(
-                                text = if (referral.status == ReferralStatus.ACCEPTED) "Book Now" else "Book Anyway",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Primary40,
-                            )
-                        }
+                    val isAccepted = referral.status == ReferralStatus.ACCEPTED
+                    val brush = if (isAccepted) {
+                        SolidColor(ReferralAcceptedAccent)
+                    } else {
+                        Brush.verticalGradient(listOf(ButtonGradientStart, ButtonGradientEnd))
+                    }
+                    Row(modifier = Modifier.widthIn(max = 136.dp).fillMaxWidth()) {
+                        ReferralOutlinedButton(
+                            text = if (isAccepted) "Book Again" else "Book Now",
+                            onClick = onBookDoctor,
+                            enabled = !isProcessing,
+                            showProgress = isProcessing,
+                            brush = brush,
+                            progressColor = if (isAccepted) ReferralAcceptedAccent else Primary40,
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
             }
         }
     }
 }
+
+@Composable
+private fun ReferralFilledButton(
+    text: String,
+    onClick: () -> Unit,
+    enabled: Boolean,
+    showProgress: Boolean,
+    container: Color,
+    modifier: Modifier = Modifier,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(ReferralButtonHeight),
+        shape = ReferralButtonShape,
+        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = Color.White),
+        contentPadding = PaddingValues(horizontal = 8.dp),
+    ) {
+        if (showProgress) {
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+        } else {
+            Text(text, style = referralButtonTextStyle(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun ReferralOutlinedButton(
+    text: String,
+    onClick: () -> Unit,
+    enabled: Boolean,
+    showProgress: Boolean,
+    brush: Brush,
+    progressColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(ReferralButtonHeight),
+        shape = ReferralButtonShape,
+        border = BorderStroke(1.dp, brush),
+        contentPadding = PaddingValues(horizontal = 8.dp),
+    ) {
+        if (showProgress) {
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = progressColor)
+        } else {
+            Text(
+                text = text,
+                style = referralButtonTextStyle().copy(brush = brush),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun referralButtonTextStyle() =
+    MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
 
 @Composable
 private fun ReferralDoctorAvatar(picture: String?, size: Int) {
@@ -531,20 +640,20 @@ private fun ReferralDoctorAvatar(picture: String?, size: Int) {
 
 @Composable
 private fun ReferralStatusBadge(status: ReferralStatus) {
-    val (bg, fg, label) = when (status) {
-        ReferralStatus.ACCEPTED -> Triple(StatusConfirmed.copy(alpha = 0.15f), StatusConfirmed, "Accepted")
-        ReferralStatus.DECLINED -> Triple(StatusSuspended.copy(alpha = 0.15f), StatusSuspended, "Declined")
-        else -> Triple(StatusPending.copy(alpha = 0.15f), StatusPending, "Pending")
+    val (color, label) = when (status) {
+        ReferralStatus.ACCEPTED -> ReferralAcceptedAccent to "Accepted"
+        ReferralStatus.DECLINED -> ReferralDeclinedAccent to "Declined"
+        else -> Primary40 to "Pending"
     }
     Box(
         modifier = Modifier
-            .background(bg, RoundedCornerShape(20.dp))
+            .background(color.copy(alpha = 0.15f), ShapePill)
             .padding(horizontal = 10.dp, vertical = 3.dp),
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-            color = fg,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, letterSpacing = 0.2.sp),
+            color = color,
         )
     }
 }
