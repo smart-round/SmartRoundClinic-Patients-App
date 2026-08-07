@@ -44,9 +44,13 @@ data class StkPushResult(
     val currency: String,
 )
 
-// Persisted client-side (DataStore) from the moment an STK push completes until the
-// resulting booking returns 201, so a killed/backgrounded app can resume the retry
-// flow on next launch instead of losing track of a payment the patient already made.
+// Persisted client-side (DataStore) from the moment an STK push is *initiated* until the
+// resulting booking returns 201, so a killed/backgrounded app — or one whose payment sheet
+// was simply closed — can resume instead of losing track of a payment the patient made.
+//
+// Persisting only from payment completion used to leave a hole: M-Pesa could debit before
+// the 3s poll observed it, and closing the sheet in that window discarded the booking with
+// no record, so the patient paid again for a slot that still looked free.
 @Serializable
 data class PendingBookingPayment(
     val doctorId: String,
@@ -55,6 +59,12 @@ data class PendingBookingPayment(
     val transactionRef: String,
     val invoiceId: String? = null,
     val referralId: String? = null,
+    /**
+     * False while the STK push is still in flight, true once the invoice is confirmed
+     * COMPLETE. Only a paid record may drive "you've already paid" UI — see
+     * [ServicesViewModel.pendingBookingPayment], which is exposed only when this is true.
+     */
+    val paid: Boolean = false,
 )
 
 private const val ALREADY_RATED_MESSAGE = "You have already rated this appointment"
@@ -148,9 +158,15 @@ class ServicesViewModel(
 
     // Non-null from the moment a payment completes until its booking succeeds (201) or the
     // transactionRef is confirmed spent (409). Retryable — the "book" CTA reuses this ref
-    // instead of starting a new STK push while it's set.
+    // instead of starting a new STK push while it's set. Only ever holds a *paid* record;
+    // an in-flight, not-yet-confirmed payment lives in [inFlightPayment] so it can't make
+    // the UI claim the patient has already paid.
     var pendingBookingPayment by mutableStateOf<PendingBookingPayment?>(null)
         private set
+
+    // The payment currently being attempted, paid or not. Persisted to DataStore from
+    // initiation so a closed sheet or a killed app can still recover the booking.
+    private var inFlightPayment: PendingBookingPayment? = null
 
     var appointmentDetail by mutableStateOf<Appointment?>(null)
         private set
@@ -267,6 +283,19 @@ class ServicesViewModel(
                         amount = data.amount,
                         currency = data.currency,
                     )
+                    // Record the intent *before* the patient can be debited, so closing the
+                    // sheet or losing the process can never strand a paid-for booking.
+                    persistPendingBookingPayment(
+                        PendingBookingPayment(
+                            doctorId = doctorId,
+                            date = date,
+                            slotStart = slotStart,
+                            transactionRef = data.transactionRef,
+                            invoiceId = data.invoiceId,
+                            referralId = referralId,
+                            paid = false,
+                        ),
+                    )
                     startPolling(data.invoiceId)
                 }
                 is Resource.Error -> {
@@ -291,12 +320,11 @@ class ServicesViewModel(
                         stkPollState = state
                         when (state) {
                             "COMPLETE" -> {
-                                val transactionRef = stkPushData?.transactionRef
                                 stkPushData = null
                                 // Wait for the IntaSend webhook to update the backend DB
                                 // before booking; without this the booking returns 402 PENDING.
                                 delay(2_000)
-                                confirmBookingAfterPayment(transactionRef, invoiceId)
+                                confirmBookingAfterPayment(invoiceId)
                                 return@launch
                             }
                             "FAILED" -> {
@@ -304,6 +332,9 @@ class ServicesViewModel(
                                     ?: "Payment was not completed. Please try again."
                                 stkError = reason
                                 snackbarController.show(reason, isError = true)
+                                // Definitively not paid — drop the record so it isn't
+                                // resumed on next launch.
+                                clearPendingBookingPayment()
                                 return@launch
                             }
                         }
@@ -319,15 +350,28 @@ class ServicesViewModel(
         }
     }
 
-    private fun confirmBookingAfterPayment(transactionRef: String?, invoiceId: String?) {
-        val doctorId = pendingDoctorId ?: return
-        val date = pendingDate ?: return
-        val slot = pendingSlot ?: return
-        val ref = transactionRef ?: return
+    /**
+     * Promotes the in-flight payment to paid and books against it. Everything is sourced from
+     * [inFlightPayment] rather than the sheet's transient state, so this still works when the
+     * payment sheet has already been dismissed.
+     */
+    private fun confirmBookingAfterPayment(invoiceId: String?) {
+        val pending = inFlightPayment ?: return
         viewModelScope.launch {
-            persistPendingBookingPayment(doctorId, date, slot, ref, invoiceId, pendingReferralIdForBooking)
-            attemptBooking(doctorId, date, slot, ref, pendingReferralIdForBooking)
+            val paid = pending.copy(invoiceId = invoiceId ?: pending.invoiceId, paid = true)
+            persistPendingBookingPayment(paid)
+            attemptBooking(paid.doctorId, paid.date, paid.slotStart, paid.transactionRef, paid.referralId)
         }
+    }
+
+    /**
+     * Re-checks any payment left in flight — a sheet closed mid-payment, or an app killed
+     * between the M-Pesa debit and the booking call. Safe to call repeatedly; [attemptBooking]
+     * treats a spent transactionRef as terminal, so it cannot double-book.
+     */
+    fun resumePendingBookingIfAny() {
+        if (isBooking) return
+        viewModelScope.launch { resumePendingBookingPayment() }
     }
 
     /**
@@ -342,7 +386,7 @@ class ServicesViewModel(
         pendingSlot = slot
         pendingReferralIdForBooking = pending.referralId
         viewModelScope.launch {
-            persistPendingBookingPayment(pending.doctorId, date, slot, pending.transactionRef, pending.invoiceId, pending.referralId)
+            persistPendingBookingPayment(pending.copy(date = date, slotStart = slot))
             attemptBooking(pending.doctorId, date, slot, pending.transactionRef, pending.referralId)
         }
     }
@@ -362,7 +406,9 @@ class ServicesViewModel(
             setKeyUseCase(PENDING_BOOKING_PAYMENT_KEY, null)
             return
         }
-        pendingBookingPayment = pending
+        inFlightPayment = pending
+        // Only a confirmed-paid record may drive the "you've already paid" UI.
+        pendingBookingPayment = pending.takeIf { it.paid }
         pendingDoctorId = pending.doctorId
         pendingDate = pending.date
         pendingSlot = pending.slotStart
@@ -371,18 +417,22 @@ class ServicesViewModel(
         val invoiceId = pending.invoiceId
         if (invoiceId == null) {
             // Persisted before invoiceId was tracked — fall back to the old blind-retry behavior.
-            attemptBooking(pending.doctorId, pending.date, pending.slotStart, pending.transactionRef, pending.referralId)
+            markPaidAndBook(pending)
             return
         }
         when (val result = getStkPushStatusUseCase(invoiceId)) {
             is Resource.Success -> {
                 when (result.data?.invoice?.state?.uppercase()) {
-                    "COMPLETE" -> attemptBooking(pending.doctorId, pending.date, pending.slotStart, pending.transactionRef, pending.referralId)
+                    "COMPLETE" -> markPaidAndBook(pending)
                     "FAILED" -> {
                         val reason = result.data?.invoice?.failedReason
                             ?: "Payment was not completed. Please try again."
-                        bookingError = reason
-                        snackbarController.show(reason, isError = true)
+                        // Only worth interrupting the patient if they were watching this
+                        // payment; a stale record recovered on a later launch just goes away.
+                        if (pending.paid) {
+                            bookingError = reason
+                            snackbarController.show(reason, isError = true)
+                        }
                         clearPendingBookingPayment()
                         pendingDoctorId = null
                         pendingDate = null
@@ -392,24 +442,27 @@ class ServicesViewModel(
                     else -> startPolling(invoiceId) // still PENDING/PROCESSING at IntaSend — keep waiting
                 }
             }
-            else -> attemptBooking(pending.doctorId, pending.date, pending.slotStart, pending.transactionRef, pending.referralId)
+            // Couldn't reach IntaSend — assume the optimistic case rather than stranding a
+            // payment; a genuinely unpaid ref just fails the booking harmlessly.
+            else -> markPaidAndBook(pending)
         }
     }
 
-    private suspend fun persistPendingBookingPayment(
-        doctorId: String,
-        date: String,
-        slotStart: String,
-        transactionRef: String,
-        invoiceId: String? = null,
-        referralId: String? = null,
-    ) {
-        val pending = PendingBookingPayment(doctorId, date, slotStart, transactionRef, invoiceId, referralId)
-        pendingBookingPayment = pending
+    private suspend fun markPaidAndBook(pending: PendingBookingPayment) {
+        val paid = pending.copy(paid = true)
+        persistPendingBookingPayment(paid)
+        attemptBooking(paid.doctorId, paid.date, paid.slotStart, paid.transactionRef, paid.referralId)
+    }
+
+    private suspend fun persistPendingBookingPayment(pending: PendingBookingPayment) {
+        inFlightPayment = pending
+        // The UI's "already paid" affordances must never fire on an unconfirmed payment.
+        pendingBookingPayment = pending.takeIf { it.paid }
         setKeyUseCase(PENDING_BOOKING_PAYMENT_KEY, Json.encodeToString(pending))
     }
 
     private suspend fun clearPendingBookingPayment() {
+        inFlightPayment = null
         pendingBookingPayment = null
         setKeyUseCase(PENDING_BOOKING_PAYMENT_KEY, null)
     }
@@ -476,14 +529,23 @@ class ServicesViewModel(
         isBooking = false
     }
 
+    /**
+     * Closes the payment sheet. The sheet is only a window onto the payment — dismissing it
+     * must not abandon money that may already have left the patient's account, so while a
+     * payment is in flight the poller keeps running and the persisted record stays put. The
+     * booking then completes in the background, and a cold start can still recover it.
+     */
     fun dismissStkPush() {
-        pollJob?.cancel()
         stkPushData = null
         stkError = null
         stkPollState = null
-        pendingDoctorId = null
-        pendingDate = null
-        pendingSlot = null
+        if (inFlightPayment == null) {
+            pollJob?.cancel()
+            pendingDoctorId = null
+            pendingDate = null
+            pendingSlot = null
+            pendingReferralIdForBooking = null
+        }
     }
 
     fun clearBookingState() {

@@ -148,6 +148,9 @@ fun BookingsRoot(
         onBack = { backStack.removeLastOrNull() },
         entryProvider = entryProvider {
             entry<BookingsList> {
+                // Opening Bookings is exactly what a patient does when a paid-for booking
+                // seems to have vanished — re-check any payment still awaiting its booking.
+                LaunchedEffect(Unit) { servicesVm.resumePendingBookingIfAny() }
                 BookingsListScreen(
                     onAppointmentClick = { backStack.add(BookingAppointmentDetail(it)) },
                     onProfileClick = onProfileClick,
