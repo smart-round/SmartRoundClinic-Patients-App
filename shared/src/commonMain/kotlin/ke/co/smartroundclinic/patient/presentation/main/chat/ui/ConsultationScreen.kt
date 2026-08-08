@@ -708,7 +708,8 @@ private fun FileViewerSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         dragHandle = null,
         containerColor = if (isImage || isVideo) Color.Black else MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxHeight(0.94f).statusBarsPadding(),
+        // Media fills the screen edge to edge; documents keep the inset sheet.
+        modifier = if (isImage || isVideo) Modifier.fillMaxSize() else Modifier.fillMaxHeight(0.94f).statusBarsPadding(),
     ) {
         if (isVideo) {
             // Plays in-app, same as photos open in-app, rather than handing off to the OS.
@@ -723,6 +724,7 @@ private fun FileViewerSheet(
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
                         .background(Color.Black.copy(alpha = 0.5f))
+                        .statusBarsPadding()
                         .padding(horizontal = 4.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -755,6 +757,7 @@ private fun FileViewerSheet(
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
                         .background(Color.Black.copy(alpha = 0.5f))
+                        .statusBarsPadding()
                         .padding(horizontal = 4.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
