@@ -94,6 +94,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Fullscreen
+import chaintech.videoplayer.model.VideoPlayerConfig
+import chaintech.videoplayer.ui.preview.VideoPreviewComposable
 import chaintech.videoplayer.host.MediaPlayerHost
 import chaintech.videoplayer.ui.video.VideoPlayerComposable
 import coil3.compose.AsyncImage
@@ -1077,16 +1081,28 @@ private fun FileBubble(
         bottomEnd = if (fromMe) 4.dp else 18.dp,
     )
 
+    val isVideo = kind == AttachmentKind.VIDEO
+
     Box(
         modifier = Modifier
             .widthIn(max = 260.dp)
             .clip(shape)
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-            ) { onFileClick(file) },
+            .then(
+                // Video plays in place, so it owns its own gestures rather than the whole
+                // bubble opening the full-screen viewer on any tap.
+                if (isVideo) Modifier else Modifier.clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                ) { onFileClick(file) },
+            ),
     ) {
-        if (isImage) {
+        if (isVideo) {
+            InlineVideoBubble(
+                url = file.url,
+                timestamp = formatTime(message.createdAt),
+                onExpand = { onFileClick(file) },
+            )
+        } else if (isImage) {
             Box {
                 AsyncImage(
                     model = file.url,
@@ -1437,4 +1453,101 @@ internal fun attachmentIcon(
     AttachmentKind.VIDEO -> Icons.Filled.Videocam
     AttachmentKind.DOCUMENT -> if (isPdf(fileName, contentType)) Icons.Filled.PictureAsPdf else Icons.AutoMirrored.Filled.InsertDriveFile
     AttachmentKind.OTHER -> Icons.AutoMirrored.Filled.InsertDriveFile
+}
+
+
+/**
+ * Video that plays inside the chat bubble, WhatsApp-style, and only goes full screen if the
+ * user asks for it.
+ *
+ * The player is created lazily on first play: a thread can hold many videos, and instantiating
+ * a platform player for each one as it scrolls into view would be far too heavy.
+ */
+@Composable
+private fun InlineVideoBubble(
+    url: String,
+    timestamp: String,
+    onExpand: () -> Unit,
+) {
+    var isPlaying by remember(url) { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier.size(240.dp, 200.dp).background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (isPlaying) {
+            val playerHost = remember(url) {
+                MediaPlayerHost(mediaUrl = url, autoPlay = true, isLooping = false)
+            }
+            VideoPlayerComposable(
+                modifier = Modifier.fillMaxSize(),
+                playerHost = playerHost,
+                playerConfig = VideoPlayerConfig(
+                    isFastForwardBackwardEnabled = false,
+                    isScreenResizeEnabled = false,
+                    isSpeedControlEnabled = false,
+                    isFullScreenEnabled = false,
+                ),
+            )
+        } else {
+            // A real frame from the video, decoded on-device, rather than a generic icon.
+            VideoPreviewComposable(
+                url = url,
+                frameCount = 1,
+                contentScale = ContentScale.Crop,
+                loadingIndicatorColor = Color.White,
+            )
+            // Scrim so the play button stays legible over a bright frame.
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.2f)))
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                    ) { isPlaying = true },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = "Play video",
+                    tint = Color.White,
+                    modifier = Modifier.size(34.dp),
+                )
+            }
+        }
+
+        // Expand to the full-screen viewer, which is where scrubbing and download live.
+        IconButton(
+            onClick = onExpand,
+            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+        ) {
+            Box(
+                modifier = Modifier.size(28.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.45f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Fullscreen,
+                    contentDescription = "Full screen",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+
+        if (!isPlaying) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            ) {
+                Text(text = timestamp, style = MaterialTheme.typography.labelSmall, color = Color.White)
+            }
+        }
+    }
 }
