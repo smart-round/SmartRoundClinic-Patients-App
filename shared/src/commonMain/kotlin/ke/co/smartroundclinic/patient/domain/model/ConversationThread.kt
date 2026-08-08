@@ -1,7 +1,7 @@
 package ke.co.smartroundclinic.patient.domain.model
 
 /** What the thread's most recent message was, so the list can show a matching icon. */
-enum class ThreadPreviewKind { TEXT, PHOTO, FILE, PRESCRIPTION }
+enum class ThreadPreviewKind { TEXT, PHOTO, VIDEO, FILE, PRESCRIPTION }
 
 /** One conversation per (doctorId, patientId) pair — merges all of that pair's consultations. */
 data class ConversationThread(

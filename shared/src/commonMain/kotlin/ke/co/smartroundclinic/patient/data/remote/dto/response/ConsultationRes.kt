@@ -185,6 +185,7 @@ fun ConversationThreadData.toDomain() = ConversationThread(
     lastSeenAt = lastSeenAt,
     lastMessageKind = when (lastMessageKind?.uppercase()) {
         "PHOTO" -> ThreadPreviewKind.PHOTO
+        "VIDEO" -> ThreadPreviewKind.VIDEO
         "FILE" -> ThreadPreviewKind.FILE
         "PRESCRIPTION" -> ThreadPreviewKind.PRESCRIPTION
         else -> ThreadPreviewKind.TEXT

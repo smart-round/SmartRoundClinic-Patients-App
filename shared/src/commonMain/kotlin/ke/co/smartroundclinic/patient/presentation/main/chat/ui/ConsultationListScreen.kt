@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
@@ -220,9 +221,14 @@ private fun ConsultationThreadRow(thread: ConversationThread, onClick: () -> Uni
             )
             Spacer(Modifier.height(3.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (thread.lastMessageKind == ThreadPreviewKind.PHOTO) {
+                val previewIcon = when (thread.lastMessageKind) {
+                    ThreadPreviewKind.PHOTO -> Icons.Filled.CameraAlt
+                    ThreadPreviewKind.VIDEO -> Icons.Filled.Videocam
+                    else -> null
+                }
+                if (previewIcon != null) {
                     Icon(
-                        imageVector = Icons.Filled.CameraAlt,
+                        imageVector = previewIcon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp),
