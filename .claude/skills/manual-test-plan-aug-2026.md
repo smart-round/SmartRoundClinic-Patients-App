@@ -6,44 +6,78 @@ Companion to [`bugfix-plan-aug-2026.md`](bugfix-plan-aug-2026.md).
 
 | Build | Ref | State |
 |---|---|---|
-| Backend | `dev` @ `30c8b16` | Pushed, **NOT deployed to sandbox** |
-| Doctor app | `8f23934` + uncommitted | Installed on device |
-| Patient app | `259c569` + uncommitted | Installed on device |
+| Backend | `dev` @ `add8550` | Pushed and **auto-deployed via Dokploy** |
+| Doctor app | `f9de240` | Installed on device |
+| Patient app | `9dcda47` | Installed on device |
 
 Both apps point at `https://sandbox-api.smartroundclinic.co.ke/`.
 
-### ⚠️ Read before starting
+### Deploy status — nothing is blocked any more
 
-**Anything marked 🚫 BLOCKED cannot pass until `dev` is deployed to sandbox.** The
-backend repo has no `.github/workflows/`, so that deploy is a manual step. Running
-those cases against today's sandbox will produce failures that are *not* app bugs.
+`dev` auto-deploys through Dokploy on push, so the backend work is live. Verified by
+probing the sandbox: `POST /chat/{id}/files/presign` returns **401** (route exists,
+needs auth) while a nonsense path returns **404**.
 
-**Nothing in this plan has been verified by anyone yet** — the apps compile, launch
-without crashing, and the backend unit tests pass. That is all. Every case below is
-genuinely unknown.
+**The earlier 🚫 BLOCKED markers on sections C and D no longer apply.** Both are
+testable now.
+
+### What has actually been confirmed
+
+Only one thing has been confirmed working on a device by a human: **the outgoing-call
+avatar (§G3)**. Everything else below is either untested, or verified only as far as
+"it compiles, launches without crashing, and unit tests pass" — which is not testing.
 
 Two accounts are needed (one patient, one doctor) with a **confirmed** appointment
 between them, and a second **completed** appointment for the rating/refer cases.
 
 ---
 
-## A. File uploads (Issue 3) — testable now
+## A. File uploads (Issue 3) — reworked substantially, needs a full pass
 
-The `LogLevel.ALL` → `HEADERS` change removed full-body logging on **every** request,
-so watch for regressions well beyond chat.
+The upload stack was rebuilt during investigation, so this section replaces the
+original. Four separate defects were found and fixed:
+
+1. `LogLevel.ALL` was stringifying every request body into the log.
+2. Picked files were read **on the UI thread**, freezing the app before anything
+   reached the network — this was the actual cause of "it takes forever".
+3. The size cap was 25 MiB, so a file the user called "26 MB" (26,000,000 bytes)
+   slipped under it.
+4. Uploads were proxied through the API, which buffered the whole file in heap and
+   then re-uploaded it to R2 — the transfer happened twice, in series.
+
+Now: size checked before reading → read on `Dispatchers.IO` → pre-signed PUT streamed
+straight to R2 in 64KB chunks → complete. Ceiling is **300MB**, client and server.
 
 | # | Steps | Expected | ✅/❌ |
 |---|---|---|---|
-| A1 | Patient → consultation → attach a file **> 25 MB** | Fails **immediately** (no long hang). Bubble shows *"Unable to send file as it is too large. Please try again"* beneath the filename | |
-| A2 | Patient → attach a ~5–10 MB image | Uploads, and noticeably faster than the previous build. Appears in the thread | |
-| A3 | Patient → attach a small (<1 MB) image | Uploads normally — confirms the timeout/cap changes broke nothing | |
-| A4 | Patient → attach a PDF | Uploads, shows as a PDF in the bubble | |
-| A5 | Doctor → attach a ~5–10 MB image | Uploads, faster than before | |
-| A6 | Doctor → attach a file **> 25 MB** | ⚠️ **Expected to still hang and fail badly** — the cap is not implemented on the doctor app yet. Record the behaviour, don't file it | |
-| A7 | Both apps: sign in, load bookings, load chat list, open a profile | Everything still works — the logging change touched the shared HTTP client | |
+| A1 | Patient → consultation → send a **> 300MB** file | Rejected **instantly**, no freeze. Bubble reads *"Unable to send file as it is too large. Please try again"* | |
+| A2 | Patient → send the **26MB mp4** | Uploads. UI stays responsive throughout | |
+| A3 | Patient → send a ~2MB image | Uploads quickly; appears in the thread | |
+| A4 | Patient → send a PDF | Uploads; shows as a PDF in the bubble | |
+| A5 | **Doctor → patient** chat: repeat A1–A3 | Same behaviour — the doctor app now has the cap and streaming too | |
+| A6 | **Doctor → doctor** chat: repeat A1–A3 | Same again; this path was the last to be converted | |
+| A7 | During a large upload, check the app stays usable (scroll, type) | No freeze — the read is off the UI thread | |
+| A8 | Both apps: sign in, load bookings, chat list, profile | Unaffected — the logging change touched the shared HTTP client | |
 
-**Regression risk:** `A7` matters. If any screen that previously worked now fails to
-load, suspect the HTTP client change first.
+**Diagnostics:** every upload logs to `SRC-UPLOAD` — start, 10% steps, stored, completed,
+with elapsed ms. `adb logcat -s SRC-UPLOAD` will show exactly where time goes, or where
+it fails.
+
+---
+
+## A2. Upload progress indicator
+
+Progress silently never moved because `PendingFile.equals` compared only `localId`, so
+Compose treated every update as an identical value and skipped recomposition. **The
+same bug also broke the "Failed to send" state.**
+
+| # | Steps | Expected | ✅/❌ |
+|---|---|---|---|
+| A2.1 | Send a large file, watch the bubble | Circular ring fills, percentage **counts up** in the centre | |
+| A2.2 | Confirm against logcat | On-screen percentage roughly tracks the `SRC-UPLOAD` 10% lines | |
+| A2.3 | Ring does not jump 0 → 100 instantly | If it does, the body is being buffered before transmit — report it | |
+| A2.4 | Force a failure (airplane mode mid-upload) | Bubble shows a failure state, not a spinner forever | |
+| A2.5 | Repeat A2.1 on doctor→patient and doctor→doctor | Identical behaviour | |
 
 ---
 
@@ -79,12 +113,12 @@ unavailable to others?
 
 ---
 
-## C. Photo previews in chat lists (Issues 4 & 5) — 🚫 BLOCKED on backend deploy
+## C. Photo previews in chat lists (Issues 4 & 5) — ✅ unblocked, untested
 
-The preview string is produced server-side. Until `dev` is deployed these will all
-show the old filename/UUID regardless of the app build.
+The preview string is produced server-side and the backend is now live, so these are
+ready to run.
 
-| # | Steps | Expected after deploy | ✅/❌ |
+| # | Steps | Expected | ✅/❌ |
 |---|---|---|---|
 | C1 | Patient → chat → **camera** → take + send a photo → back to chat list | Row shows a **camera icon + "Photo"** — not a UUID | |
 | C2 | Patient → chat → **gallery** → send an image → back to list | Camera icon + "Photo" — not `filename.png` | |
@@ -93,16 +127,16 @@ show the old filename/UUID regardless of the app build.
 | C5 | Doctor app → same four cases in the patient chat list | Same results | |
 | C6 | Doctor app → **doctor-to-doctor** chat list | Same results | |
 | C7 | Doctor app → **Home** screen recent messages | Camera icon + "Photo" for image threads | |
-| C8 | Both apps against the **old** backend | Graceful: previews show filenames, no crash, no blank rows (the field defaults to TEXT) | |
+| C8 | Both apps against an **older** backend build | Graceful: previews show filenames, no crash, no blank rows (the field defaults to TEXT) | |
 
 **Note:** the image *inside* the message bubble still shows the raw filename — only
 the thread-list preview was changed. Not a bug; flagged as secondary in the bugfix plan.
 
 ---
 
-## D. Appointment amount (doctor app) — 🚫 BLOCKED on backend deploy
+## D. Appointment amount (doctor app) — ✅ unblocked, untested
 
-| # | Steps | Expected after deploy | ✅/❌ |
+| # | Steps | Expected | ✅/❌ |
 |---|---|---|---|
 | D1 | Doctor → Bookings → open any appointment | Summary card shows **Amount** and e.g. `KES 750`, matching the doctor's service tier price | |
 | D2 | Check an appointment on a **different service tier** | Amount reflects that tier's price, not a hardcoded value | |
@@ -162,6 +196,19 @@ These shipped earlier in the session and **no one has looked at them on a device
 > **Accessibility note:** action buttons are 32dp tall, below the 48dp minimum touch
 > target. That is what the design specifies. Check they're comfortably tappable in
 > practice.
+
+---
+
+## G. Call screens — avatars
+
+| # | Steps | Expected | ✅/❌ |
+|---|---|---|---|
+| G1 | Patient calls a doctor; doctor app **open** (WebSocket path) | Incoming-call screen shows the **patient's** avatar | |
+| G2 | Patient calls a doctor; doctor app **killed** (push path) | Same — this is separate code from G1, test both | |
+| G3 | Caller sees the callee's avatar on the "Calling…" screen | ✅ **CONFIRMED WORKING** | ✅ |
+| G4 | Doctor → doctor call, both directions | Avatars on incoming and outgoing | |
+| G5 | Counterpart with **no** profile picture | Person-icon placeholder, never a blank circle | |
+| G6 | Patient app receiving a doctor's call | ⚠️ **Known gap** — the patient app's incoming-call screen was never wired for `callerPicture`. Backend sends it; client change not done. Expect no avatar | |
 
 ---
 

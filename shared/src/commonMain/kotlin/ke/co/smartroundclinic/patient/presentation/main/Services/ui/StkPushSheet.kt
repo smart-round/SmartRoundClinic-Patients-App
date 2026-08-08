@@ -74,6 +74,21 @@ fun StkPushSheet(
     onViewAppointment: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val stkState = when {
+        bookedAppointmentId != null -> "SUCCESS"
+        isBooking -> "BOOKING"
+        stkPollState == "FAILED" || (!isStkInitiating && stkPushData == null && stkError != null) -> "FAILED"
+        stkPushData != null -> "POLLING"
+        isStkInitiating -> "SENDING"
+        else -> "INPUT"
+    }
+
+    // The patient may leave only before money can move, or once the outcome is settled.
+    // Closing mid-flight is what stranded paid-for bookings: M-Pesa had already debited but
+    // the app hadn't yet observed it, so there was nothing on screen tying the two together.
+    // Swipe, back press and tap-outside were already blocked; the header's X was not.
+    val canDismiss = stkState == "INPUT" || stkState == "FAILED" || stkState == "SUCCESS"
+
     ModalBottomSheet(
         onDismissRequest = {},
         sheetState = sheetState,
@@ -117,25 +132,23 @@ fun StkPushSheet(
                         color = Color.White,
                         modifier = Modifier.weight(1f),
                     )
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = Color.White,
-                        )
+                    if (canDismiss) {
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = Color.White,
+                            )
+                        }
+                    } else {
+                        // Keeps the title from shifting as the close button comes and goes.
+                        Spacer(Modifier.size(48.dp))
                     }
                 }
             }
 
             AnimatedContent(
-                targetState = when {
-                    bookedAppointmentId != null -> "SUCCESS"
-                    isBooking -> "BOOKING"
-                    stkPollState == "FAILED" || (!isStkInitiating && stkPushData == null && stkError != null) -> "FAILED"
-                    stkPushData != null -> "POLLING"
-                    isStkInitiating -> "SENDING"
-                    else -> "INPUT"
-                },
+                targetState = stkState,
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
                 label = "stk_state",
             ) { state ->
@@ -410,6 +423,17 @@ private fun PollingContent(stkPushData: StkPushResult?) {
         Text(
             text = "Enter your M-Pesa PIN when prompted to complete payment.",
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        // The sheet is deliberately locked at this point; say why rather than leaving the
+        // patient wondering where the close button went.
+        Text(
+            text = "Please keep this screen open until your payment is confirmed.",
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
