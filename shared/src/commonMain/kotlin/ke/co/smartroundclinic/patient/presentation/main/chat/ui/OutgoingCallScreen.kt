@@ -1,5 +1,8 @@
 package ke.co.smartroundclinic.patient.presentation.main.chat.ui
 
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +37,7 @@ import ke.co.smartroundclinic.patient.presentation.theme.SnackbarError
 @Composable
 internal fun OutgoingCallScreen(
     calleeName: String,
+    calleePicture: String?,
     statusText: String,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
@@ -51,15 +55,25 @@ internal fun OutgoingCallScreen(
         Box(
             modifier = Modifier
                 .size(120.dp)
-                .background(Color.White.copy(alpha = 0.15f), CircleShape),
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = Icons.Filled.Person,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(64.dp),
-            )
+            if (!calleePicture.isNullOrBlank()) {
+                AsyncImage(
+                    model = calleePicture,
+                    contentDescription = calleeName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.Person,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(64.dp),
+                )
+            }
         }
         Spacer(Modifier.height(24.dp))
         Text(

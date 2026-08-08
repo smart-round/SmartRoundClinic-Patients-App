@@ -13,4 +13,4 @@ import kotlinx.serialization.Serializable
 
 // Ringing screen shown to the caller between InviteToCallUseCase and the callee answering —
 // see OutgoingCallState. otherUserId doubles as the doctorId (patient app is patient-only).
-@Serializable data class OutgoingCall(val otherUserId: String, val calleeName: String, val isVideo: Boolean) : NavKey
+@Serializable data class OutgoingCall(val otherUserId: String, val calleeName: String, val isVideo: Boolean, val calleePicture: String? = null) : NavKey

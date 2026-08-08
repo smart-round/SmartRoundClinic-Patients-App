@@ -123,7 +123,7 @@ fun ChatRoot(
                         vm.disconnect()
                         backStack.removeLastOrNull()
                     },
-                    onVideoCall = { backStack.add(OutgoingCall(dest.doctorId, dest.doctorName, isVideo = true)) },
+                    onVideoCall = { backStack.add(OutgoingCall(dest.doctorId, dest.doctorName, isVideo = true, calleePicture = doctorPicture)) },
                     onSendText = vm::sendText,
                     onSendFile = vm::sendFile,
                     onFileTooLarge = vm::rejectOversizedFile,
@@ -170,6 +170,7 @@ fun ChatRoot(
 
                 OutgoingCallScreen(
                     calleeName = dest.calleeName,
+                    calleePicture = dest.calleePicture,
                     statusText = when (status) {
                         is OutgoingCallStatus.Declined -> "Call declined"
                         else -> "Calling…"
