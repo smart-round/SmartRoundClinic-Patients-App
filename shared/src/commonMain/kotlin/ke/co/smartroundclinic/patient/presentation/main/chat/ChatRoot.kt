@@ -127,6 +127,7 @@ fun ChatRoot(
                     onSendText = vm::sendText,
                     onSendFile = vm::sendFile,
                     onFileTooLarge = vm::rejectOversizedFile,
+                    onDismissPendingFile = vm::dismissPendingFile,
                     onSendFileFailed = vm::rejectUnreadableFile,
                 )
             }

@@ -37,3 +37,14 @@ fun attachmentLabel(fileName: String, contentType: String): String =
 
 fun isPdf(fileName: String, contentType: String): Boolean =
     contentType == "application/pdf" || fileName.endsWith(".pdf", ignoreCase = true)
+
+/**
+ * Size in decimal units, matching how file managers report sizes — so "300 MB" here means the
+ * same thing as "300 MB" in the picker the user just came from.
+ */
+fun formatFileSizeDecimal(bytes: Long): String = when {
+    bytes >= 1_000_000_000 -> "${(bytes / 100_000_000) / 10.0} GB"
+    bytes >= 1_000_000 -> "${bytes / 1_000_000} MB"
+    bytes >= 1_000 -> "${bytes / 1_000} KB"
+    else -> "$bytes B"
+}

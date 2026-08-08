@@ -1,5 +1,6 @@
 package ke.co.smartroundclinic.patient.presentation.main.chat
 
+import ke.co.smartroundclinic.patient.presentation.main.chat.util.formatFileSizeDecimal
 import kotlinx.io.RawSource
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -64,6 +65,9 @@ private val wsJson = Json { ignoreUnknownKeys = true; isLenient = true; explicit
 // list has no scroll room at all and the user can never trigger the next page.
 private const val HISTORY_PAGE_SIZE = 20
 
+/** A rejected attachment clears itself after this long. */
+private const val FAILED_ATTACHMENT_AUTO_DISMISS_MS = 5_000L
+
 data class PendingFile(
     val localId: String,
     val fileName: String,
@@ -77,6 +81,8 @@ data class PendingFile(
     val failed: Boolean = false,
     /** Shown beneath the attachment when it fails, e.g. the file-too-large message. */
     val errorText: String? = null,
+    /** Secondary line under [errorText], e.g. the actual size against the limit. */
+    val detailText: String? = null,
     /** Bytes written so far and the total, for the in-flight progress bar. */
     val sentBytes: Long = 0L,
     val totalBytes: Long = 0L,
@@ -527,16 +533,30 @@ class ConsultationViewModel(
         )
     }
 
-    fun rejectOversizedFile(fileName: String, contentType: String) {
+    fun rejectOversizedFile(fileName: String, contentType: String, sizeBytes: Long) {
+        val localId = "p${kotlin.random.Random.nextInt()}"
         pendingFiles.add(
             PendingFile(
-                localId = "p${kotlin.random.Random.nextInt()}",
+                localId = localId,
                 fileName = fileName,
                 contentType = contentType,
                 failed = true,
                 errorText = Constants.FILE_TOO_LARGE_MESSAGE,
+                // Naming both numbers makes the rejection actionable — the patient can see how
+                // far over the limit they are rather than guessing.
+                detailText = "${formatFileSizeDecimal(sizeBytes)} / ${formatFileSizeDecimal(Constants.MAX_CHAT_FILE_BYTES)} max",
             ),
         )
+        // Clears itself so a rejection doesn't sit in the thread forever; the X dismisses it sooner.
+        viewModelScope.launch {
+            delay(FAILED_ATTACHMENT_AUTO_DISMISS_MS)
+            dismissPendingFile(localId)
+        }
+    }
+
+    /** Removes a failed attachment from the thread — the bubble's X, or the auto-dismiss timer. */
+    fun dismissPendingFile(localId: String) {
+        pendingFiles.removeAll { it.localId == localId }
     }
 
     /**
