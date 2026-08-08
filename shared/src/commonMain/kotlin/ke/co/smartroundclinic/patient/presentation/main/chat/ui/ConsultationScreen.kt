@@ -103,6 +103,7 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
 import io.github.vinceglb.filekit.size
+import io.github.vinceglb.filekit.source
 import ke.co.smartroundclinic.patient.data.remote.dto.response.MedicalRecordData
 import ke.co.smartroundclinic.patient.common.Constants
 import ke.co.smartroundclinic.patient.domain.model.NextAppointment
@@ -124,6 +125,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.io.RawSource
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
@@ -155,8 +157,9 @@ internal fun ConsultationScreen(
     onBack: () -> Unit,
     onVideoCall: () -> Unit,
     onSendText: (String) -> Unit,
-    onSendFile: (String, String, ByteArray) -> Unit,
+    onSendFile: (String, String, Long, ByteArray?, () -> RawSource) -> Unit,
     onFileTooLarge: (String, String) -> Unit = { _, _ -> },
+    onSendFileFailed: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     var inputText by remember { mutableStateOf("") }
@@ -236,13 +239,24 @@ internal fun ConsultationScreen(
     fun sendPickedFile(file: PlatformFile, fallbackName: String) {
         scope.launch {
             val name = file.name.ifBlank { fallbackName }
+            val mime = mimeFromName(name)
             val size = withContext(Dispatchers.IO) { runCatching { file.size() }.getOrNull() }
-            if (size != null && size > Constants.MAX_CHAT_FILE_BYTES) {
-                onFileTooLarge(name, mimeFromName(name))
+            if (size == null) {
+                onSendFileFailed(name, mime)
                 return@launch
             }
-            val bytes = withContext(Dispatchers.IO) { file.readBytes() }
-            onSendFile(name, mimeFromName(name), bytes)
+            if (size > Constants.MAX_CHAT_FILE_BYTES) {
+                onFileTooLarge(name, mime)
+                return@launch
+            }
+            // Only small images are read into memory, purely to draw the in-flight thumbnail.
+            // The upload itself streams from disk, so nothing else needs the bytes.
+            val preview = if (mime.startsWith("image/") && size <= Constants.MAX_INLINE_PREVIEW_BYTES) {
+                withContext(Dispatchers.IO) { runCatching { file.readBytes() }.getOrNull() }
+            } else {
+                null
+            }
+            onSendFile(name, mime, size, preview) { file.source() }
         }
     }
 
@@ -1116,7 +1130,7 @@ private fun PendingFileBubble(pending: PendingFile) {
         if (isImage) {
             Box(Modifier.widthIn(max = 260.dp).clip(shape)) {
                 AsyncImage(
-                    model = pending.bytes,
+                    model = pending.previewBytes,
                     contentDescription = pending.fileName,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.size(240.dp, 200.dp),

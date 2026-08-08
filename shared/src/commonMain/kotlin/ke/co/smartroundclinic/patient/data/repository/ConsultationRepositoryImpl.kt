@@ -11,10 +11,15 @@ import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.content.ByteArrayContent
+import io.ktor.http.content.OutgoingContent
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.ByteWriteChannel
+import io.ktor.utils.io.writeFully
 import kotlinx.datetime.Clock
+import kotlinx.io.RawSource
+import kotlinx.io.buffered
+import kotlinx.io.readAtMostTo
 import ke.co.smartroundclinic.patient.common.Constants
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.data.remote.dto.request.CallActionReq
@@ -94,16 +99,17 @@ class ConsultationRepositoryImpl(
         otherUserId: String,
         fileName: String,
         contentType: String,
-        bytes: ByteArray,
+        sizeBytes: Long,
+        openSource: () -> RawSource,
     ): Resource<ConsultationMessage> = withContext(Dispatchers.IO) {
         val startedAt = Clock.System.now().toEpochMilliseconds()
         fun elapsed() = Clock.System.now().toEpochMilliseconds() - startedAt
-        Napier.i(tag = "SRC-UPLOAD", message = "start name=$fileName type=$contentType bytes=${bytes.size}")
+        Napier.i(tag = "SRC-UPLOAD", message = "start name=$fileName type=$contentType bytes=$sizeBytes")
         try {
             // 1. Ask the API where to put it. The API also enforces its own size ceiling here,
             //    so an oversized file is rejected before a single byte of it is sent.
             val presign = client.post("chat/$otherUserId/files/presign") {
-                setBody(PresignUploadReq(fileName = fileName, contentType = contentType, sizeBytes = bytes.size.toLong()))
+                setBody(PresignUploadReq(fileName = fileName, contentType = contentType, sizeBytes = sizeBytes))
             }.body<PresignUploadResponse>()
             val target = presign.data
             if (!presign.status || target == null) {
@@ -120,7 +126,24 @@ class ConsultationRepositoryImpl(
                     socketTimeoutMillis = Constants.UPLOAD_SOCKET_TIMEOUT_MS
                 }
                 contentType(ContentType.parse(target.contentType))
-                setBody(ByteArrayContent(bytes, ContentType.parse(target.contentType)))
+                // Streamed in fixed chunks straight off disk — the file is never materialised
+                // in memory, which is what makes a 300MB attachment possible at all.
+                setBody(
+                    object : OutgoingContent.WriteChannelContent() {
+                        override val contentType = ContentType.parse(target.contentType)
+                        override val contentLength = sizeBytes
+                        override suspend fun writeTo(channel: ByteWriteChannel) {
+                            openSource().buffered().use { source ->
+                                val chunk = ByteArray(Constants.UPLOAD_CHUNK_BYTES)
+                                while (true) {
+                                    val read = source.readAtMostTo(chunk, 0, chunk.size)
+                                    if (read <= 0) break
+                                    channel.writeFully(chunk, 0, read)
+                                }
+                            }
+                        }
+                    },
+                )
             }
             if (!putResponse.status.isSuccess()) {
                 Napier.e(tag = "SRC-UPLOAD", message = "storage PUT failed after ${elapsed()}ms http=${putResponse.status}")
@@ -136,7 +159,7 @@ class ConsultationRepositoryImpl(
                         key = target.key,
                         fileName = fileName,
                         contentType = target.contentType,
-                        sizeBytes = bytes.size.toLong(),
+                        sizeBytes = sizeBytes,
                     ),
                 )
             }.body<ConsultationFileUploadResponse>()

@@ -1,5 +1,6 @@
 package ke.co.smartroundclinic.patient.presentation.main.chat
 
+import kotlinx.io.RawSource
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -67,7 +68,12 @@ data class PendingFile(
     val localId: String,
     val fileName: String,
     val contentType: String,
-    val bytes: ByteArray,
+    /**
+     * Thumbnail bytes for the in-flight bubble, and *only* that. Null for anything above
+     * [Constants.MAX_INLINE_PREVIEW_BYTES] — the upload itself streams from disk, so holding a
+     * large attachment here purely to draw a preview would defeat the point and exhaust the heap.
+     */
+    val previewBytes: ByteArray? = null,
     val failed: Boolean = false,
     /** Shown beneath the attachment when it fails, e.g. the file-too-large message. */
     val errorText: String? = null,
@@ -493,20 +499,42 @@ class ConsultationViewModel(
      * Shows a failed attachment for a file rejected on size before it was ever read. Keeps the
      * reason in front of the patient instead of a transient snackbar.
      */
+    /** Shows a failed attachment for a file we could not read at all (revoked URI, etc). */
+    fun rejectUnreadableFile(fileName: String, contentType: String) {
+        pendingFiles.add(
+            PendingFile(
+                localId = "p${kotlin.random.Random.nextInt()}",
+                fileName = fileName,
+                contentType = contentType,
+                failed = true,
+                errorText = "Couldn't read this file. Please try again.",
+            ),
+        )
+    }
+
     fun rejectOversizedFile(fileName: String, contentType: String) {
         pendingFiles.add(
             PendingFile(
                 localId = "p${kotlin.random.Random.nextInt()}",
                 fileName = fileName,
                 contentType = contentType,
-                bytes = ByteArray(0),
                 failed = true,
                 errorText = Constants.FILE_TOO_LARGE_MESSAGE,
             ),
         )
     }
 
-    fun sendFile(fileName: String, contentType: String, bytes: ByteArray) {
+    /**
+     * Queues an attachment. [openSource] is a factory rather than bytes so the upload can stream
+     * the file straight to storage without ever holding it in memory.
+     */
+    fun sendFile(
+        fileName: String,
+        contentType: String,
+        sizeBytes: Long,
+        previewBytes: ByteArray?,
+        openSource: () -> RawSource,
+    ) {
         val otherUserId = currentOtherUserId
         if (otherUserId == null) {
             snackbarController.show("Not connected", isError = true)
@@ -516,18 +544,18 @@ class ConsultationViewModel(
             localId = "p${kotlin.random.Random.nextInt()}",
             fileName = fileName,
             contentType = contentType,
-            bytes = bytes,
+            previewBytes = previewBytes,
         )
         pendingFiles.add(pending)
 
-        // Backstop for callers that didn't check the size before reading the file.
-        if (bytes.size > Constants.MAX_CHAT_FILE_BYTES) {
+        // Backstop for callers that didn't check the size first.
+        if (sizeBytes > Constants.MAX_CHAT_FILE_BYTES) {
             markFailed(pending, Constants.FILE_TOO_LARGE_MESSAGE)
             return
         }
 
         viewModelScope.launch {
-            when (val result = consultationRepository.uploadFile(otherUserId, fileName, contentType, bytes)) {
+            when (val result = consultationRepository.uploadFile(otherUserId, fileName, contentType, sizeBytes, openSource)) {
                 is Resource.Success -> {
                     // The WebSocket change-stream broadcast will deliver the message
                     // and remove the pending entry. As a fallback, also append the
