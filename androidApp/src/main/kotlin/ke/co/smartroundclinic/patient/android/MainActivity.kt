@@ -63,6 +63,15 @@ class MainActivity : FragmentActivity() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
         val notificationManager = getSystemService(NotificationManager::class.java) ?: return
         if (notificationManager.canUseFullScreenIntent()) return
+
+        // Ask once, ever. Declining leaves canUseFullScreenIntent() false forever, so without
+        // remembering that we asked, every cold start threw the user straight into Settings.
+        // Calls still work without it — the notification's Answer/Decline buttons are unaffected;
+        // it only upgrades the ringing UI to a full-screen call screen.
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_FULL_SCREEN_INTENT_ASKED, false)) return
+        prefs.edit().putBoolean(KEY_FULL_SCREEN_INTENT_ASKED, true).apply()
+
         runCatching {
             startActivity(
                 Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
@@ -107,5 +116,10 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    private companion object {
+        const val PREFS_NAME = "app_permission_prompts"
+        const val KEY_FULL_SCREEN_INTENT_ASKED = "full_screen_intent_asked"
     }
 }
