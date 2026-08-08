@@ -489,6 +489,23 @@ class ConsultationViewModel(
         }
     }
 
+    /**
+     * Shows a failed attachment for a file rejected on size before it was ever read. Keeps the
+     * reason in front of the patient instead of a transient snackbar.
+     */
+    fun rejectOversizedFile(fileName: String, contentType: String) {
+        pendingFiles.add(
+            PendingFile(
+                localId = "p${kotlin.random.Random.nextInt()}",
+                fileName = fileName,
+                contentType = contentType,
+                bytes = ByteArray(0),
+                failed = true,
+                errorText = Constants.FILE_TOO_LARGE_MESSAGE,
+            ),
+        )
+    }
+
     fun sendFile(fileName: String, contentType: String, bytes: ByteArray) {
         val otherUserId = currentOtherUserId
         if (otherUserId == null) {
@@ -503,8 +520,7 @@ class ConsultationViewModel(
         )
         pendingFiles.add(pending)
 
-        // Reject oversized files up front rather than spending minutes on a transfer that
-        // the server will refuse anyway. The bubble stays visible carrying the reason.
+        // Backstop for callers that didn't check the size before reading the file.
         if (bytes.size > Constants.MAX_CHAT_FILE_BYTES) {
             markFailed(pending, Constants.FILE_TOO_LARGE_MESSAGE)
             return

@@ -97,11 +97,14 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.compose.rememberCameraPickerLauncher
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
+import io.github.vinceglb.filekit.size
 import ke.co.smartroundclinic.patient.data.remote.dto.response.MedicalRecordData
+import ke.co.smartroundclinic.patient.common.Constants
 import ke.co.smartroundclinic.patient.domain.model.NextAppointment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationFileAttachment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
@@ -117,7 +120,10 @@ import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
 import ke.co.smartroundclinic.patient.presentation.theme.StatusSuspended
 import ke.co.smartroundclinic.patient.presentation.theme.Tertiary40
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.Instant
@@ -150,6 +156,7 @@ internal fun ConsultationScreen(
     onVideoCall: () -> Unit,
     onSendText: (String) -> Unit,
     onSendFile: (String, String, ByteArray) -> Unit,
+    onFileTooLarge: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     var inputText by remember { mutableStateOf("") }
@@ -217,22 +224,40 @@ internal fun ConsultationScreen(
         }
     }
 
-    fun sendPickedFile(name: String, bytes: ByteArray) {
-        scope.launch { onSendFile(name, mimeFromName(name), bytes) }
+    /**
+     * Reads a picked file and hands it to the ViewModel.
+     *
+     * The read happens on [Dispatchers.IO], never on the composition's Main-dispatched scope:
+     * pulling tens of MB off a content provider on the UI thread freezes the app for the whole
+     * transfer, which looked exactly like a slow upload even though nothing had reached the
+     * network yet. The size is checked first so an oversized file is rejected without being
+     * read at all.
+     */
+    fun sendPickedFile(file: PlatformFile, fallbackName: String) {
+        scope.launch {
+            val name = file.name.ifBlank { fallbackName }
+            val size = withContext(Dispatchers.IO) { runCatching { file.size() }.getOrNull() }
+            if (size != null && size > Constants.MAX_CHAT_FILE_BYTES) {
+                onFileTooLarge(name, mimeFromName(name))
+                return@launch
+            }
+            val bytes = withContext(Dispatchers.IO) { file.readBytes() }
+            onSendFile(name, mimeFromName(name), bytes)
+        }
     }
 
     // Camera photos may have no recognisable extension — force .jpg so MIME is correct
     val cameraLauncher = rememberCameraPickerLauncher { file ->
         file?.let {
             val name = it.name.takeIf { n -> n.isNotBlank() && n.contains('.') } ?: "photo.jpg"
-            scope.launch { sendPickedFile(name, it.readBytes()) }
+            sendPickedFile(it, name)
         }
     }
     val galleryLauncher = rememberFilePickerLauncher(mode = FileKitMode.Single, type = FileKitType.Image) { file ->
-        file?.let { scope.launch { sendPickedFile(it.name.ifBlank { "image.jpg" }, it.readBytes()) } }
+        file?.let { sendPickedFile(it, "image.jpg") }
     }
     val fileLauncher = rememberFilePickerLauncher(mode = FileKitMode.Single, type = FileKitType.File()) { file ->
-        file?.let { scope.launch { sendPickedFile(it.name.ifBlank { "file" }, it.readBytes()) } }
+        file?.let { sendPickedFile(it, "file") }
     }
 
     Scaffold(

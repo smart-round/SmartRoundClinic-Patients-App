@@ -126,6 +126,7 @@ fun ChatRoot(
                     onVideoCall = { backStack.add(OutgoingCall(dest.doctorId, dest.doctorName, isVideo = true)) },
                     onSendText = vm::sendText,
                     onSendFile = vm::sendFile,
+                    onFileTooLarge = vm::rejectOversizedFile,
                 )
             }
             entry<OutgoingCall> { dest ->
