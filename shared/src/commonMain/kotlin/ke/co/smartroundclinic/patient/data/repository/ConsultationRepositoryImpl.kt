@@ -18,8 +18,8 @@ import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.writeFully
 import kotlinx.datetime.Clock
 import kotlinx.io.RawSource
-import kotlinx.io.buffered
-import kotlinx.io.readAtMostTo
+import kotlinx.io.Buffer
+import kotlinx.io.readByteArray
 import ke.co.smartroundclinic.patient.common.Constants
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.data.remote.dto.request.CallActionReq
@@ -134,18 +134,22 @@ class ConsultationRepositoryImpl(
                         override val contentType = ContentType.parse(target.contentType)
                         override val contentLength = sizeBytes
                         override suspend fun writeTo(channel: ByteWriteChannel) {
-                            openSource().buffered().use { source ->
-                                val chunk = ByteArray(Constants.UPLOAD_CHUNK_BYTES)
+                            // Reads through RawSource/Buffer rather than the ByteArray overload of
+                            // readAtMostTo: on Kotlin/Native that name also matches an internal
+                            // CPointer overload, which fails to compile for iOS.
+                            val buffer = Buffer()
+                            openSource().use { source ->
                                 var sent = 0L
                                 // Only report on whole-percent changes — a 300MB file is ~4800
                                 // chunks, and recomposing the bubble that often would cost more
                                 // than the upload.
                                 var lastReportedPercent = -1
                                 while (true) {
-                                    val read = source.readAtMostTo(chunk, 0, chunk.size)
-                                    if (read <= 0) break
-                                    channel.writeFully(chunk, 0, read)
-                                    sent += read
+                                    val read = source.readAtMostTo(buffer, Constants.UPLOAD_CHUNK_BYTES.toLong())
+                                    if (read <= 0L) break
+                                    val bytes = buffer.readByteArray()
+                                    channel.writeFully(bytes)
+                                    sent += bytes.size
                                     val percent = if (sizeBytes > 0) ((sent * 100) / sizeBytes).toInt() else 0
                                     if (percent != lastReportedPercent) {
                                         if (percent / 10 != lastReportedPercent / 10) {

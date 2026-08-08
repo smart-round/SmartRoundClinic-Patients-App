@@ -29,6 +29,9 @@ kvault = "1.12.0"
 koin = "4.1.0"
 material3-extended-icons = "1.7.3"
 filekit = "0.14.0"
+# Chaintech media player — built against Kotlin 2.3.0, which our 2.3.21 toolchain can read.
+# The more active kdroidfilter alternative is compiled against Kotlin 2.4.x and will not resolve.
+mediaPlayer = "1.0.53"
 napier = "2.7.1"
 kotlinx-datetime = "0.6.2"
 google-services = "4.4.2"
@@ -89,6 +92,7 @@ koin-compose = { module = "io.insert-koin:koin-compose", version.ref = "koin" }
 koin-compose-viewmodel = { module = "io.insert-koin:koin-compose-viewmodel", version.ref = "koin" }
 #FileKit
 filekit-core = { module = "io.github.vinceglb:filekit-core", version.ref = "filekit" }
+media-player = { module = "network.chaintech:compose-multiplatform-media-player", version.ref = "mediaPlayer" }
 filekit-dialogs = { module = "io.github.vinceglb:filekit-dialogs", version.ref = "filekit" }
 filekit-dialogs-compose = { module = "io.github.vinceglb:filekit-dialogs-compose", version.ref = "filekit" }
 filekit-coil = { module = "io.github.vinceglb:filekit-coil", version.ref = "filekit" }

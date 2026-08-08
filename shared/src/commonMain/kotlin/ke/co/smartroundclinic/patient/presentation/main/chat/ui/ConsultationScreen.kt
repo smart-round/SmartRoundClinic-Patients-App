@@ -94,6 +94,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import chaintech.videoplayer.host.MediaPlayerHost
+import chaintech.videoplayer.ui.video.VideoPlayerComposable
 import coil3.compose.AsyncImage
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -271,8 +273,8 @@ internal fun ConsultationScreen(
             sendPickedFile(it, name)
         }
     }
-    val galleryLauncher = rememberFilePickerLauncher(mode = FileKitMode.Single, type = FileKitType.Image) { file ->
-        file?.let { sendPickedFile(it, "image.jpg") }
+    val galleryLauncher = rememberFilePickerLauncher(mode = FileKitMode.Single, type = FileKitType.ImageAndVideo) { file ->
+        file?.let { sendPickedFile(it, "media") }
     }
     val fileLauncher = rememberFilePickerLauncher(mode = FileKitMode.Single, type = FileKitType.File()) { file ->
         file?.let { sendPickedFile(it, "file") }
@@ -691,17 +693,51 @@ private fun FileViewerSheet(
     onDismiss: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
-    val isImage = file.fileName.isImageFile() || file.contentType.startsWith("image/")
-    val isPdf = file.fileName.endsWith(".pdf", ignoreCase = true) || file.contentType == "application/pdf"
+    val kind = attachmentKind(file.fileName, file.contentType)
+    val isImage = kind == AttachmentKind.PHOTO
+    val isVideo = kind == AttachmentKind.VIDEO
+    val isPdfFile = isPdf(file.fileName, file.contentType)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         dragHandle = null,
-        containerColor = if (isImage) Color.Black else MaterialTheme.colorScheme.surface,
+        containerColor = if (isImage || isVideo) Color.Black else MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxHeight(0.94f).statusBarsPadding(),
     ) {
-        if (isImage) {
+        if (isVideo) {
+            // Plays in-app, same as photos open in-app, rather than handing off to the OS.
+            val playerHost = remember(file.url) { MediaPlayerHost(mediaUrl = file.url, autoPlay = true, isLooping = false) }
+            Box(modifier = Modifier.fillMaxSize()) {
+                VideoPlayerComposable(
+                    modifier = Modifier.fillMaxSize(),
+                    playerHost = playerHost,
+                )
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)
+                    }
+                    Text(
+                        text = file.fileName,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = { uriHandler.openUri(file.url) }) {
+                        Icon(Icons.Filled.Download, contentDescription = "Download", tint = Color.White)
+                    }
+                }
+            }
+        } else if (isImage) {
             Box(modifier = Modifier.fillMaxSize()) {
                 AsyncImage(
                     model = file.url,
@@ -764,13 +800,13 @@ private fun FileViewerSheet(
                         modifier = Modifier
                             .size(80.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (isPdf) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant),
+                            .background(if (isPdfFile) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            imageVector = if (isPdf) Icons.Filled.PictureAsPdf else Icons.AutoMirrored.Filled.InsertDriveFile,
+                            imageVector = if (isPdfFile) Icons.Filled.PictureAsPdf else Icons.AutoMirrored.Filled.InsertDriveFile,
                             contentDescription = null,
-                            tint = if (isPdf) StatusSuspended else Primary40,
+                            tint = if (isPdfFile) StatusSuspended else Primary40,
                             modifier = Modifier.size(48.dp),
                         )
                     }
