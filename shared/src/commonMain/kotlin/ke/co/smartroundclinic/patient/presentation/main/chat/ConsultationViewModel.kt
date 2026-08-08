@@ -77,7 +77,12 @@ data class PendingFile(
     val failed: Boolean = false,
     /** Shown beneath the attachment when it fails, e.g. the file-too-large message. */
     val errorText: String? = null,
+    /** Bytes written so far and the total, for the in-flight progress bar. */
+    val sentBytes: Long = 0L,
+    val totalBytes: Long = 0L,
 ) {
+    /** 0f..1f, or null when the total isn't known yet. */
+    val progress: Float? get() = if (totalBytes > 0) (sentBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else null
     override fun equals(other: Any?) = other is PendingFile && localId == other.localId
     override fun hashCode() = localId.hashCode()
 }
@@ -545,6 +550,7 @@ class ConsultationViewModel(
             fileName = fileName,
             contentType = contentType,
             previewBytes = previewBytes,
+            totalBytes = sizeBytes,
         )
         pendingFiles.add(pending)
 
@@ -555,7 +561,15 @@ class ConsultationViewModel(
         }
 
         viewModelScope.launch {
-            when (val result = consultationRepository.uploadFile(otherUserId, fileName, contentType, sizeBytes, openSource)) {
+            val result = consultationRepository.uploadFile(
+                otherUserId = otherUserId,
+                fileName = fileName,
+                contentType = contentType,
+                sizeBytes = sizeBytes,
+                openSource = openSource,
+                onProgress = { sent, total -> updateProgress(pending.localId, sent, total) },
+            )
+            when (result) {
                 is Resource.Success -> {
                     // The WebSocket change-stream broadcast will deliver the message
                     // and remove the pending entry. As a fallback, also append the
@@ -611,6 +625,11 @@ class ConsultationViewModel(
     fun cancelOutgoingCall(otherUserId: String, callId: String) {
         OutgoingCallState.clear()
         viewModelScope.launch { cancelCallUseCase(otherUserId, callId) }
+    }
+
+    private fun updateProgress(localId: String, sent: Long, total: Long) {
+        val idx = pendingFiles.indexOfFirst { it.localId == localId }
+        if (idx >= 0) pendingFiles[idx] = pendingFiles[idx].copy(sentBytes = sent, totalBytes = total)
     }
 
     private fun markFailed(pending: PendingFile, errorText: String? = null) {

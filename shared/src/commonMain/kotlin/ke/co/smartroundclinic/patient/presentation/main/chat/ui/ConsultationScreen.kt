@@ -1180,10 +1180,12 @@ private fun PendingFileBubble(pending: PendingFile) {
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    val progress = pending.progress
                     Text(
                         text = when {
                             pending.errorText != null -> pending.errorText
                             pending.failed -> "Failed to send"
+                            progress != null -> "Sending… ${(progress * 100).toInt()}%  ·  ${formatBytes(pending.totalBytes)}"
                             else -> "Sending…"
                         },
                         style = MaterialTheme.typography.labelSmall,
@@ -1192,6 +1194,16 @@ private fun PendingFileBubble(pending: PendingFile) {
                         else
                             Color.White.copy(alpha = 0.7f),
                     )
+                    // A large attachment takes minutes; without a real bar it reads as frozen.
+                    if (!pending.failed && progress != null) {
+                        Spacer(Modifier.height(6.dp))
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.fillMaxWidth().height(3.dp),
+                            color = Color.White,
+                            trackColor = Color.White.copy(alpha = 0.3f),
+                        )
+                    }
                 }
                 if (!pending.failed) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
@@ -1335,5 +1347,13 @@ private fun formatTime(iso: String): String = try {
 private fun formatFileSize(bytes: Long): String = when {
     bytes >= 1_048_576 -> { val t = bytes * 10L / 1_048_576L; "${t / 10}.${t % 10} MB" }
     bytes >= 1024 -> "${bytes / 1024} KB"
+    else -> "$bytes B"
+}
+
+/** Human-readable size in decimal units, matching how file managers report sizes. */
+internal fun formatBytes(bytes: Long): String = when {
+    bytes >= 1_000_000_000 -> "${(bytes / 100_000_000) / 10.0} GB"
+    bytes >= 1_000_000 -> "${(bytes / 100_000) / 10.0} MB"
+    bytes >= 1_000 -> "${bytes / 1_000} KB"
     else -> "$bytes B"
 }

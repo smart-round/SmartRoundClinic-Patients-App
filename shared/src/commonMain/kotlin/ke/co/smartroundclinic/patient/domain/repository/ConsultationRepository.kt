@@ -22,6 +22,8 @@ interface ConsultationRepository {
         contentType: String,
         sizeBytes: Long,
         openSource: () -> RawSource,
+        /** Reports bytes written so far. Called on the upload's IO context, not the main thread. */
+        onProgress: (sent: Long, total: Long) -> Unit = { _, _ -> },
     ): Resource<ConsultationMessage>
     suspend fun joinCall(otherUserId: String): Resource<CallJoinInfo>
 

@@ -101,6 +101,7 @@ class ConsultationRepositoryImpl(
         contentType: String,
         sizeBytes: Long,
         openSource: () -> RawSource,
+        onProgress: (sent: Long, total: Long) -> Unit,
     ): Resource<ConsultationMessage> = withContext(Dispatchers.IO) {
         val startedAt = Clock.System.now().toEpochMilliseconds()
         fun elapsed() = Clock.System.now().toEpochMilliseconds() - startedAt
@@ -135,10 +136,21 @@ class ConsultationRepositoryImpl(
                         override suspend fun writeTo(channel: ByteWriteChannel) {
                             openSource().buffered().use { source ->
                                 val chunk = ByteArray(Constants.UPLOAD_CHUNK_BYTES)
+                                var sent = 0L
+                                // Only report on whole-percent changes — a 300MB file is ~4800
+                                // chunks, and recomposing the bubble that often would cost more
+                                // than the upload.
+                                var lastReportedPercent = -1
                                 while (true) {
                                     val read = source.readAtMostTo(chunk, 0, chunk.size)
                                     if (read <= 0) break
                                     channel.writeFully(chunk, 0, read)
+                                    sent += read
+                                    val percent = if (sizeBytes > 0) ((sent * 100) / sizeBytes).toInt() else 0
+                                    if (percent != lastReportedPercent) {
+                                        lastReportedPercent = percent
+                                        onProgress(sent, sizeBytes)
+                                    }
                                 }
                             }
                         }
