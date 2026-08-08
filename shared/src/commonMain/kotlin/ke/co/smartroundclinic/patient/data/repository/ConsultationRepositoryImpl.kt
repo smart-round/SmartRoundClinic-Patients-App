@@ -148,6 +148,9 @@ class ConsultationRepositoryImpl(
                                     sent += read
                                     val percent = if (sizeBytes > 0) ((sent * 100) / sizeBytes).toInt() else 0
                                     if (percent != lastReportedPercent) {
+                                        if (percent / 10 != lastReportedPercent / 10) {
+                                            Napier.i(tag = "SRC-UPLOAD", message = "$percent% ($sent/$sizeBytes) at ${elapsed()}ms")
+                                        }
                                         lastReportedPercent = percent
                                         onProgress(sent, sizeBytes)
                                     }

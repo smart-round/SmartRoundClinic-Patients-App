@@ -1180,13 +1180,11 @@ private fun PendingFileBubble(pending: PendingFile) {
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    val progress = pending.progress
                     Text(
                         text = when {
                             pending.errorText != null -> pending.errorText
                             pending.failed -> "Failed to send"
-                            progress != null -> "Sending… ${(progress * 100).toInt()}%  ·  ${formatBytes(pending.totalBytes)}"
-                            else -> "Sending…"
+                            else -> formatBytes(pending.totalBytes)
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = if (pending.failed)
@@ -1194,19 +1192,9 @@ private fun PendingFileBubble(pending: PendingFile) {
                         else
                             Color.White.copy(alpha = 0.7f),
                     )
-                    // A large attachment takes minutes; without a real bar it reads as frozen.
-                    if (!pending.failed && progress != null) {
-                        Spacer(Modifier.height(6.dp))
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier.fillMaxWidth().height(3.dp),
-                            color = Color.White,
-                            trackColor = Color.White.copy(alpha = 0.3f),
-                        )
-                    }
                 }
                 if (!pending.failed) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                    UploadProgressRing(progress = pending.progress)
                 }
             }
         }
@@ -1356,4 +1344,32 @@ internal fun formatBytes(bytes: Long): String = when {
     bytes >= 1_000_000 -> "${(bytes / 100_000) / 10.0} MB"
     bytes >= 1_000 -> "${bytes / 1_000} KB"
     else -> "$bytes B"
+}
+
+
+/**
+ * WhatsApp-style upload indicator: a determinate ring with the percentage in the middle.
+ * Falls back to an indeterminate spinner until the first progress callback arrives.
+ */
+@Composable
+private fun UploadProgressRing(progress: Float?) {
+    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+        if (progress == null) {
+            CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
+        } else {
+            CircularProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxSize(),
+                color = Color.White,
+                trackColor = Color.White.copy(alpha = 0.3f),
+                strokeWidth = 3.dp,
+                gapSize = 0.dp,
+            )
+            Text(
+                text = "${(progress * 100).toInt()}",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                color = Color.White,
+            )
+        }
+    }
 }

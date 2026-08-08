@@ -83,7 +83,17 @@ data class PendingFile(
 ) {
     /** 0f..1f, or null when the total isn't known yet. */
     val progress: Float? get() = if (totalBytes > 0) (sentBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else null
-    override fun equals(other: Any?) = other is PendingFile && localId == other.localId
+    // localId alone is NOT enough: the progress fields change while the upload runs, and if
+    // equals ignores them Compose treats each update as an identical value and skips
+    // recomposition — the percentage then never moves on screen. ByteArray is deliberately
+    // still excluded, since its equality is by identity.
+    override fun equals(other: Any?) = other is PendingFile &&
+        localId == other.localId &&
+        sentBytes == other.sentBytes &&
+        totalBytes == other.totalBytes &&
+        failed == other.failed &&
+        errorText == other.errorText
+
     override fun hashCode() = localId.hashCode()
 }
 
