@@ -110,6 +110,10 @@ import ke.co.smartroundclinic.patient.domain.model.NextAppointment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationFileAttachment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
 import ke.co.smartroundclinic.patient.presentation.main.chat.PendingFile
+import ke.co.smartroundclinic.patient.presentation.main.chat.util.AttachmentKind
+import ke.co.smartroundclinic.patient.presentation.main.chat.util.attachmentKind
+import ke.co.smartroundclinic.patient.presentation.main.chat.util.attachmentLabel
+import ke.co.smartroundclinic.patient.presentation.main.chat.util.isPdf
 import ke.co.smartroundclinic.patient.presentation.main.chat.util.CallAvailability
 import ke.co.smartroundclinic.patient.presentation.main.chat.util.callAvailability
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
@@ -1026,8 +1030,10 @@ private fun FileBubble(
 ) {
     val file = message.files.firstOrNull() ?: return
     val fileName = file.fileName.ifBlank { message.message ?: "File" }
-    val isImage = fileName.isImageFile() || file.contentType.startsWith("image/")
-    val isPdf = fileName.endsWith(".pdf", ignoreCase = true) || file.contentType == "application/pdf"
+    val kind = attachmentKind(fileName, file.contentType)
+    val isImage = kind == AttachmentKind.PHOTO
+    val label = attachmentLabel(fileName, file.contentType)
+    val isPdfFile = isPdf(fileName, file.contentType)
 
     val shape = RoundedCornerShape(
         topStart = 18.dp, topEnd = 18.dp,
@@ -1079,19 +1085,19 @@ private fun FileBubble(
                     modifier = Modifier
                         .size(46.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(if (fromMe) Color.White.copy(alpha = 0.15f) else if (isPdf) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surface),
+                        .background(if (fromMe) Color.White.copy(alpha = 0.15f) else if (isPdfFile) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surface),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = if (isPdf) Icons.Filled.PictureAsPdf else Icons.AutoMirrored.Filled.InsertDriveFile,
+                        imageVector = attachmentIcon(kind, fileName, file.contentType),
                         contentDescription = null,
-                        tint = if (isPdf) StatusSuspended else if (fromMe) Color.White else Primary40,
+                        tint = if (isPdfFile) StatusSuspended else if (fromMe) Color.White else Primary40,
                         modifier = Modifier.size(28.dp),
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = fileName,
+                        text = label,
                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                         color = if (fromMe) Color.White else MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
@@ -1119,8 +1125,10 @@ private fun FileBubble(
 // WhatsApp-style optimistic bubble shown immediately while the file is uploading
 @Composable
 private fun PendingFileBubble(pending: PendingFile) {
-    val isImage = pending.contentType.startsWith("image/") || pending.fileName.isImageFile()
-    val isPdf = pending.fileName.endsWith(".pdf", ignoreCase = true) || pending.contentType == "application/pdf"
+    val kind = attachmentKind(pending.fileName, pending.contentType)
+    // Only show the inline preview when we actually kept the bytes (small images).
+    val isImage = kind == AttachmentKind.PHOTO && pending.previewBytes != null
+    val label = attachmentLabel(pending.fileName, pending.contentType)
     val shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 4.dp)
 
     Box(
@@ -1142,9 +1150,16 @@ private fun PendingFileBubble(pending: PendingFile) {
                     contentAlignment = Alignment.Center,
                 ) {
                     if (pending.failed) {
-                        Text("Failed", style = MaterialTheme.typography.labelMedium, color = Color.White)
+                        Text(
+                            text = pending.errorText ?: "Failed",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
                     } else {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
+                        // Same determinate ring as every other attachment type.
+                        UploadProgressRing(progress = pending.progress)
                     }
                 }
             }
@@ -1166,7 +1181,7 @@ private fun PendingFileBubble(pending: PendingFile) {
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = if (isPdf) Icons.Filled.PictureAsPdf else Icons.AutoMirrored.Filled.InsertDriveFile,
+                        imageVector = attachmentIcon(kind, pending.fileName, pending.contentType),
                         contentDescription = null,
                         tint = if (pending.failed) MaterialTheme.colorScheme.onErrorContainer else Color.White,
                         modifier = Modifier.size(28.dp),
@@ -1174,7 +1189,7 @@ private fun PendingFileBubble(pending: PendingFile) {
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = pending.fileName,
+                        text = label,
                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                         color = if (pending.failed) MaterialTheme.colorScheme.onErrorContainer else Color.White,
                         maxLines = 2,
@@ -1372,4 +1387,18 @@ private fun UploadProgressRing(progress: Float?) {
             )
         }
     }
+}
+
+
+/** Icon for an attachment bubble, matching the label produced by attachmentLabel. */
+@Composable
+internal fun attachmentIcon(
+    kind: AttachmentKind,
+    fileName: String,
+    contentType: String,
+): ImageVector = when (kind) {
+    AttachmentKind.PHOTO -> Icons.Filled.Photo
+    AttachmentKind.VIDEO -> Icons.Filled.Videocam
+    AttachmentKind.DOCUMENT -> if (isPdf(fileName, contentType)) Icons.Filled.PictureAsPdf else Icons.AutoMirrored.Filled.InsertDriveFile
+    AttachmentKind.OTHER -> Icons.AutoMirrored.Filled.InsertDriveFile
 }
