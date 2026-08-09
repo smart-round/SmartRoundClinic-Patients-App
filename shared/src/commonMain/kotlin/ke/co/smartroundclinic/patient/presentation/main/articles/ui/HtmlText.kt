@@ -12,6 +12,7 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
@@ -20,11 +21,13 @@ import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 internal fun HtmlText(
     html: String,
     modifier: Modifier = Modifier,
+    textAlign: TextAlign? = null,
 ) {
     val annotated = remember(html) { html.toAnnotatedString() }
     Text(
         text = annotated,
-        style = MaterialTheme.typography.bodyMedium,
+        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 18.sp),
+        textAlign = textAlign,
         modifier = modifier,
     )
 }
