@@ -9,8 +9,10 @@ plugins {
 // No serviceAccountCredentials — CI authenticates via Workload Identity Federation, not a
 // downloaded key (our GCP org blocks key creation: iam.disableServiceAccountKeyCreation).
 // google-github-actions/auth sets GOOGLE_APPLICATION_CREDENTIALS to a short-lived, federated
-// token file; GPP's underlying Google auth library picks that up via standard ADC discovery.
+// token file, but GPP won't pick it up on its own — useApplicationDefaultCredentials must be
+// set explicitly, or GPP fails with "No credentials specified" even though ADC is available.
 play {
+    useApplicationDefaultCredentials = true
     track.set("internal")
     defaultToAppBundles.set(true)
 }
