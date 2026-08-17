@@ -42,3 +42,8 @@ fastlane/Preview.html
 fastlane/screenshots
 fastlane/test_output
 .env
+
+# Local Ruby/bundler install for running fastlane outside CI
+vendor/bundle/
+.bundle/
+Gemfile.lock

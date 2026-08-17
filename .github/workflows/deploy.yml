@@ -72,12 +72,17 @@ jobs:
       - name: Write App Store Connect API key
         run: echo '${{ secrets.APP_STORE_CONNECT_API_KEY_JSON }}' > "$RUNNER_TEMP/asc-api-key.json"
 
+      # match clones/pushes the private certs repo over SSH using a deploy key scoped to just
+      # that repo — narrower blast radius than a personal-account HTTPS PAT.
+      - name: Set up SSH for match repo access
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.MATCH_SSH_PRIVATE_KEY }}
+
       - name: Build and upload to TestFlight
         env:
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
-          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_STORE_CONNECT_API_KEY_PATH: ${{ runner.temp }}/asc-api-key.json
           IOS_BUILD_NUMBER: ${{ env.BUILD_NUMBER }}
