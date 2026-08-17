@@ -1,9 +1,5 @@
 package ke.co.smartroundclinic.patient.presentation.main.chat.ui
 
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,12 +21,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -38,11 +37,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,26 +50,40 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import ke.co.smartroundclinic.patient.domain.model.ConversationThread
 import ke.co.smartroundclinic.patient.domain.model.ThreadPreviewKind
 import ke.co.smartroundclinic.patient.presentation.common.composables.PatientDashboardHeader
+import ke.co.smartroundclinic.patient.presentation.theme.Neutral20
+import ke.co.smartroundclinic.patient.presentation.theme.Neutral60
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 import ke.co.smartroundclinic.patient.presentation.theme.Primary90
-import ke.co.smartroundclinic.patient.presentation.theme.ShapePill
 import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+
+// ── Amended chat card (369×78 in the 414pt Figma frame) ──────────────────────
+/** 369 wide in a 414 frame — the same 23dp gutter the amended Articles screens hang off. */
+private val ChatCardGutter = 23.dp
+private val ChatCardHeight = 78.dp
+private val ChatCardPadding = 18.dp
+private val ChatCardAvatarGap = 31.dp
+private const val ChatCardAvatarSize = 53
+private val ChatCardShape = RoundedCornerShape(12.dp)
+
+/** #393938 at 3% — a wash just strong enough to separate the card from the page. */
+private val ChatCardBackground = Neutral20.copy(alpha = 0.03f)
 
 @Composable
 internal fun ConsultationListScreen(
@@ -83,7 +97,6 @@ internal fun ConsultationListScreen(
     modifier: Modifier = Modifier,
 ) {
     var threadPendingDelete by remember { mutableStateOf<ConversationThread?>(null) }
-    var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
     val visibleThreads = if (searchQuery.isNotBlank()) {
@@ -97,16 +110,13 @@ internal fun ConsultationListScreen(
             title = "Consultations",
             onProfileClick = onProfileClick,
             onNotificationsClick = onNotificationsClick,
+            bottomContent = {
+                ChatSearchField(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                )
+            },
         )
-
-        ChatSearchHeaderRow(
-            isSearching = isSearching,
-            onToggleSearch = { isSearching = !isSearching; if (!isSearching) searchQuery = "" },
-            searchQuery = searchQuery,
-            onSearchQueryChange = { searchQuery = it },
-            hintText = "Your conversations with doctors",
-        )
-        HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
         PullToRefreshBox(
             isRefreshing = isLoading,
@@ -148,17 +158,14 @@ internal fun ConsultationListScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+                    contentPadding = PaddingValues(horizontal = ChatCardGutter, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(visibleThreads, key = { it.threadId }) { thread ->
-                        ConsultationThreadRow(
+                        ConsultationThreadCard(
                             thread = thread,
                             onClick = { onThreadClick(thread) },
                             onLongClick = { threadPendingDelete = thread },
-                        )
-                        HorizontalDivider(
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                            modifier = Modifier.padding(start = 76.dp),
                         )
                     }
                 }
@@ -185,22 +192,24 @@ internal fun ConsultationListScreen(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ConsultationThreadRow(thread: ConversationThread, onClick: () -> Unit, onLongClick: () -> Unit = {}) {
+private fun ConsultationThreadCard(thread: ConversationThread, onClick: () -> Unit, onLongClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(ChatCardHeight)
+            .clip(ChatCardShape)
+            .background(ChatCardBackground)
             .combinedClickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = ChatCardPadding),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box {
-            DoctorAvatar(picture = thread.counterpartPicture, size = 48)
+            DoctorAvatar(picture = thread.counterpartPicture, size = ChatCardAvatarSize)
             if (thread.isOnline) {
                 Box(
                     modifier = Modifier
@@ -214,12 +223,26 @@ private fun ConsultationThreadRow(thread: ConversationThread, onClick: () -> Uni
                 )
             }
         }
+
+        Spacer(Modifier.width(ChatCardAvatarGap))
+
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "Dr. ${thread.counterpartName}",
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    letterSpacing = 0.sp,
+                ),
+                color = Neutral20,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(3.dp))
+
+            Spacer(Modifier.height(6.dp))
+
+            // Preview and timestamp share the second line in the amended card, rather than the
+            // timestamp sitting centred against the full row height.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val previewIcon = when (thread.lastMessageKind) {
                     ThreadPreviewKind.PHOTO -> Icons.Filled.CameraAlt
@@ -230,26 +253,29 @@ private fun ConsultationThreadRow(thread: ConversationThread, onClick: () -> Uni
                     Icon(
                         imageVector = previewIcon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = Neutral60,
                         modifier = Modifier.size(14.dp),
                     )
                     Spacer(Modifier.width(4.dp))
                 }
                 Text(
                     text = thread.lastMessagePreview ?: "No messages yet",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, letterSpacing = 0.sp),
+                    color = Neutral60,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
+                if (thread.lastMessageAt != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = formatThreadTimestamp(thread.lastMessageAt),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, letterSpacing = 0.sp),
+                        color = Neutral60,
+                        maxLines = 1,
+                    )
+                }
             }
-        }
-        if (thread.lastMessageAt != null) {
-            Text(
-                text = formatThreadTimestamp(thread.lastMessageAt),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
@@ -292,83 +318,61 @@ internal fun DoctorAvatar(picture: String?, size: Int, modifier: Modifier = Modi
     }
 }
 
-/** Mirrors the doctor app's chat search design: a compact pill field that expands from the
- * search icon's position rather than springing in at full width all at once. */
+/**
+ * The Services tab's in-header search field, with the magnifier moved to the trailing edge — it
+ * doubles as the clear button once there is a query to clear.
+ */
 @Composable
-private fun ChatSearchHeaderRow(
-    isSearching: Boolean,
-    onToggleSearch: () -> Unit,
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
-    hintText: String,
+private fun ChatSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(modifier = Modifier.weight(1f)) {
-            androidx.compose.animation.AnimatedVisibility(visible = !isSearching, enter = fadeIn(), exit = fadeOut()) {
-                Text(
-                    text = hintText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            androidx.compose.animation.AnimatedVisibility(
-                visible = isSearching,
-                enter = expandHorizontally(expandFrom = Alignment.End) + fadeIn(),
-                exit = shrinkHorizontally(shrinkTowards = Alignment.End) + fadeOut(),
-            ) {
-                CompactChatSearchField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-        Spacer(Modifier.size(4.dp))
-        IconButton(onClick = onToggleSearch) {
-            Icon(
-                imageVector = if (isSearching) Icons.Filled.Close else Icons.Filled.Search,
-                contentDescription = if (isSearching) "Close search" else "Search doctors",
-                tint = Primary40,
-            )
-        }
-    }
-}
+    val keyboardController = LocalSoftwareKeyboardController.current
 
-@Composable
-private fun CompactChatSearchField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-
-    Box(
-        modifier = modifier
-            .height(36.dp)
-            .clip(ShapePill)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = 14.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        if (value.isEmpty()) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = {
             Text(
                 text = "Search doctors...",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.6f),
             )
-        }
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
-            cursorBrush = SolidColor(Primary40),
-            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
-        )
-    }
+        },
+        trailingIcon = {
+            if (query.isEmpty()) {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.size(20.dp),
+                )
+            } else {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(
+                        imageVector = Icons.Filled.Clear,
+                        contentDescription = "Clear search",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White,
+            focusedBorderColor = Color.White.copy(alpha = 0.6f),
+            unfocusedBorderColor = Color.White.copy(alpha = 0.35f),
+            cursorColor = Color.White,
+            focusedContainerColor = Color.White.copy(alpha = 0.15f),
+            unfocusedContainerColor = Color.White.copy(alpha = 0.1f),
+        ),
+        textStyle = MaterialTheme.typography.bodyMedium,
+        modifier = modifier.fillMaxWidth(),
+    )
 }

@@ -37,10 +37,7 @@ fun ArticlesRoot(
     val liveArticles by viewModel.liveArticles.collectAsState()
     val categories by viewModel.categories.collectAsState()
     var selectedCategoryId by retain { mutableStateOf<String?>(null) }
-    var isSearching by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-
-    LaunchedEffect(isSearching) { if (!isSearching) query = "" }
 
     NavDisplay(
         modifier = modifier,
@@ -56,10 +53,8 @@ fun ArticlesRoot(
                     isLoading = viewModel.isLoading,
                     hasLoaded = viewModel.hasLoaded,
                     isRefreshing = viewModel.isRefreshing,
-                    isSearching = isSearching,
                     query = query,
                     onQueryChange = { query = it },
-                    onSearchingChange = { isSearching = it },
                     onRefresh = { viewModel.pullRefresh() },
                     onArticleClick = { article -> backStack.add(ArticleDetail(article.id)) },
                     onProfileClick = onProfileClick,
@@ -73,11 +68,6 @@ fun ArticlesRoot(
                         article = article,
                         categoryName = categories.find { it.id == article.categoryId }?.name.orEmpty(),
                         onBack = { backStack.removeLastOrNull() },
-                        onNotificationsClick = onNotificationsClick,
-                        onSearchClick = {
-                            backStack.removeLastOrNull()
-                            isSearching = true
-                        },
                     )
                 }
             }

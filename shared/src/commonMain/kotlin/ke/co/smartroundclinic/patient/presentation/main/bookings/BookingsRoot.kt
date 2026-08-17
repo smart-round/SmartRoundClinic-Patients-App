@@ -797,7 +797,13 @@ private fun AppointmentCard(appointment: Appointment, onClick: () -> Unit) {
                         RefundStatusBadge(status = refund.status)
                     }
                 }
-                Spacer(Modifier.height(10.dp))
+                // Splits the card in half: appointment date/time above, doctor and View below —
+                // matching the divider on the doctor app's consultation card.
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 10.dp),
+                    thickness = 1.dp,
+                    color = Neutral20.copy(alpha = 0.26f),
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier

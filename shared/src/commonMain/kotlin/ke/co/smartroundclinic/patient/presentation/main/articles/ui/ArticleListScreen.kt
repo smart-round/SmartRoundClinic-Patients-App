@@ -24,14 +24,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -46,11 +49,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -63,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import ke.co.smartroundclinic.patient.domain.model.Article
 import ke.co.smartroundclinic.patient.domain.model.ArticleCategory
+import ke.co.smartroundclinic.patient.presentation.common.composables.PatientDashboardHeader
 import ke.co.smartroundclinic.patient.presentation.main.articles.formatDayMonth
 import ke.co.smartroundclinic.patient.presentation.main.articles.readMinutes
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
@@ -72,6 +75,8 @@ import ke.co.smartroundclinic.patient.presentation.theme.Neutral60
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
 
 // ── Figma geometry (414pt frame) ─────────────────────────────────────────────
+/** Horizontal inset every element on the Articles screens hangs off (23dp in the Figma frame). */
+internal val ArticlesGutter = 23.dp
 private val CardShape = RoundedCornerShape(12.dp)
 private val CardHeight = 129.dp
 private val CardThumbWidth = 97.dp
@@ -90,10 +95,8 @@ internal fun ArticleListScreen(
     isLoading: Boolean,
     hasLoaded: Boolean,
     isRefreshing: Boolean,
-    isSearching: Boolean,
     query: String,
     onQueryChange: (String) -> Unit,
-    onSearchingChange: (Boolean) -> Unit,
     onRefresh: () -> Unit,
     onArticleClick: (Article) -> Unit,
     onProfileClick: () -> Unit = {},
@@ -121,23 +124,17 @@ internal fun ArticleListScreen(
         containerColor = Color.White,
         topBar = {
             Column(modifier = Modifier.background(Color.White)) {
-                ArticlesHeader(
-                    title = if (isSearching) null else "Articles",
+                PatientDashboardHeader(
+                    title = "Articles",
                     onProfileClick = onProfileClick,
                     onNotificationsClick = onNotificationsClick,
-                    onSearchClick = { onSearchingChange(!isSearching) },
+                    bottomContent = {
+                        ArticleSearchField(query = query, onQueryChange = onQueryChange)
+                    },
                 )
 
-                if (isSearching) {
-                    ArticleSearchField(
-                        query = query,
-                        onQueryChange = onQueryChange,
-                        onClose = { onSearchingChange(false) },
-                    )
-                }
-
                 if (categories.isNotEmpty()) {
-                    Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(12.dp))
                     CategoryFilterRow(
                         categories = categories,
                         selectedCategoryId = selectedCategoryId,
@@ -203,46 +200,62 @@ internal fun ArticleListScreen(
     }
 }
 
+/**
+ * The in-header search field the Services and Chat tabs use, with the magnifier on the trailing
+ * edge — it doubles as the clear button once there is a query to clear.
+ */
 @Composable
 private fun ArticleSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
-    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
-        placeholder = { Text("Search articles", style = MaterialTheme.typography.bodyMedium, color = Neutral60) },
-        singleLine = true,
-        shape = CardShape,
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        trailingIcon = {
-            Icon(
-                imageVector = Icons.Filled.Close,
-                contentDescription = "Close search",
-                tint = Neutral60,
-                modifier = Modifier
-                    .size(20.dp)
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() },
-                        onClick = onClose,
-                    ),
+        placeholder = {
+            Text(
+                text = "Search articles...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.6f),
             )
         },
+        trailingIcon = {
+            if (query.isEmpty()) {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.size(20.dp),
+                )
+            } else {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(
+                        imageVector = Icons.Filled.Clear,
+                        contentDescription = "Clear search",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+        shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Primary40,
-            unfocusedBorderColor = Primary40,
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White,
+            focusedBorderColor = Color.White.copy(alpha = 0.6f),
+            unfocusedBorderColor = Color.White.copy(alpha = 0.35f),
+            cursorColor = Color.White,
+            focusedContainerColor = Color.White.copy(alpha = 0.15f),
+            unfocusedContainerColor = Color.White.copy(alpha = 0.1f),
         ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = ArticlesGutter, vertical = 12.dp)
-            .focusRequester(focusRequester),
+        textStyle = MaterialTheme.typography.bodyMedium,
+        modifier = modifier.fillMaxWidth(),
     )
 }
 
