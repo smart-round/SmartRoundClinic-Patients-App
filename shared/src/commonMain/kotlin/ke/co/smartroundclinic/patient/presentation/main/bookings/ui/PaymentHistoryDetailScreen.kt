@@ -53,6 +53,7 @@ import ke.co.smartroundclinic.patient.domain.usecase.payments.GetPaymentHistoryB
 import ke.co.smartroundclinic.patient.generated.resources.Res
 import ke.co.smartroundclinic.patient.generated.resources.card_payment
 import ke.co.smartroundclinic.patient.generated.resources.mpesa
+import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
 import org.jetbrains.compose.resources.painterResource
@@ -218,7 +219,7 @@ fun PaymentHistoryDetailScreen(
 private fun DetailCard(title: String, content: @Composable () -> Unit) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(1.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {

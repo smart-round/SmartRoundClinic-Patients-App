@@ -1,0 +1,84 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    # id-token: write lets this job mint a short-lived OIDC token that Google exchanges for a
+    # federated credential — no downloaded service-account key, since our GCP org enforces
+    # iam.disableServiceAccountKeyCreation and won't allow one.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # GitHub Actions expressions have no arithmetic operators (the `+` below is shell, not
+      # an expression) — 1000 is a floor comfortably above the versionCode/build-number already
+      # hardcoded in the repo (22 at the time this workflow was written); bump it above whatever
+      # Play Console/App Store Connect already has if either was seeded from outside CI.
+      - name: Compute build number
+        run: echo "BUILD_NUMBER=$((1000 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode signing keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/645351885712/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
+          service_account: smartround-ci-play-publisher@circular-jet-505719-e1.iam.gserviceaccount.com
+
+      - name: Build and upload to Play Internal Testing
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_VERSION_CODE: ${{ env.BUILD_NUMBER }}
+        # google-github-actions/auth already exported GOOGLE_APPLICATION_CREDENTIALS pointing at
+        # the federated token file — Gradle Play Publisher's auth library picks it up via
+        # standard ADC discovery, no serviceAccountCredentials path needed in the play {} block.
+        run: ./gradlew :androidApp:publishReleaseBundle
+
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute build number
+        run: echo "BUILD_NUMBER=$((1000 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+
+      - name: Write App Store Connect API key
+        run: echo '${{ secrets.APP_STORE_CONNECT_API_KEY_JSON }}' > "$RUNNER_TEMP/asc-api-key.json"
+
+      - name: Build and upload to TestFlight
+        env:
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH: ${{ runner.temp }}/asc-api-key.json
+          IOS_BUILD_NUMBER: ${{ env.BUILD_NUMBER }}
+        run: bundle exec fastlane ios beta

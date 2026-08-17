@@ -18,6 +18,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -44,8 +45,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Circle
@@ -54,10 +57,15 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -111,7 +119,9 @@ import io.github.vinceglb.filekit.readBytes
 import io.github.vinceglb.filekit.size
 import io.github.vinceglb.filekit.source
 import ke.co.smartroundclinic.patient.data.remote.dto.response.MedicalRecordData
+import ke.co.smartroundclinic.patient.data.remote.dto.response.PrescriptionItemData
 import ke.co.smartroundclinic.patient.common.Constants
+import ke.co.smartroundclinic.patient.domain.model.MedicalRecord
 import ke.co.smartroundclinic.patient.domain.model.NextAppointment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationFileAttachment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
@@ -121,10 +131,14 @@ import ke.co.smartroundclinic.patient.presentation.main.chat.util.attachmentKind
 import ke.co.smartroundclinic.patient.presentation.main.chat.util.attachmentLabel
 import ke.co.smartroundclinic.patient.presentation.main.chat.util.isPdf
 import ke.co.smartroundclinic.patient.presentation.main.chat.util.CallAvailability
+import ke.co.smartroundclinic.patient.presentation.main.profile.ui.MedicalRecordItem
 import ke.co.smartroundclinic.patient.presentation.main.chat.util.callAvailability
+import ke.co.smartroundclinic.patient.presentation.theme.CardBackground
+import ke.co.smartroundclinic.patient.presentation.theme.Neutral40
+import ke.co.smartroundclinic.patient.presentation.theme.Primary20
 import ke.co.smartroundclinic.patient.presentation.theme.Primary40
-import ke.co.smartroundclinic.patient.presentation.theme.Tertiary20
-import ke.co.smartroundclinic.patient.presentation.theme.Tertiary90
+import ke.co.smartroundclinic.patient.presentation.theme.Primary90
+import ke.co.smartroundclinic.patient.presentation.theme.Primary99
 import kotlinx.serialization.json.Json
 import ke.co.smartroundclinic.patient.presentation.theme.ShapePill
 import ke.co.smartroundclinic.patient.presentation.theme.StatusConfirmed
@@ -164,6 +178,8 @@ internal fun ConsultationScreen(
     onTyping: (Boolean) -> Unit = {},
     appointment: NextAppointment? = null,
     onLockedCallClick: (String) -> Unit = {},
+    medicalHistory: List<MedicalRecord> = emptyList(),
+    isLoadingMedicalHistory: Boolean = false,
     onBack: () -> Unit,
     onVideoCall: () -> Unit,
     onSendText: (String) -> Unit,
@@ -186,6 +202,7 @@ internal fun ConsultationScreen(
     val scope = rememberCoroutineScope()
     var viewerFile by remember { mutableStateOf<ConsultationFileAttachment?>(null) }
     var showAttachMenu by remember { mutableStateOf(false) }
+    var showMedicalHistorySheet by remember { mutableStateOf(false) }
 
     // NOT remember()'d: `messages` is a SnapshotStateList mutated in place (add/addAll/clear), so its
     // identity never changes — remember(messages) would cache the first result forever and silently
@@ -440,6 +457,7 @@ internal fun ConsultationScreen(
                                             message = item.message,
                                             fromMe = fromMe,
                                             onFileClick = { viewerFile = it },
+                                            onMedicalRecordClick = { showMedicalHistorySheet = true },
                                         )
                                     }
                                 }
@@ -488,6 +506,55 @@ internal fun ConsultationScreen(
 
     viewerFile?.let { file ->
         FileViewerSheet(file = file, onDismiss = { viewerFile = null })
+    }
+
+    if (showMedicalHistorySheet) {
+        MedicalHistorySheet(
+            records = medicalHistory,
+            isLoading = isLoadingMedicalHistory,
+            onDismiss = { showMedicalHistorySheet = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MedicalHistorySheet(
+    records: List<MedicalRecord>,
+    isLoading: Boolean,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.background,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = "Medical History",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            )
+            when {
+                isLoading -> Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Primary40)
+                }
+                records.isEmpty() -> Text(
+                    text = "No medical history yet",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 24.dp),
+                )
+                else -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    records.forEach { record -> MedicalRecordItem(record = record) }
+                }
+            }
+        }
     }
 }
 
@@ -897,10 +964,11 @@ private fun MessageBubble(
     message: ConsultationMessage,
     fromMe: Boolean,
     onFileClick: (ConsultationFileAttachment) -> Unit,
+    onMedicalRecordClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isFile = message.messageType.uppercase() == "FILE"
-    val isPrescription = message.messageType.uppercase() == "PRESCRIPTION"
+    val isMedicalRecord = message.messageType.uppercase() == "PRESCRIPTION"
     Box(
         modifier = modifier.fillMaxWidth().padding(vertical = 2.dp),
         contentAlignment = if (fromMe) Alignment.CenterEnd else Alignment.CenterStart,
@@ -909,7 +977,7 @@ private fun MessageBubble(
             modifier = Modifier.fillMaxWidth(0.90f),
             horizontalAlignment = if (fromMe) Alignment.End else Alignment.Start,
         ) {
-            if (!fromMe) {
+            if (!fromMe && !isMedicalRecord) {
                 Text(
                     text = message.senderName,
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
@@ -918,7 +986,11 @@ private fun MessageBubble(
                 )
             }
             when {
-                isPrescription -> PrescriptionCard(json = message.message ?: "", time = formatTime(message.createdAt))
+                isMedicalRecord -> MedicalRecordCard(
+                    json = message.message ?: "",
+                    time = formatTime(message.createdAt),
+                    onClick = onMedicalRecordClick,
+                )
                 isFile -> FileBubble(message = message, fromMe = fromMe, onFileClick = onFileClick)
                 else -> TextBubble(text = message.message ?: "", fromMe = fromMe, time = formatTime(message.createdAt))
             }
@@ -970,95 +1042,207 @@ private fun TypingDots(modifier: Modifier = Modifier) {
     }
 }
 
-private val prescriptionJson = Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false }
+private val medicalRecordJson = Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false }
 
+/**
+ * A medical record is a document, not a chat message — it gets its own card chrome (uniform
+ * corners, header strip, sectioned body) instead of the asymmetric speech-bubble shape everything
+ * else in the thread uses, so it reads as "attached record" rather than "something someone typed".
+ */
 @Composable
-private fun PrescriptionCard(json: String, time: String, modifier: Modifier = Modifier) {
+private fun MedicalRecordCard(json: String, time: String, onClick: () -> Unit = {}, modifier: Modifier = Modifier) {
     val record = remember(json) {
-        runCatching { prescriptionJson.decodeFromString<MedicalRecordData>(json) }.getOrNull()
+        runCatching { medicalRecordJson.decodeFromString<MedicalRecordData>(json) }.getOrNull()
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 4.dp, bottomEnd = 18.dp))
-            .background(Tertiary90)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+    Card(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        elevation = CardDefaults.cardElevation(1.dp),
+        border = BorderStroke(1.dp, Primary90),
     ) {
         Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Primary90)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Tertiary20.copy(alpha = 0.15f)),
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(Primary40),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("Rx", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = Tertiary40)
+                Icon(
+                    imageVector = Icons.Filled.Assignment,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = "Medical Record",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                    color = Primary20,
+                )
+                if (!record?.doctorName.isNullOrBlank()) {
+                    Text(
+                        text = "Dr. ${record?.doctorName}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Primary40,
+                    )
+                }
             }
             Text(
-                text = "Prescription",
-                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                color = Tertiary40,
+                text = time,
+                style = MaterialTheme.typography.labelSmall,
+                color = Primary40.copy(alpha = 0.7f),
             )
         }
 
-        if (record == null) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "Unable to display prescription",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            if (!record.diagnosis.isNullOrBlank()) {
-                Spacer(Modifier.height(8.dp))
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (record == null) {
                 Text(
-                    text = "Diagnosis: ${record.diagnosis}",
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            if (record.prescription.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                record.prescription.forEach { item ->
-                    Row(modifier = Modifier.padding(vertical = 2.dp)) {
-                        Text("• ", style = MaterialTheme.typography.bodySmall, color = Tertiary40)
-                        Column {
-                            Text(
-                                text = "${item.drug} — ${item.dosage}",
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                text = "${item.frequency} for ${item.duration}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-            if (!record.summary.isNullOrBlank()) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = record.summary,
+                    text = "Unable to display this medical record",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            } else {
+                if (!record.diagnosis.isNullOrBlank()) {
+                    MedicalRecordSection(icon = Icons.Filled.MedicalServices, label = "Diagnosis") {
+                        Text(record.diagnosis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+                if (record.prescription.isNotEmpty()) {
+                    MedicalRecordSection(icon = Icons.Filled.Medication, label = "Medication") {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            record.prescription.forEach { item -> MedicationRow(item) }
+                        }
+                    }
+                }
+                if (record.labRequests.isNotEmpty()) {
+                    MedicalRecordSection(icon = Icons.Filled.Science, label = "Lab Requests") {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            record.labRequests.forEach { request ->
+                                Text("•  $request", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
+                if (!record.referralNote.isNullOrBlank()) {
+                    MedicalRecordSection(icon = Icons.AutoMirrored.Filled.ArrowForward, label = "Referral") {
+                        Text(record.referralNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+                if (!record.summary.isNullOrBlank() || !record.additionalNotes.isNullOrBlank()) {
+                    MedicalRecordSection(icon = Icons.AutoMirrored.Filled.InsertDriveFile, label = "Notes") {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            if (!record.summary.isNullOrBlank()) {
+                                Text(record.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            if (!record.additionalNotes.isNullOrBlank()) {
+                                Text(record.additionalNotes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+
+                // A revision posts its own card rather than rewriting the earlier one, so this line
+                // is what tells the two apart in the history.
+                val editedLabel = record.editedLabel()
+                if (editedLabel != null) {
+                    Text(
+                        text = editedLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.End),
+                    )
+                }
             }
         }
-
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = time,
-            style = MaterialTheme.typography.labelSmall,
-            color = Tertiary40.copy(alpha = 0.7f),
-            modifier = Modifier.align(Alignment.End),
-        )
     }
+}
+
+@Composable
+private fun MedicalRecordSection(
+    icon: ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Primary40,
+            modifier = Modifier.size(16.dp).padding(top = 2.dp),
+        )
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = Neutral40,
+            )
+            content()
+        }
+    }
+}
+
+@Composable
+private fun MedicationRow(item: PrescriptionItemData, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Primary99)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = "${item.drug} · ${item.dosage}",
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = "${item.frequency} · ${item.duration}",
+            style = MaterialTheme.typography.labelSmall,
+            color = Neutral40,
+        )
+        if (!item.instructions.isNullOrBlank()) {
+            Text(
+                text = item.instructions,
+                style = MaterialTheme.typography.labelSmall,
+                color = Primary40,
+            )
+        }
+    }
+}
+
+/**
+ * "Edited — prescription, lab requests" for a revision, naming what actually changed; null for a
+ * first save. Falls back to a bare "Edited" for cards written before the server started sending
+ * [MedicalRecordData.editedFields].
+ */
+private fun MedicalRecordData.editedLabel(): String? {
+    if (updatedAt == null) return null
+    val names = editedFields.mapNotNull { field ->
+        when (field) {
+            "DIAGNOSIS" -> "diagnosis"
+            "PRESCRIPTION" -> "medication"
+            "LAB_REQUESTS" -> "lab requests"
+            "REFERRAL_NOTE" -> "referral note"
+            else -> null
+        }
+    }
+    return if (names.isEmpty()) "Edited" else "Edited — ${names.joinToString(", ")}"
 }
 
 @Composable

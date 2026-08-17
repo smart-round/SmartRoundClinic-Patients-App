@@ -184,6 +184,7 @@ fun ServicesRoot(
                     doctor = vm.appointmentDetail?.let { vm.doctorById(it.doctorId) },
                     medicalRecord = vm.medicalRecord,
                     isLoadingMedicalRecord = vm.isLoadingMedicalRecord,
+                    payment = vm.appointmentPayment,
                     onLoad = { id -> vm.loadAppointmentDetail(id) },
                     onBack = { backStack.removeLastOrNull() },
                     onRebook = { doctor, previousAppointmentId ->

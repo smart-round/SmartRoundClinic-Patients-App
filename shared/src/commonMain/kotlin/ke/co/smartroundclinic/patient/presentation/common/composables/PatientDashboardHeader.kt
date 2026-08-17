@@ -1,5 +1,6 @@
 package ke.co.smartroundclinic.patient.presentation.common.composables
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -33,11 +34,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import ke.co.smartroundclinic.patient.generated.resources.Res
+import ke.co.smartroundclinic.patient.generated.resources.background_pattern
 import ke.co.smartroundclinic.patient.generated.resources.notification
 import ke.co.smartroundclinic.patient.presentation.main.notifications.NotificationsViewModel
 import ke.co.smartroundclinic.patient.presentation.main.profile.ProfileViewModel
@@ -69,11 +74,25 @@ fun PatientDashboardHeader(
             .fillMaxWidth()
             .heightIn(min = 120.dp)
             .background(Brush.horizontalGradient(listOf(GradientStart, GradientEnd)), HeaderShape)
-            .clip(HeaderShape)
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .clip(HeaderShape),
     ) {
-        Column {
+        // Same pattern the splash screen lays over the gradient, so the header reads as the same
+        // surface. matchParentSize keeps it out of the sizing pass — the content below still
+        // decides how tall the header is — and it sits outside the insets/padding so the pattern
+        // runs under the status bar instead of starting below it.
+        Image(
+            painter = painterResource(Res.drawable.background_pattern),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.TopCenter,
+            modifier = Modifier.matchParentSize(),
+        )
+
+        Column(
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
@@ -104,14 +123,20 @@ fun PatientDashboardHeader(
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = if (isGreeting) "Hello${if (firstName.isNotBlank()) " $firstName" else ""} 👋" else title,
-                    // FontFamily.Default (not the brand Montserrat/Raleway fonts, which carry no
-                    // emoji glyphs or fallback chain) — needed for the 👋 to render on iOS.
-                    style = if (isGreeting) {
-                        MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Default)
-                    } else {
-                        MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                    // One weight *and* one typeface for every header across the tabs — the
+                    // greeting on Home reads exactly like a screen name such as "Consultations".
+                    // Only the 👋 drops to FontFamily.Default: the brand Montserrat/Raleway fonts
+                    // carry no emoji glyphs or fallback chain, so on iOS it would not render — but
+                    // scoping that to the emoji keeps the words themselves in the brand bold.
+                    text = buildAnnotatedString {
+                        if (isGreeting) {
+                            append("Hello${if (firstName.isNotBlank()) " $firstName" else ""}")
+                            withStyle(SpanStyle(fontFamily = FontFamily.Default)) { append(" 👋") }
+                        } else {
+                            append(title)
+                        }
                     },
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                     modifier = Modifier.weight(1f),
                 )

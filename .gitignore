@@ -30,3 +30,15 @@ replay_pid*.log
 # Swift Package Manager build cache for locally-vendored packages (847MB of
 # generated output — Package.resolved is tracked, the cache is not)
 iosApp/LocalPackages/**/.build/
+
+# Signing material and fastlane run artifacts — never committed, CI writes these to $RUNNER_TEMP
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+.env

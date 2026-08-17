@@ -38,7 +38,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import ke.co.smartroundclinic.patient.common.passwordErrorOrNull
 import ke.co.smartroundclinic.patient.presentation.auth.ForgotPasswordViewModel
+import ke.co.smartroundclinic.patient.presentation.common.composables.PasswordRequirements
 import ke.co.smartroundclinic.patient.presentation.common.composables.PrimaryButton
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
@@ -57,7 +59,7 @@ internal fun CreateNewPasswordScreen(
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     val isLoading by viewModel.isLoading.collectAsState()
 
-    val passwordError = if (newPassword.isNotBlank() && newPassword.length < 8) "Password must be at least 8 characters" else null
+    val passwordError = if (newPassword.isNotBlank()) newPassword.passwordErrorOrNull() else null
     val confirmError = if (confirmPassword.isNotBlank() && confirmPassword != newPassword) "Passwords do not match" else null
     val canSubmit = newPassword.isNotBlank() && passwordError == null && confirmError == null && confirmPassword == newPassword
 
@@ -111,9 +113,10 @@ internal fun CreateNewPasswordScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    if (passwordError != null) {
-                        Text(passwordError, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(start = 4.dp, top = 2.dp))
-                    }
+                    PasswordRequirements(
+                        password = newPassword,
+                        visible = newPassword.isNotBlank(),
+                    )
                 }
 
                 Spacer(Modifier.height(12.dp))

@@ -29,7 +29,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import ke.co.smartroundclinic.patient.common.isValidPassword
+import ke.co.smartroundclinic.patient.common.passwordErrorOrNull
+import ke.co.smartroundclinic.patient.presentation.common.composables.PasswordRequirements
 import ke.co.smartroundclinic.patient.presentation.auth.ForgotPasswordViewModel
 import ke.co.smartroundclinic.patient.presentation.common.composables.PrimaryButton
 import ke.co.smartroundclinic.patient.presentation.theme.ShapeInput
@@ -47,7 +48,7 @@ fun CreateNewPasswordScreen(
     var newPasswordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    val passwordError = if (newPassword.isNotBlank() && !newPassword.isValidPassword()) "Password must be at least 8 characters" else null
+    val passwordError = if (newPassword.isNotBlank()) newPassword.passwordErrorOrNull() else null
     val confirmError = if (confirmPassword.isNotBlank() && confirmPassword != newPassword) "Passwords do not match" else null
     val canSubmit = newPassword.isNotBlank() && passwordError == null && confirmError == null && confirmPassword == newPassword && !isLoading
 
@@ -105,14 +106,10 @@ fun CreateNewPasswordScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (passwordError != null) {
-                    Text(
-                        text = passwordError,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(start = 4.dp, top = 2.dp),
-                    )
-                }
+                PasswordRequirements(
+                    password = newPassword,
+                    visible = newPassword.isNotBlank(),
+                )
             }
 
             Spacer(Modifier.height(12.dp))

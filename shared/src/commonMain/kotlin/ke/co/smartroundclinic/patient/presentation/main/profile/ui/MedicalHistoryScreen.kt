@@ -133,8 +133,13 @@ fun MedicalHistoryScreen(
     }
 }
 
+/**
+ * Also reused by [ke.co.smartroundclinic.patient.presentation.main.chat.ui.MedicalHistorySheet] so
+ * the history opened from chat can't drift out of sync with the full Medical History screen — one
+ * rendering of a [MedicalRecord], not two copies to keep aligned by hand.
+ */
 @Composable
-private fun MedicalRecordItem(record: MedicalRecord, modifier: Modifier = Modifier) {
+internal fun MedicalRecordItem(record: MedicalRecord, modifier: Modifier = Modifier) {
     var expanded by remember { mutableStateOf(false) }
 
     Card(
@@ -217,6 +222,13 @@ private fun MedicalRecordItem(record: MedicalRecord, modifier: Modifier = Modifi
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
+                                    if (!item.instructions.isNullOrBlank()) {
+                                        Text(
+                                            text = item.instructions,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Tertiary40,
+                                        )
+                                    }
                                 }
                             }
                             Spacer(Modifier.height(6.dp))

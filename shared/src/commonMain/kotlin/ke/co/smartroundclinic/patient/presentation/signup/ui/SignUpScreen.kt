@@ -68,6 +68,8 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.readBytes
 import androidx.compose.material3.CircularProgressIndicator
 import ke.co.smartroundclinic.patient.common.isValidEmail
+import ke.co.smartroundclinic.patient.common.isValidPassword
+import ke.co.smartroundclinic.patient.presentation.common.composables.PasswordRequirements
 import ke.co.smartroundclinic.patient.presentation.common.composables.PrimaryButton
 import ke.co.smartroundclinic.patient.presentation.signup.SignUpFilesViewModel
 import ke.co.smartroundclinic.patient.presentation.signup.SignUpFormViewModel
@@ -107,7 +109,7 @@ fun SignUpScreen(
 
     val isFormValid = formViewModel.fullName.isNotBlank() &&
             formViewModel.email.isValidEmail() &&
-            formViewModel.password.length >= 8 &&
+            formViewModel.password.isValidPassword() &&
             formViewModel.agreedToTerms
 
     if (showPhotoPicker) {
@@ -260,6 +262,7 @@ fun SignUpScreen(
             onValueChange = { formViewModel.password = it },
             label = { Text("Password", style = MaterialTheme.typography.bodySmall) },
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            isError = formViewModel.password.isNotBlank() && !formViewModel.password.isValidPassword(),
             trailingIcon = {
                 TextButton(onClick = { passwordVisible = !passwordVisible }) {
                     Text(if (passwordVisible) "Hide" else "Show", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
@@ -273,6 +276,11 @@ fun SignUpScreen(
                 .fillMaxWidth()
                 .bringIntoViewRequester(passwordBivr)
                 .onFocusChanged { if (it.isFocused) scope.launch { passwordBivr.bringIntoView() } },
+        )
+
+        PasswordRequirements(
+            password = formViewModel.password,
+            visible = formViewModel.password.isNotBlank(),
         )
 
         Spacer(Modifier.height(8.dp))

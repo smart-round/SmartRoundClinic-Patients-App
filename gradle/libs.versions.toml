@@ -36,6 +36,7 @@ napier = "2.7.1"
 kotlinx-datetime = "0.6.2"
 google-services = "4.4.2"
 kmpnotifier = "1.6.1"
+gradlePlayPublisher = "4.1.1"
 
 [libraries]
 app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "appUpdateKtx" }
@@ -115,3 +116,4 @@ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 androidx-room = { id = "androidx.room", version.ref = "room" }
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin"}
 googleServices = { id = "com.google.gms.google-services", version.ref = "google-services" }
+gradlePlayPublisher = { id = "com.github.triplet.play", version.ref = "gradlePlayPublisher" }

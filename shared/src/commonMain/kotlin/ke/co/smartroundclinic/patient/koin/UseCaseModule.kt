@@ -48,6 +48,7 @@ import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorsBySpeciali
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetRecommendedDoctorsUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.servicecategory.GetServiceCategoriesUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorByIdUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.payments.GetPaymentByAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.payments.GetPaymentHistoryByIdUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.payments.GetPaymentHistoryUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.referral.AcceptReferralUseCase
@@ -129,6 +130,7 @@ val useCaseModule = module {
     single { GetStkPushStatusUseCase(get()) }
     single { GetPaymentHistoryUseCase(get()) }
     single { GetPaymentHistoryByIdUseCase(get()) }
+    single { GetPaymentByAppointmentUseCase(get()) }
 
     // Referral use cases
     single { GetPendingReferralsUseCase(get()) }
@@ -173,8 +175,8 @@ val useCaseModule = module {
     viewModel { HomeViewModel(get(), get(), get(), get()) }
     viewModel { ProfileViewModel(get(), get(), get(), get(), get(), get(), get()) }
     viewModel { DoctorsProfileViewModel(get(), get(), get(), get()) }
-    viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
-    viewModel { ConsultationViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { ServicesViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { ConsultationViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { NotificationsViewModel(get(), get()) }
     viewModel { MedicalBioViewModel(get(), get(), get(), get(), get()) }
     viewModel { MedicalHistoryViewModel(get()) }

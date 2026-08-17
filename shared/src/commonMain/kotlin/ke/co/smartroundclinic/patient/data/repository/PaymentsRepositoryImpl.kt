@@ -8,6 +8,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.data.remote.dto.request.StkPushPreBookingReq
+import ke.co.smartroundclinic.patient.data.remote.dto.response.GetPaymentByAppointmentRes
 import ke.co.smartroundclinic.patient.data.remote.dto.response.GetPaymentHistoryByIdRes
 import ke.co.smartroundclinic.patient.data.remote.dto.response.GetPaymentHistoryRes
 import ke.co.smartroundclinic.patient.data.remote.dto.response.StkPushInitiationData
@@ -70,6 +71,16 @@ class PaymentsRepositoryImpl(private val client: HttpClient) : PaymentsRepositor
                 if (res.status) Resource.Success(res, res.message) else Resource.Error(res.message)
             } catch (e: Exception) {
                 Resource.Error(e.message ?: "Failed to load payment details")
+            }
+        }
+
+    override suspend fun getPaymentByAppointment(appointmentId: String): Resource<GetPaymentByAppointmentRes> =
+        withContext(Dispatchers.IO) {
+            try {
+                val res = client.get("payments/appointment/$appointmentId").body<GetPaymentByAppointmentRes>()
+                if (res.status) Resource.Success(res, res.message) else Resource.Error(res.message)
+            } catch (e: Exception) {
+                Resource.Error(e.message ?: "Failed to load payment")
             }
         }
 }
