@@ -60,6 +60,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # macos-15's default xcode-select points at an older Xcode. Apple now rejects any
+      # App Store Connect / TestFlight upload not built with the iOS 26 SDK (Xcode 26+).
+      - name: Select Xcode 26
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "26"
+
       - name: Compute build number
         run: echo "BUILD_NUMBER=$((1000 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
 
