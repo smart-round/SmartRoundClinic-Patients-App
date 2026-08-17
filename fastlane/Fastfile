@@ -1,0 +1,45 @@
+# Android no longer goes through fastlane/supply — Gradle Play Publisher (see androidApp's
+# play {} block) authenticates via Workload Identity Federation directly, which fastlane's
+# Ruby auth stack doesn't reliably support yet (open upstream bug: missing client_email when
+# fed a WIF token instead of a service-account key).
+default_platform(:ios)
+
+platform :ios do
+  desc "Build a release archive and push it to TestFlight"
+  lane :beta do
+    setup_ci if ENV["CI"]
+
+    match(type: "appstore", api_key_path: ENV["APP_STORE_CONNECT_API_KEY_PATH"])
+
+    # match provisions with manual signing; the checked-in project uses Automatic locally, so
+    # switch it to the match-provided identity/profile for this CI run only — nothing here is
+    # ever committed back, the checkout is thrown away at the end of the job.
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "../iosApp/iosApp.xcodeproj",
+      code_sign_identity: "Apple Distribution",
+      bundle_identifier: "ke.co.smartroundclinic.patientapp",
+      profile_name: lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING]["ke.co.smartroundclinic.patientapp"],
+      team_id: ENV["APPLE_TEAM_ID"] || "65X556349W",
+    )
+
+    if ENV["IOS_BUILD_NUMBER"]
+      increment_build_number(
+        xcodeproj: "../iosApp/iosApp.xcodeproj",
+        build_number: ENV["IOS_BUILD_NUMBER"],
+      )
+    end
+
+    build_app(
+      project: "../iosApp/iosApp.xcodeproj",
+      scheme: "iosApp",
+      export_method: "app-store",
+      output_directory: "../build/ios",
+    )
+
+    upload_to_testflight(
+      api_key_path: ENV["APP_STORE_CONNECT_API_KEY_PATH"],
+      skip_waiting_for_build_processing: true,
+    )
+  end
+end
