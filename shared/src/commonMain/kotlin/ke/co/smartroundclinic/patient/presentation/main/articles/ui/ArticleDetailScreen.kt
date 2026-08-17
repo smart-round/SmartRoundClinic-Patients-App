@@ -1,13 +1,12 @@
 package ke.co.smartroundclinic.patient.presentation.main.articles.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,17 +17,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -40,7 +43,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import ke.co.smartroundclinic.patient.core.platform.rememberShareText
 import ke.co.smartroundclinic.patient.domain.model.Article
 import ke.co.smartroundclinic.patient.presentation.main.articles.formatLongDate
 import ke.co.smartroundclinic.patient.presentation.main.articles.readMinutes
@@ -60,8 +62,6 @@ internal fun ArticleDetailScreen(
     onSearchClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val shareText = rememberShareText()
-
     val minutes = remember(article.content) { readMinutes(article.content) }
     val formattedDate = remember(article.datePosted, article.createdAt) {
         formatLongDate(article.datePosted ?: article.createdAt)
@@ -71,10 +71,20 @@ internal fun ArticleDetailScreen(
         modifier = modifier,
         containerColor = Color.White,
         topBar = {
-            ArticlesHeader(
-                onBack = onBack,
-                onNotificationsClick = onNotificationsClick,
-                onSearchClick = onSearchClick,
+            // The app's standard sub-screen bar, same as every other detail screen.
+            TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                title = {
+                    Text(
+                        text = "Article",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
             )
         },
         contentWindowInsets = WindowInsets(0),
@@ -112,37 +122,19 @@ internal fun ArticleDetailScreen(
 
             Spacer(Modifier.height(10.dp))
 
-            Row(
+            Text(
+                text = buildAnnotatedString {
+                    if (formattedDate.isNotBlank()) append("$formattedDate by ")
+                    val author = article.authorName
+                    if (!author.isNullOrBlank()) {
+                        withStyle(SpanStyle(color = Primary40)) { append(author) }
+                    }
+                    append(" · $minutes min read")
+                },
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, letterSpacing = 0.sp),
+                color = Neutral20,
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = buildAnnotatedString {
-                        if (formattedDate.isNotBlank()) append("$formattedDate by ")
-                        val author = article.authorName
-                        if (!author.isNullOrBlank()) {
-                            withStyle(SpanStyle(color = Primary40)) { append(author) }
-                        }
-                        append(" · $minutes min read")
-                    },
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, letterSpacing = 0.sp),
-                    color = Neutral20,
-                    modifier = Modifier.weight(1f),
-                )
-
-                Icon(
-                    imageVector = Icons.Filled.Share,
-                    contentDescription = "Share article",
-                    tint = Neutral20,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clickable(
-                            indication = null,
-                            interactionSource = remember { MutableInteractionSource() },
-                            onClick = { shareText("${article.title}\n\n${article.summary}") },
-                        ),
-                )
-            }
+            )
 
             Spacer(Modifier.height(20.dp))
 
@@ -155,11 +147,19 @@ internal fun ArticleDetailScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 if (article.thumbnailUrl != null) {
+                    // Blurred cover fill hides the letterboxing when the source photo's aspect
+                    // ratio doesn't match this banner, instead of stretching it to fit.
                     AsyncImage(
                         model = article.thumbnailUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().blur(16.dp),
+                    )
+                    AsyncImage(
+                        model = article.thumbnailUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxHeight().aspectRatio(1f),
                     )
                 } else {
                     Icon(

@@ -58,7 +58,10 @@ class HomeViewModel(
     private fun loadDoctors() {
         viewModelScope.launch {
             isLoading = true
-            val result = getRecommendedDoctorsUseCase()
+            // Always hit the server on launch — a stale or short cached list (e.g. left over
+            // from a narrower fetch, or a doctor who's since dropped off the recommended list)
+            // would otherwise sit there indefinitely since nothing else invalidates it.
+            val result = getRecommendedDoctorsUseCase(forceRefresh = true)
             if (result is Resource.Success) doctors = result.data ?: emptyList()
             isLoading = false
         }

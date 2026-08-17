@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import androidx.compose.material3.AlertDialog
+import ke.co.smartroundclinic.patient.data.remote.dto.response.PaymentByAppointmentData
 import ke.co.smartroundclinic.patient.domain.model.Appointment
 import ke.co.smartroundclinic.patient.domain.model.Doctor
 import ke.co.smartroundclinic.patient.domain.model.MedicalRecord
@@ -89,6 +90,7 @@ fun AppointmentDetailsScreen(
     doctor: Doctor?,
     medicalRecord: MedicalRecord? = null,
     isLoadingMedicalRecord: Boolean = false,
+    payment: PaymentByAppointmentData? = null,
     onLoad: (String) -> Unit,
     onBack: () -> Unit,
     onRebook: ((doctor: Doctor, previousAppointmentId: String) -> Unit)? = null,
@@ -251,46 +253,58 @@ fun AppointmentDetailsScreen(
             // Doctor card
             if (doctor != null) {
                 DetailCard(title = "Doctor") {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(
-                                    Brush.verticalGradient(listOf(GradientStart, GradientEnd)),
-                                    RoundedCornerShape(10.dp),
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(
+                                        Brush.verticalGradient(listOf(GradientStart, GradientEnd)),
+                                        RoundedCornerShape(10.dp),
+                                    )
+                                    .clip(RoundedCornerShape(10.dp)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (doctor.profilePicture != null) {
+                                    AsyncImage(
+                                        model = doctor.profilePicture,
+                                        contentDescription = doctor.displayName,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Filled.Person,
+                                        contentDescription = null,
+                                        tint = Color.White.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(28.dp),
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = doctor.displayName,
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                                 )
-                                .clip(RoundedCornerShape(10.dp)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (doctor.profilePicture != null) {
-                                AsyncImage(
-                                    model = doctor.profilePicture,
-                                    contentDescription = doctor.displayName,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Filled.Person,
-                                    contentDescription = null,
-                                    tint = Color.White.copy(alpha = 0.6f),
-                                    modifier = Modifier.size(28.dp),
-                                )
+                                if (doctor.specialization != null) {
+                                    Text(
+                                        text = doctor.specialization,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
                             }
                         }
-                        Spacer(Modifier.width(12.dp))
-                        Column {
+                        if (payment != null) {
                             Text(
-                                text = doctor.displayName,
-                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                                text = formatAmount(payment.amount, payment.currency),
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                             )
-                            if (doctor.specialization != null) {
-                                Text(
-                                    text = doctor.specialization,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
                         }
                     }
                 }
@@ -346,7 +360,7 @@ fun AppointmentDetailsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = formatRefundAmount(refund.amount, refund.currency),
+                            text = formatAmount(refund.amount, refund.currency),
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = MaterialTheme.colorScheme.onSurface,
                         )
@@ -805,7 +819,7 @@ private fun DetailRow(
     }
 }
 
-private fun formatRefundAmount(amount: Double, currency: String): String {
+private fun formatAmount(amount: Double, currency: String): String {
     val whole = amount.toLong()
     val cents = ((amount - whole) * 100).toLong()
     return "$currency $whole.${cents.toString().padStart(2, '0')}"

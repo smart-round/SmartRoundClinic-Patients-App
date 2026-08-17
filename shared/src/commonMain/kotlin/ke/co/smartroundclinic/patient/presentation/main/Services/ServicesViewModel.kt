@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ke.co.smartroundclinic.patient.common.Resource
+import ke.co.smartroundclinic.patient.data.remote.dto.response.PaymentByAppointmentData
 import ke.co.smartroundclinic.patient.data.remote.dto.response.toDomain
 import ke.co.smartroundclinic.patient.domain.model.Appointment
 import ke.co.smartroundclinic.patient.domain.model.Article
@@ -24,6 +25,7 @@ import ke.co.smartroundclinic.patient.domain.usecase.datastore.SetKeyUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.doctor.GetDoctorsBySpecializationUseCase
 import ke.co.smartroundclinic.patient.core.snackbar.SnackbarController
 import ke.co.smartroundclinic.patient.domain.usecase.medicalrecord.GetMedicalRecordUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.payments.GetPaymentByAppointmentUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.payments.GetStkPushStatusUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.payments.StkPushPreBookingUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.rating.DeleteDoctorRatingUseCase
@@ -81,6 +83,7 @@ class ServicesViewModel(
     private val stkPushPreBookingUseCase: StkPushPreBookingUseCase,
     private val getStkPushStatusUseCase: GetStkPushStatusUseCase,
     private val getMedicalRecordUseCase: GetMedicalRecordUseCase,
+    private val getPaymentByAppointmentUseCase: GetPaymentByAppointmentUseCase,
     private val rateDoctorUseCase: RateDoctorUseCase,
     private val updateDoctorRatingUseCase: UpdateDoctorRatingUseCase,
     private val deleteDoctorRatingUseCase: DeleteDoctorRatingUseCase,
@@ -177,6 +180,9 @@ class ServicesViewModel(
     var medicalRecord by mutableStateOf<MedicalRecord?>(null)
         private set
     var isLoadingMedicalRecord by mutableStateOf(false)
+        private set
+
+    var appointmentPayment by mutableStateOf<PaymentByAppointmentData?>(null)
         private set
 
     var myRatingOfDoctor by mutableStateOf<Rating?>(null)
@@ -578,6 +584,7 @@ class ServicesViewModel(
             }
         }
         loadMedicalRecord(id)
+        loadAppointmentPayment(id)
     }
 
     fun submitRating(appointmentId: String, doctorId: String, rating: Int, comment: String?) {
@@ -642,6 +649,16 @@ class ServicesViewModel(
                 else -> {}
             }
             isLoadingMedicalRecord = false
+        }
+    }
+
+    private fun loadAppointmentPayment(appointmentId: String) {
+        appointmentPayment = null
+        viewModelScope.launch {
+            when (val result = getPaymentByAppointmentUseCase(appointmentId)) {
+                is Resource.Success -> appointmentPayment = result.data?.data
+                else -> {}
+            }
         }
     }
 

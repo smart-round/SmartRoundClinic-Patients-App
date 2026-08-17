@@ -6,5 +6,5 @@ import ke.co.smartroundclinic.patient.domain.repository.DoctorLocalRepository
 
 class DoctorLocalRepositoryImpl(private val dao: DoctorDao) : DoctorLocalRepository {
     override suspend fun getDoctors(): List<DoctorEntity> = dao.getAll()
-    override suspend fun saveDoctors(entities: List<DoctorEntity>) = dao.upsertAll(entities)
+    override suspend fun saveDoctors(entities: List<DoctorEntity>) = dao.replaceAll(entities)
 }

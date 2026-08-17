@@ -106,6 +106,8 @@ fun ChatRoot(
                     doctorPicture = doctorPicture,
                     appointment = vm.nextAppointment,
                     onLockedCallClick = { vm.notifyCallLocked(it) },
+                    medicalHistory = vm.medicalHistory,
+                    isLoadingMedicalHistory = vm.isLoadingMedicalHistory,
                     messages = vm.messages,
                     isLoadingHistory = vm.isLoadingHistory,
                     isLoadingMoreHistory = vm.isLoadingMoreHistory,

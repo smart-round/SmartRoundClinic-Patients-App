@@ -29,6 +29,8 @@ data class MedicalRecordData(
     val createdAt: String,
     val updatedAt: String? = null,
     val doctorName: String? = null,
+    /** Set only on the copy embedded in a chat card — which fields this revision changed. */
+    val editedFields: List<String> = emptyList(),
 )
 
 @Serializable

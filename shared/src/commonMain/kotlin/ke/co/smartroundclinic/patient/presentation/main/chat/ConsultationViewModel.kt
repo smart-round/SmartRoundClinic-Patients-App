@@ -31,6 +31,7 @@ import ke.co.smartroundclinic.patient.data.remote.dto.response.toDomain
 import ke.co.smartroundclinic.patient.domain.model.Appointment
 import ke.co.smartroundclinic.patient.domain.model.ConsultationMessage
 import ke.co.smartroundclinic.patient.domain.model.ConversationThread
+import ke.co.smartroundclinic.patient.domain.model.MedicalRecord
 import ke.co.smartroundclinic.patient.domain.model.NextAppointment
 import ke.co.smartroundclinic.patient.domain.repository.ConsultationRepository
 import ke.co.smartroundclinic.patient.domain.repository.DoctorLocalRepository
@@ -47,6 +48,7 @@ import ke.co.smartroundclinic.patient.domain.usecase.consultation.GetMergedConsu
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.InviteToCallUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.JoinConsultationCallUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.ListConversationThreadsUseCase
+import ke.co.smartroundclinic.patient.domain.usecase.medicalrecord.GetMyMedicalHistoryUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -117,6 +119,7 @@ class ConsultationViewModel(
     private val getMergedHistoryUseCase: GetMergedConsultationHistoryUseCase,
     private val deleteConversationThreadUseCase: DeleteConversationThreadUseCase,
     private val getNextAppointmentUseCase: GetNextAppointmentUseCase,
+    private val getMyMedicalHistoryUseCase: GetMyMedicalHistoryUseCase,
 ) : ViewModel() {
 
     // ─── Consultation list ─────────────────────────────────────────────────
@@ -127,6 +130,11 @@ class ConsultationViewModel(
         private set
 
     var nextAppointment by mutableStateOf<NextAppointment?>(null)
+        private set
+
+    var medicalHistory by mutableStateOf<List<MedicalRecord>>(emptyList())
+        private set
+    var isLoadingMedicalHistory by mutableStateOf(false)
         private set
 
     var threads by mutableStateOf<List<ConversationThread>>(emptyList())
@@ -187,6 +195,18 @@ class ConsultationViewModel(
             loadAppointments()
         }
         loadThreads()
+        loadMedicalHistory()
+    }
+
+    fun loadMedicalHistory() {
+        viewModelScope.launch {
+            isLoadingMedicalHistory = true
+            when (val result = getMyMedicalHistoryUseCase()) {
+                is Resource.Success -> medicalHistory = result.data ?: emptyList()
+                else -> {}
+            }
+            isLoadingMedicalHistory = false
+        }
     }
 
     private fun loadCurrentUser() {
