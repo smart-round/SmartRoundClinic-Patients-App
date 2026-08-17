@@ -6,12 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-# 1000 is a floor comfortably above the versionCode/build-number already hardcoded in the repo
-# (22 at the time this workflow was written) — if Play Console/App Store Connect already has a
-# higher one uploaded from outside CI, bump this floor above that before the first run.
-env:
-  BUILD_NUMBER: ${{ 1000 + github.run_number }}
-
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -23,6 +17,13 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+
+      # GitHub Actions expressions have no arithmetic operators (the `+` below is shell, not
+      # an expression) — 1000 is a floor comfortably above the versionCode/build-number already
+      # hardcoded in the repo (22 at the time this workflow was written); bump it above whatever
+      # Play Console/App Store Connect already has if either was seeded from outside CI.
+      - name: Compute build number
+        run: echo "BUILD_NUMBER=$((1000 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -58,6 +59,9 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Compute build number
+        run: echo "BUILD_NUMBER=$((1000 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
