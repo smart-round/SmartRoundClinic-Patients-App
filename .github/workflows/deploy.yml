@@ -86,4 +86,8 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_STORE_CONNECT_API_KEY_PATH: ${{ runner.temp }}/asc-api-key.json
           IOS_BUILD_NUMBER: ${{ env.BUILD_NUMBER }}
+          # Default 3s base timeout (3/6/12/24s retries) is too short while Xcode is still
+          # resolving Firebase's ~15 Swift Package Manager dependencies on a cold checkout.
+          FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: "120"
+          FASTLANE_XCODEBUILD_SETTINGS_RETRIES: "5"
         run: bundle exec fastlane ios beta
