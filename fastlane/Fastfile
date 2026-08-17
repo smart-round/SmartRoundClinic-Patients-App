@@ -7,6 +7,13 @@ default_platform(:ios)
 platform :ios do
   desc "Build a release archive and push it to TestFlight"
   lane :beta do
+    # Captured up front as absolute paths — some actions (namely match, which clones the certs
+    # repo into a temp dir) can leave the process cwd in a different place than where the lane
+    # started, so relative paths like "../iosApp/iosApp.xcodeproj" resolve inconsistently
+    # between local runs and CI.
+    xcodeproj_path = File.expand_path("../iosApp/iosApp.xcodeproj")
+    build_output_dir = File.expand_path("../build/ios")
+
     setup_ci if ENV["CI"]
 
     match(type: "appstore", api_key_path: ENV["APP_STORE_CONNECT_API_KEY_PATH"])
@@ -16,7 +23,7 @@ platform :ios do
     # ever committed back, the checkout is thrown away at the end of the job.
     update_code_signing_settings(
       use_automatic_signing: false,
-      path: "../iosApp/iosApp.xcodeproj",
+      path: xcodeproj_path,
       code_sign_identity: "Apple Distribution",
       bundle_identifier: "ke.co.smartroundclinic.patientapp",
       profile_name: lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING]["ke.co.smartroundclinic.patientapp"],
@@ -25,16 +32,16 @@ platform :ios do
 
     if ENV["IOS_BUILD_NUMBER"]
       increment_build_number(
-        xcodeproj: "../iosApp/iosApp.xcodeproj",
+        xcodeproj: xcodeproj_path,
         build_number: ENV["IOS_BUILD_NUMBER"],
       )
     end
 
     build_app(
-      project: "../iosApp/iosApp.xcodeproj",
+      project: xcodeproj_path,
       scheme: "iosApp",
       export_method: "app-store",
-      output_directory: "../build/ios",
+      output_directory: build_output_dir,
     )
 
     upload_to_testflight(
