@@ -9,6 +9,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.data.remote.dto.response.GetNotificationsRes
+import ke.co.smartroundclinic.patient.data.remote.dto.response.SuccessRes
 import ke.co.smartroundclinic.patient.domain.repository.NotificationRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -23,10 +24,11 @@ class NotificationRepositoryImpl(private val client: HttpClient) : NotificationR
     override suspend fun registerDeviceToken(token: String, platform: String, tokenType: String): Resource<Unit> =
         withContext(Dispatchers.IO) {
             try {
-                client.post("notification/device-token") {
+                val res = client.post("notification/device-token") {
                     setBody(RegisterDeviceTokenRequest(deviceToken = token, platform = platform.uppercase(), tokenType = tokenType.uppercase()))
-                }
-                Resource.Success(Unit)
+                }.body<SuccessRes>()
+                if (res.status) Resource.Success(Unit)
+                else Resource.Error(res.message)
             } catch (e: Exception) {
                 Resource.Error(e.message ?: "Failed to register device token")
             }

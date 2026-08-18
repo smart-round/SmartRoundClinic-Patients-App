@@ -9,10 +9,11 @@
 /* Begin PBXBuildFile section */
 		C08C834E2BDBE76C7437A752 /* RealtimeKit in Frameworks */ = {isa = PBXBuildFile; productRef = C08C834C2BDBE76C7437A752 /* RealtimeKit */; };
 		FB00000000000000000000B3 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = FB00000000000000000000B2 /* FirebaseMessaging */; };
+		FB00000000000000000000B5 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = FB00000000000000000000B4 /* FirebaseCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		E5FAA8F66851B0D5F157B6F0 /* Smartround clinic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Smartround clinic.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E5FAA8F66851B0D5F157B6F0 /* Smart Round - Patient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Smart Round - Patient.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -48,6 +49,7 @@
 			files = (
 				C08C834E2BDBE76C7437A752 /* RealtimeKit in Frameworks */,
 				FB00000000000000000000B3 /* FirebaseMessaging in Frameworks */,
+				FB00000000000000000000B5 /* FirebaseCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -57,7 +59,7 @@
 		1C0B50D5EF1504EC1C6CF5FC /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				E5FAA8F66851B0D5F157B6F0 /* Smartround clinic.app */,
+				E5FAA8F66851B0D5F157B6F0 /* Smart Round - Patient.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -94,9 +96,10 @@
 			packageProductDependencies = (
 				C08C834C2BDBE76C7437A752 /* RealtimeKit */,
 				FB00000000000000000000B2 /* FirebaseMessaging */,
+				FB00000000000000000000B4 /* FirebaseCore */,
 			);
 			productName = iosApp;
-			productReference = E5FAA8F66851B0D5F157B6F0 /* Smartround clinic.app */;
+			productReference = E5FAA8F66851B0D5F157B6F0 /* Smart Round - Patient.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -189,6 +192,7 @@
 				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
 				DEVELOPMENT_TEAM = 65X556349W;
 				ENABLE_PREVIEWS = YES;
@@ -224,6 +228,7 @@
 				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
 				DEVELOPMENT_TEAM = 65X556349W;
 				ENABLE_PREVIEWS = YES;
@@ -426,6 +431,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = FB00000000000000000000B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseMessaging;
+		};
+		FB00000000000000000000B4 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FB00000000000000000000B1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
