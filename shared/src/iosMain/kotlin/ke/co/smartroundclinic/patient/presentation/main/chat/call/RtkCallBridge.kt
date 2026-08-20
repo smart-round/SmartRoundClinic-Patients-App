@@ -49,4 +49,12 @@ interface IosCallSessionListener {
     fun onAudioUpdate(enabled: Boolean)
     fun onVideoUpdate(enabled: Boolean)
     fun onRemoteParticipantUpdate(name: String?, audioEnabled: Boolean, videoEnabled: Boolean)
+
+    /**
+     * RealtimeKit reconnects its own signaling socket with exponential backoff on a network drop
+     * — this only surfaces that ongoing attempt, it doesn't drive it. Swift calls this from
+     * RtkMeetingRoomEventListener.onSocketConnectionUpdate; a genuine give-up (isReconnectionFailure)
+     * goes through [onFailed] instead of this.
+     */
+    fun onReconnecting(isReconnecting: Boolean)
 }

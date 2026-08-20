@@ -2,12 +2,34 @@ package ke.co.smartroundclinic.patient.presentation.main.chat.call
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.cloudflare.realtimekit.platform.VideoView
+
+// RealtimeKit tears down and rebuilds the WebRTC transport's consumers/producers on network-drop
+// recovery (MediaRoomController.reconnectTransport — closes the transport, creates a new one, and
+// for the receive side rebuilds all consumers from scratch), which can hand back a genuinely new
+// native view from getSelfPreview()/getVideoView() afterwards. But AndroidView's factory only
+// runs once per node's lifetime (see the notes on each composable below), so without forcing a
+// fresh node post-recovery, the old — now-dead — view stays mounted forever: a frozen last frame
+// that never resumes, which is exactly the "video hangs after a network drop" symptom this fixes.
+// Bumping this key only on the true->false edge (recovery, not entry) means the node rebuilds
+// once reconnection is actually done, not while it's still in progress. onRelease (already set on
+// both AndroidViews below) frees the old native surface when the node tears down for this reason.
+@Composable
+private fun rememberMediaGeneration(controller: RtkCallController): Int {
+    val isReconnecting by controller.isReconnecting
+    var wasReconnecting by remember { mutableStateOf(false) }
+    var generation by remember { mutableIntStateOf(0) }
+    if (wasReconnecting && !isReconnecting) generation++
+    wasReconnecting = isReconnecting
+    return generation
+}
 
 // Both participants' video surfaces are backed by WebRTC SurfaceViewRenderers (a hardware
 // hole-punch, not a normal drawn View), so their relative stacking is decided by the actual
@@ -38,16 +60,18 @@ import com.cloudflare.realtimekit.platform.VideoView
 @Composable
 actual fun LocalVideoPreview(controller: RtkCallController, isFrontmost: Boolean, modifier: Modifier) {
     val isVideoEnabled by controller.isVideoEnabled
-    AndroidView(
-        factory = { context -> controller.client?.localUser?.getSelfPreview() ?: VideoView(context) },
-        // Only bring the Surface's hardware overlay forward while it's actually showing real
-        // video — otherwise the avatar-card overlay ParticipantView draws in its place (a
-        // normal Compose-drawn layer, not a Surface) can't reliably cover it, and a frozen last
-        // frame keeps showing through on top of the "camera off" placeholder.
-        update = { view -> view.setZOrderMediaOverlay(isFrontmost && isVideoEnabled) },
-        onRelease = { it.release() },
-        modifier = modifier,
-    )
+    key(rememberMediaGeneration(controller)) {
+        AndroidView(
+            factory = { context -> controller.client?.localUser?.getSelfPreview() ?: VideoView(context) },
+            // Only bring the Surface's hardware overlay forward while it's actually showing real
+            // video — otherwise the avatar-card overlay ParticipantView draws in its place (a
+            // normal Compose-drawn layer, not a Surface) can't reliably cover it, and a frozen last
+            // frame keeps showing through on top of the "camera off" placeholder.
+            update = { view -> view.setZOrderMediaOverlay(isFrontmost && isVideoEnabled) },
+            onRelease = { it.release() },
+            modifier = modifier,
+        )
+    }
 }
 
 @Composable
@@ -65,16 +89,18 @@ actual fun RemoteVideoView(controller: RtkCallController, isFrontmost: Boolean, 
     if (remote?.videoEnabled == true) everHadVideo = true
     if (!everHadVideo) return
 
-    AndroidView(
-        factory = { context ->
-            controller.client?.participants?.joined?.firstOrNull()?.getVideoView() ?: VideoView(context)
-        },
-        // Same reasoning as LocalVideoPreview above — also covers the participant leaving
-        // entirely (remote becomes null, videoEnabled reads false): without this, their last
-        // frame stays visible on top of the "You" placeholder/gone state instead of being
-        // covered by it.
-        update = { view -> view.setZOrderMediaOverlay(isFrontmost && remote?.videoEnabled == true) },
-        onRelease = { it.release() },
-        modifier = modifier,
-    )
+    key(rememberMediaGeneration(controller)) {
+        AndroidView(
+            factory = { context ->
+                controller.client?.participants?.joined?.firstOrNull()?.getVideoView() ?: VideoView(context)
+            },
+            // Same reasoning as LocalVideoPreview above — also covers the participant leaving
+            // entirely (remote becomes null, videoEnabled reads false): without this, their last
+            // frame stays visible on top of the "You" placeholder/gone state instead of being
+            // covered by it.
+            update = { view -> view.setZOrderMediaOverlay(isFrontmost && remote?.videoEnabled == true) },
+            onRelease = { it.release() },
+            modifier = modifier,
+        )
+    }
 }

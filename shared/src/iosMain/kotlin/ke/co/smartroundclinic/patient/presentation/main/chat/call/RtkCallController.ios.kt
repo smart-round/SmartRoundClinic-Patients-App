@@ -22,14 +22,27 @@ actual class RtkCallController {
     private val _remoteParticipant = mutableStateOf<RemoteParticipantInfo?>(null)
     actual val remoteParticipant: State<RemoteParticipantInfo?> = _remoteParticipant
 
+    private val _isReconnecting = mutableStateOf(false)
+    actual val isReconnecting: State<Boolean> = _isReconnecting
+
     private val listener = object : IosCallSessionListener {
         override fun onConnected() { _connectionState.value = CallConnectionState.Connected }
         override fun onEnded() { _connectionState.value = CallConnectionState.Ended }
-        override fun onFailed(message: String) { _connectionState.value = CallConnectionState.Failed(message) }
+        override fun onFailed(message: String) {
+            _isReconnecting.value = false
+            _connectionState.value = CallConnectionState.Failed(message)
+        }
         override fun onAudioUpdate(enabled: Boolean) { _isAudioEnabled.value = enabled }
         override fun onVideoUpdate(enabled: Boolean) { _isVideoEnabled.value = enabled }
         override fun onRemoteParticipantUpdate(name: String?, audioEnabled: Boolean, videoEnabled: Boolean) {
             _remoteParticipant.value = name?.let { RemoteParticipantInfo(it, audioEnabled, videoEnabled) }
+        }
+        override fun onReconnecting(isReconnecting: Boolean) {
+            // Ignore a reconnecting=true blip before the call has ever connected — the initial
+            // join handshake already has its own Connecting UI; only a mid-call drop matters here.
+            if (!isReconnecting || _connectionState.value is CallConnectionState.Connected) {
+                _isReconnecting.value = isReconnecting
+            }
         }
     }
 
@@ -43,6 +56,7 @@ actual class RtkCallController {
             return
         }
         _connectionState.value = CallConnectionState.Connecting
+        _isReconnecting.value = false
         session = factory(authToken, enableAudio, enableVideo, listener)
     }
 

@@ -120,7 +120,7 @@ fun MainRoot(modifier: Modifier = Modifier, onSignOut: () -> Unit = {}) {
                 is NotificationEvent.ToCall -> {
                     selectTab(Appointments)
                     pendingConsultation = ConsultationChat(event.doctorId, event.doctorName, event.appointmentId)
-                    pendingCall = ConsultationCall(event.doctorId, isVideo = true)
+                    pendingCall = ConsultationCall(event.doctorId, isVideo = true, callId = event.callId)
                 }
                 is NotificationEvent.ToSupportTicket -> {
                     selectTab(Home)

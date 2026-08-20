@@ -2,6 +2,8 @@ package ke.co.smartroundclinic.patient.presentation.main.chat.call
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,20 +43,43 @@ private fun UIView.sendToBackOfSuperview() {
     superview?.sendSubviewToBack(this)
 }
 
+// RealtimeKit tears down and rebuilds the WebRTC transport's consumers/producers on network-drop
+// recovery (MediaRoomController.reconnectTransport — closes the transport, creates a new one, and
+// for the receive side rebuilds all consumers from scratch), which can hand back a genuinely new
+// native view from localVideoView()/remoteVideoView() afterwards. But UIKitView's factory only
+// runs once per node's lifetime (see the notes on each composable below), so without forcing a
+// fresh node post-recovery, the old — now-dead — view stays mounted forever: a frozen last frame
+// that never resumes, which is exactly the "video hangs after a network drop" symptom this fixes.
+// Bumping this key only on the true->false edge (recovery, not entry) means the node rebuilds
+// once reconnection is actually done, not while it's still in progress.
+@Composable
+private fun rememberMediaGeneration(controller: RtkCallController): Int {
+    val isReconnecting by controller.isReconnecting
+    var wasReconnecting by remember { mutableStateOf(false) }
+    var generation by remember { mutableIntStateOf(0) }
+    if (wasReconnecting && !isReconnecting) generation++
+    wasReconnecting = isReconnecting
+    return generation
+}
+
 @Composable
 actual fun LocalVideoPreview(controller: RtkCallController, isFrontmost: Boolean, modifier: Modifier) {
     val isVideoEnabled by controller.isVideoEnabled
     val view = controller.session?.localVideoView() ?: return
-    UIKitView(
-        factory = { view },
-        modifier = modifier,
-        // Only bring this view forward while it's actually showing real video — otherwise
-        // send it to the back so the avatar-card overlay ParticipantView draws in its place
-        // (normal Compose-drawn content, not an interop view) reliably covers it instead of a
-        // frozen last frame staying visible on top of the "camera off" placeholder.
-        update = { if (isFrontmost && isVideoEnabled) it.bringToFrontOfSuperview() else it.sendToBackOfSuperview() },
-        properties = videoInteropProperties,
-    )
+    // See rememberMediaGeneration's doc comment above — forces a fresh UIKitView node (and thus
+    // a fresh factory call) once reconnection resolves, in case the producer transport was rebuilt.
+    key(rememberMediaGeneration(controller)) {
+        UIKitView(
+            factory = { view },
+            modifier = modifier,
+            // Only bring this view forward while it's actually showing real video — otherwise
+            // send it to the back so the avatar-card overlay ParticipantView draws in its place
+            // (normal Compose-drawn content, not an interop view) reliably covers it instead of a
+            // frozen last frame staying visible on top of the "camera off" placeholder.
+            update = { if (isFrontmost && isVideoEnabled) it.bringToFrontOfSuperview() else it.sendToBackOfSuperview() },
+            properties = videoInteropProperties,
+        )
+    }
 }
 
 @Composable
@@ -70,13 +95,15 @@ actual fun RemoteVideoView(controller: RtkCallController, isFrontmost: Boolean, 
     if (!everHadVideo) return
 
     val view = controller.session?.remoteVideoView() ?: return
-    UIKitView(
-        factory = { view },
-        modifier = modifier,
-        // Same reasoning as LocalVideoPreview above — also covers the participant leaving
-        // entirely (remote becomes null, videoEnabled reads false): without this, their last
-        // frame stays visible on top of the "gone" placeholder instead of being covered by it.
-        update = { if (isFrontmost && remote?.videoEnabled == true) it.bringToFrontOfSuperview() else it.sendToBackOfSuperview() },
-        properties = videoInteropProperties,
-    )
+    key(rememberMediaGeneration(controller)) {
+        UIKitView(
+            factory = { view },
+            modifier = modifier,
+            // Same reasoning as LocalVideoPreview above — also covers the participant leaving
+            // entirely (remote becomes null, videoEnabled reads false): without this, their last
+            // frame stays visible on top of the "gone" placeholder instead of being covered by it.
+            update = { if (isFrontmost && remote?.videoEnabled == true) it.bringToFrontOfSuperview() else it.sendToBackOfSuperview() },
+            properties = videoInteropProperties,
+        )
+    }
 }

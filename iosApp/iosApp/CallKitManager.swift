@@ -34,6 +34,34 @@ func configureAndActivateWebRTCAudioSession(isVideo: Bool) {
     NSLog("SRC-AUDIO: isAudioEnabled set true, sampleRate=\(session.sampleRate), category=\(session.category.rawValue), route=\(session.currentRoute.outputs.map { $0.portName })")
 }
 
+// Second, independent line of defense against a stale "Incoming Video Call" VoIP push — the
+// backend now sets an apns-expiration TTL on the push itself (see ApnsVoipClient.kt), which stops
+// the common case (device offline, push queues and delivers late) from being delivered at all.
+// This catches anything that slips through, since this VoIP-push path bypasses the Kotlin
+// NotificationSetup.onPayloadData equivalent check entirely — Kotlin never sees a VoIP push.
+private let staleInviteGraceSeconds: TimeInterval = 5
+
+private func parseBackendTimestamp(_ iso: String) -> Date? {
+    // Backend's sortableNowIso() emits 9 fractional digits (nanoseconds) — ISO8601DateFormatter's
+    // withFractionalSeconds only understands up to milliseconds, so trim before parsing.
+    var trimmed = iso
+    if let dotIndex = iso.firstIndex(of: "."), let zIndex = iso.firstIndex(of: "Z") {
+        let fraction = iso[iso.index(after: dotIndex)..<zIndex].prefix(3)
+        trimmed = "\(iso[..<dotIndex]).\(fraction)Z"
+    }
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    if let date = formatter.date(from: trimmed) { return date }
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter.date(from: trimmed)
+}
+
+private func isStaleInvite(createdAt: String?, ringTimeoutSeconds: Int64) -> Bool {
+    guard let createdAt = createdAt, let createdDate = parseBackendTimestamp(createdAt) else { return false }
+    let age = Date().timeIntervalSince(createdDate)
+    return age > Double(ringTimeoutSeconds) + staleInviteGraceSeconds
+}
+
 func deactivateWebRTCAudioSession() {
     let rtcAudioSession = RTKRTCAudioSession.sharedInstance()
     rtcAudioSession.isAudioEnabled = false
@@ -256,7 +284,22 @@ extension CallKitManager: PKPushRegistryDelegate {
 
             let callerName = data["callerName"] as? String
             let isVideo = (data["isVideo"] as? String) == "true"
-            let ringTimeoutSeconds = Int64((data["ringTimeoutSeconds"] as? String) ?? "") ?? 45
+            let ringTimeoutSeconds = Int64((data["ringTimeoutSeconds"] as? String) ?? "") ?? 60
+
+            if isStaleInvite(createdAt: data["createdAt"] as? String, ringTimeoutSeconds: ringTimeoutSeconds) {
+                // Apple requires every VoIP push to result in a reportNewIncomingCall, or the app
+                // risks having its VoIP push entitlement throttled — silently dropping this one
+                // isn't an option even though the invite is already dead. Report it (satisfying
+                // that requirement) and immediately end it again, without ever routing through
+                // IncomingCallHandler/IncomingCallState, so the stale call never reaches the
+                // in-app ring UI. uuidByCallId is populated synchronously inside
+                // reportIncomingCall, before its own async completion runs, so endCall can safely
+                // follow it on the very next line.
+                NSLog("CallKitManager: reporting-then-ending stale Incoming Video Call push callId=\(callId) — invite already past its ring window")
+                reportIncomingCall(callId: callId, callerName: callerName, isVideo: isVideo)
+                endCall(callId: callId)
+                return
+            }
 
             callerInfoByCallId[callId] = (callerId: callerId, callerName: callerName)
 
@@ -320,7 +363,7 @@ extension CallKitManager: CXProviderDelegate {
         // Same deep-link the tap-to-join notification flow already uses — lands the user in
         // ConsultationChat/ConsultationCall once MainRoot picks up the pending event.
         NotificationDeepLink.shared.signal(
-            event: NotificationEvent.ToCall(doctorId: info.callerId, doctorName: info.callerName ?? "Doctor", appointmentId: "")
+            event: NotificationEvent.ToCall(doctorId: info.callerId, doctorName: info.callerName ?? "Doctor", appointmentId: "", callId: callId)
         )
         action.fulfill()
         NSLog("SRC-AUDIO: CXAnswerCallAction fulfilled")

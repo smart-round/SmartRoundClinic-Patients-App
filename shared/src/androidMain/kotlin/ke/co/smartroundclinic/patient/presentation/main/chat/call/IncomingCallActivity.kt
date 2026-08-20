@@ -123,7 +123,7 @@ class IncomingCallActivity : ComponentActivity() {
     }
 
     private fun acceptCall(callId: String, callerId: String, callerName: String?) {
-        NotificationDeepLink.signal(NotificationEvent.ToCall(doctorId = callerId, doctorName = callerName ?: "Doctor", appointmentId = ""))
+        NotificationDeepLink.signal(NotificationEvent.ToCall(doctorId = callerId, doctorName = callerName ?: "Doctor", appointmentId = "", callId = callId))
         packageManager.getLaunchIntentForPackage(packageName)?.let { launchIntent ->
             launchIntent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
                 android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or

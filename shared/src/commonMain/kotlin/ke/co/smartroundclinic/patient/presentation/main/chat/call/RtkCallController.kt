@@ -17,6 +17,16 @@ expect class RtkCallController {
     val isVideoEnabled: State<Boolean>
     val remoteParticipant: State<RemoteParticipantInfo?>
 
+    /**
+     * True while RealtimeKit's own signaling socket is mid-reconnect after a network drop —
+     * the SDK retries with exponential backoff on its own; this just surfaces that so the UI can
+     * show "Reconnecting…" instead of the call silently freezing, and so the call isn't hung up
+     * on the mistaken assumption the remote participant left. Becomes false again once the
+     * socket recovers; a [CallConnectionState.Failed] follows only if RealtimeKit itself gives up
+     * (see SocketConnectionState.isReconnectionFailure) — this device otherwise waits it out.
+     */
+    val isReconnecting: State<Boolean>
+
     /** Initializes the SDK with [authToken] and joins the room once init succeeds. */
     fun start(authToken: String, enableAudio: Boolean, enableVideo: Boolean)
     fun leaveRoom()

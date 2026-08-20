@@ -232,7 +232,30 @@ private final class RtkCallSessionImpl: NSObject, RtkMeetingRoomEventListener, R
     // MARK: - RtkConnectionEventListener (required by RtkMeetingRoomEventListener)
 
     func onMediaConnectionUpdate(update: MediaConnectionUpdate) {}
-    func onSocketConnectionUpdate(newState: SocketConnectionState) {}
+
+    // RealtimeKit reconnects its own signaling socket with exponential backoff on a network drop
+    // — this just forwards that ongoing attempt to Kotlin (IosCallSessionListener.onReconnecting)
+    // so CallScreen can show "Reconnecting…" and hold off on hanging up, rather than doing
+    // anything to drive the reconnection itself. Ignore .reconnecting before the call has ever
+    // connected — the initial join handshake already has its own Connecting UI.
+    func onSocketConnectionUpdate(newState: SocketConnectionState) {
+        NSLog("SRC-AUDIO: onSocketConnectionUpdate — state=\(newState.socketState) reconnectionAttempt=\(newState.reconnectionAttempt) isReconnectionFailure=\(newState.isReconnectionFailure)")
+        switch newState.socketState {
+        case .reconnecting:
+            listener.onReconnecting(isReconnecting: true)
+        case .connected:
+            listener.onReconnecting(isReconnecting: false)
+        case .failed:
+            if newState.isReconnectionFailure {
+                listener.onReconnecting(isReconnecting: false)
+                listener.onFailed(message: "Connection lost — unable to reconnect")
+            }
+        case .disconnected:
+            break
+        default:
+            break
+        }
+    }
 
     // MARK: - RtkMeetingRoomEventListener
 
@@ -349,7 +372,21 @@ private final class RtkCallSessionImpl: NSObject, RtkMeetingRoomEventListener, R
     func onScreenShareUpdate(participant: RtkRemoteParticipant, isEnabled: Bool) {}
     func onParticipantPinned(participant: RtkRemoteParticipant) {}
     func onParticipantUnpinned(participant: RtkRemoteParticipant) {}
-    func onActiveParticipantsChanged(active: [RtkRemoteParticipant]) {}
+    // Fired when ParticipantController re-activates the grid — notably, this is also the path
+    // MediaRoomController.reconnectTransport() drives via refreshGridParticipants(true) after a
+    // network-drop recovery, to re-subscribe consumers for participants that never actually left.
+    // That reactivation does NOT go through onParticipantJoin/onVideoUpdate/onAudioUpdate (those
+    // fire from a different, join-time-only SFU event path), so without this, the Kotlin side's
+    // remoteParticipant state — and therefore the video tile's visibility — can stay stuck on
+    // whatever it was right before the drop, even though media itself has resumed underneath.
+    func onActiveParticipantsChanged(active: [RtkRemoteParticipant]) {
+        guard let participant = active.first else { return }
+        listener.onRemoteParticipantUpdate(
+            name: participant.name,
+            audioEnabled: participant.audioEnabled,
+            videoEnabled: participant.videoEnabled
+        )
+    }
     func onActiveSpeakerChanged(participant: RtkRemoteParticipant?) {}
     func onAllParticipantsUpdated(allParticipants: [RtkParticipant]) {}
     func onNewBroadcastMessage(type: String, payload: [String: Any]) {}

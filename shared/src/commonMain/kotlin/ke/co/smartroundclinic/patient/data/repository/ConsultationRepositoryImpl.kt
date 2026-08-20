@@ -52,17 +52,26 @@ class ConsultationRepositoryImpl(
     private val storageClient: HttpClient,
 ) : ConsultationRepository {
 
-    override suspend fun joinCall(otherUserId: String): Resource<CallJoinInfo> = withContext(Dispatchers.IO) {
+    override suspend fun joinCall(otherUserId: String, callId: String): Resource<CallJoinInfo> = withContext(Dispatchers.IO) {
         // HttpRequestRetry (HttpClientFactory.kt) only retries GET requests — POSTs are excluded
         // there because most of them (invite/decline/cancel) have side effects that aren't safe
         // to retry blindly. Joining a call is idempotent (just hands back the room token), and
         // this call fires the moment an incoming call is answered — often within moments of the
         // process (re)launching from a VoIP push, when the network stack hasn't warmed up yet and
         // the very first attempt can fail fast on a transient exception. Retry locally here.
+        //
+        // Note: a genuine 410 ("Call is no longer active" — the backend's atomic-join gate, see
+        // JoinThreadCallUseCase.requireLiveInvite) is a real, permanent rejection, not a transient
+        // failure — retrying it would just get 410 again. Ktor throws on non-2xx by default here,
+        // so that surfaces as an exception like any other and gets retried up to 3x regardless;
+        // that's wasted attempts but not incorrect, since the error message still propagates
+        // correctly to the caller once retries are exhausted.
         var lastError: Exception? = null
         repeat(3) { attempt ->
             try {
-                val res = client.post("chat/$otherUserId/call/join").body<JoinCallResponse>()
+                val res = client.post("chat/$otherUserId/call/join") {
+                    setBody(CallActionReq(callId = callId))
+                }.body<JoinCallResponse>()
                 return@withContext if (res.status && res.data != null) Resource.Success(res.data.toDomain(), res.message)
                 else Resource.Error(res.message)
             } catch (e: Exception) {

@@ -42,6 +42,7 @@ import ke.co.smartroundclinic.patient.domain.usecase.appointment.GetNextAppointm
 import ke.co.smartroundclinic.patient.core.notification.ActiveCallNotifier
 import ke.co.smartroundclinic.patient.core.notification.IncomingCallHandler
 import ke.co.smartroundclinic.patient.core.notification.OutgoingCallState
+import ke.co.smartroundclinic.patient.core.notification.isStaleInvite
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.CancelCallUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.DeleteConversationThreadUseCase
 import ke.co.smartroundclinic.patient.domain.usecase.consultation.GetMergedConsultationHistoryUseCase
@@ -413,16 +414,18 @@ class ConsultationViewModel(
                                         // is the fallback for backgrounded/killed apps.
                                         "CALL_INVITE" -> {
                                             val event = wsJson.decodeFromString<ConsultationCallInviteEventData>(raw)
-                                            withContext(Dispatchers.Main) {
-                                                IncomingCallHandler.onCallInvite(
-                                                    callId = event.callId,
-                                                    callerId = event.callerId,
-                                                    callerName = event.callerName,
-                                                    doctorId = otherUserId,
-                                                    patientId = currentUserId,
-                                                    isVideo = event.isVideo,
-                                                    ringTimeoutSeconds = event.ringTimeoutSeconds,
-                                                )
+                                            if (!isStaleInvite(event.createdAt, event.ringTimeoutSeconds)) {
+                                                withContext(Dispatchers.Main) {
+                                                    IncomingCallHandler.onCallInvite(
+                                                        callId = event.callId,
+                                                        callerId = event.callerId,
+                                                        callerName = event.callerName,
+                                                        doctorId = otherUserId,
+                                                        patientId = currentUserId,
+                                                        isVideo = event.isVideo,
+                                                        ringTimeoutSeconds = event.ringTimeoutSeconds,
+                                                    )
+                                                }
                                             }
                                         }
                                         "CALL_ANSWERED" -> {
@@ -639,11 +642,11 @@ class ConsultationViewModel(
         }
     }
 
-    fun joinCall(otherUserId: String) {
+    fun joinCall(otherUserId: String, callId: String) {
         if (callJoinState is Resource.Success) return
         viewModelScope.launch {
             callJoinState = Resource.Loading()
-            callJoinState = joinCallUseCase(otherUserId)
+            callJoinState = joinCallUseCase(otherUserId, callId)
         }
     }
 

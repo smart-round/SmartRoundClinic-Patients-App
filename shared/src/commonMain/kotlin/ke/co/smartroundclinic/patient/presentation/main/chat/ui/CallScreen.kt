@@ -132,6 +132,7 @@ private fun ActiveCall(
     val isAudioEnabled by controller.isAudioEnabled
     val isVideoEnabled by controller.isVideoEnabled
     val remote by controller.remoteParticipant
+    val isReconnecting by controller.isReconnecting
 
     // Tapping "End call" fires onEnd() immediately (so the screen dismisses without waiting on
     // leaveRoom()'s network round trip) — but that same round trip's onSuccess/onFailure also
@@ -226,11 +227,38 @@ private fun ActiveCall(
             // blip (network hiccup reported as leave-then-rejoin, see the note above on
             // everHadRemote) doesn't end the call — LaunchedEffect(hasRemote) automatically
             // cancels this countdown the moment `remote` comes back within the window.
-            LaunchedEffect(hasRemote) {
-                if (everHadRemote && !hasRemote) {
+            //
+            // Also skipped entirely while THIS device is the one reconnecting (isReconnecting) —
+            // RealtimeKit is already retrying the socket with its own backoff (see
+            // RtkCallController.isReconnecting); the remote hasn't left, we just can't see them
+            // right now. Re-keying on isReconnecting cancels/re-evaluates this effect the moment
+            // it changes, so a blip starting mid-countdown doesn't still hang up.
+            LaunchedEffect(hasRemote, isReconnecting) {
+                if (everHadRemote && !hasRemote && !isReconnecting) {
                     delay(8_000L)
-                    controller.leaveRoom()
-                    endOnce()
+                    if (!isReconnecting) {
+                        controller.leaveRoom()
+                        endOnce()
+                    }
+                }
+            }
+
+            // Symmetric case: the remote participant may never show up at all — their own join
+            // can fail independently after this side's already succeeded (network blip, RealtimeKit
+            // connect failure, or the backend rejecting a now-stale invite) — leaving this side
+            // connected but permanently alone in the room. Mirrors the caller's own outgoing-ring
+            // timeout (ChatRoot.kt, ~60s) so both sides give up around the same time instead of one
+            // side waiting indefinitely for a call that's never going to connect on the other end.
+            // Restarts (rather than merely pausing) if isReconnecting flips — this device's own
+            // network being flaky isn't a reason to give up on the remote sooner, if anything it
+            // deserves a fresh window once back online.
+            LaunchedEffect(isReconnecting) {
+                if (!isReconnecting) {
+                    delay(60_000L)
+                    if (!everHadRemote && !isReconnecting) {
+                        controller.leaveRoom()
+                        endOnce()
+                    }
                 }
             }
 
@@ -285,6 +313,27 @@ private fun ActiveCall(
                             .zIndex(if (effectiveSelfPrimary) 1f else 0f)
                             .then(if (effectiveSelfPrimary) Modifier.clickable { selfIsPrimary = false } else Modifier),
                     )
+                }
+
+                // Non-destructive overlay on top of the still-mounted call UI, not a state swap —
+                // the video tiles must never be conditionally removed/re-added (see the note on
+                // ParticipantView above; RealtimeKit hands back the same native view every time,
+                // and re-parenting it mid-detach crashes), so a brief network drop just freezes the
+                // last frame under this banner instead of tearing anything down.
+                if (isReconnecting) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(top = 8.dp).align(Alignment.TopCenter).zIndex(3f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Row(
+                            modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Color.Black.copy(alpha = 0.6f))
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
+                            Text(text = "Reconnecting…", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
 
                 // Hidden in PiP — the collapsed window is too small for reliable touch targets;

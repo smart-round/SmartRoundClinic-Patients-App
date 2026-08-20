@@ -95,6 +95,7 @@ data class ConsultationCallInviteEventData(
     val callerName: String? = null,
     val isVideo: Boolean,
     val ringTimeoutSeconds: Long,
+    val createdAt: String? = null,
 )
 
 @Serializable

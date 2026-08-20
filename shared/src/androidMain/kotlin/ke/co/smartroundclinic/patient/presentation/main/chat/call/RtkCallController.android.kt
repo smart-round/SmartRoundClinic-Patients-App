@@ -15,6 +15,8 @@ import com.cloudflare.realtimekit.RtkParticipant
 import com.cloudflare.realtimekit.errors.MeetingError
 import com.cloudflare.realtimekit.media.AudioDevice
 import com.cloudflare.realtimekit.media.VideoDevice
+import com.cloudflare.realtimekit.meta.SocketConnectionState
+import com.cloudflare.realtimekit.meta.SocketState
 import com.cloudflare.realtimekit.models.RtkMeetingInfo
 import com.cloudflare.realtimekit.network.info.SelfPermissions
 import com.cloudflare.realtimekit.participants.RtkParticipants
@@ -44,6 +46,9 @@ actual class RtkCallController(private val activity: Activity) {
 
     private val _remoteParticipant = mutableStateOf<RemoteParticipantInfo?>(null)
     actual val remoteParticipant: State<RemoteParticipantInfo?> = _remoteParticipant
+
+    private val _isReconnecting = mutableStateOf(false)
+    actual val isReconnecting: State<Boolean> = _isReconnecting
 
     private fun onFailed(error: MeetingError) {
         Napier.e(tag = TAG, message = "Call failed: ${error.code} ${error.message}")
@@ -78,6 +83,25 @@ actual class RtkCallController(private val activity: Activity) {
             CallForegroundService.stop(activity)
         }
         override fun onActiveTabUpdate(meeting: RealtimeKitClient, activeTab: ActiveTab) {}
+
+        // RealtimeKit reconnects its own signaling socket with exponential backoff on a network
+        // drop — this only surfaces that ongoing attempt to the UI, it doesn't drive it. Ignore
+        // RECONNECTING before the call has ever connected: the initial join handshake already has
+        // its own Connecting UI, and briefly toggling isReconnecting mid-join would be confusing.
+        override fun onSocketConnectionUpdate(newState: SocketConnectionState) {
+            Napier.d(tag = TAG, message = "Socket connection update: $newState")
+            when (newState.socketState) {
+                SocketState.RECONNECTING ->
+                    if (_connectionState.value is CallConnectionState.Connected) _isReconnecting.value = true
+                SocketState.CONNECTED -> _isReconnecting.value = false
+                SocketState.FAILED ->
+                    if (newState.isReconnectionFailure) {
+                        _isReconnecting.value = false
+                        _connectionState.value = CallConnectionState.Failed("Connection lost — unable to reconnect")
+                    }
+                SocketState.DISCONNECTED -> Unit
+            }
+        }
     }
 
     private val selfListener = object : RtkSelfEventListener {
@@ -116,7 +140,17 @@ actual class RtkCallController(private val activity: Activity) {
         override fun onScreenShareUpdate(participant: RtkRemoteParticipant, isEnabled: Boolean) {}
         override fun onParticipantPinned(participant: RtkRemoteParticipant) {}
         override fun onParticipantUnpinned(participant: RtkRemoteParticipant) {}
-        override fun onActiveParticipantsChanged(active: List<RtkRemoteParticipant>) {}
+        // Fired when ParticipantController re-activates the grid — notably, this is also the path
+        // MediaRoomController.reconnectTransport() drives via refreshGridParticipants(true) after
+        // a network-drop recovery, to re-subscribe consumers for participants that never actually
+        // left. That reactivation does NOT go through onParticipantJoin/onVideoUpdate/onAudioUpdate
+        // (those fire from a different, join-time-only SFU event path), so without this, this
+        // controller's remoteParticipant state — and therefore the video tile's visibility — can
+        // stay stuck on whatever it was right before the drop, even though media itself has
+        // resumed underneath. Re-derive from the current participant object on every reactivation.
+        override fun onActiveParticipantsChanged(active: List<RtkRemoteParticipant>) {
+            active.firstOrNull()?.let { _remoteParticipant.value = toRemoteInfo(it) }
+        }
         override fun onActiveSpeakerChanged(participant: RtkRemoteParticipant?) {}
         override fun onAllParticipantsUpdated(allParticipants: List<RtkParticipant>) {}
         override fun onNewBroadcastMessage(type: String, payload: Map<String, *>) {}
@@ -133,6 +167,7 @@ actual class RtkCallController(private val activity: Activity) {
             stale.release(onSuccess = {}, onFailure = {})
         }
         _connectionState.value = CallConnectionState.Connecting
+        _isReconnecting.value = false
         val meeting = RealtimeKitMeetingBuilder.build(activity)
         client = meeting
         meeting.addMeetingRoomEventListener(roomListener)

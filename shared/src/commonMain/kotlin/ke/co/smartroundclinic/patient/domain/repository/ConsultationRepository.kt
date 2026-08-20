@@ -25,7 +25,7 @@ interface ConsultationRepository {
         /** Reports bytes written so far. Called on the upload's IO context, not the main thread. */
         onProgress: (sent: Long, total: Long) -> Unit = { _, _ -> },
     ): Resource<ConsultationMessage>
-    suspend fun joinCall(otherUserId: String): Resource<CallJoinInfo>
+    suspend fun joinCall(otherUserId: String, callId: String): Resource<CallJoinInfo>
 
     /** Rings the other party (WhatsApp-style) — does not join the meeting itself, see JoinConsultationCallUseCase. */
     suspend fun inviteToCall(otherUserId: String, isVideo: Boolean): Resource<CallInvite>

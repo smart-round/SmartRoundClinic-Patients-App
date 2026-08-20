@@ -8,7 +8,9 @@ sealed class NotificationEvent {
     data object ToMedicalHistory : NotificationEvent()
     data class ToAppointmentDetail(val appointmentId: String) : NotificationEvent()
     data class ToConsultationChat(val doctorId: String, val doctorName: String, val appointmentId: String) : NotificationEvent()
-    data class ToCall(val doctorId: String, val doctorName: String, val appointmentId: String) : NotificationEvent()
+    // callId is required by the backend's atomic-join gate — POST .../call/join now rejects a
+    // join with no live invite behind it.
+    data class ToCall(val doctorId: String, val doctorName: String, val appointmentId: String, val callId: String) : NotificationEvent()
     data class ToSupportTicket(val ticketId: String) : NotificationEvent()
     data object ToReferrals : NotificationEvent()
 }
