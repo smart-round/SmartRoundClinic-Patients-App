@@ -124,6 +124,15 @@ actual class RtkCallController(private val activity: Activity) {
     }
 
     actual fun start(authToken: String, enableAudio: Boolean, enableVideo: Boolean) {
+        // A retry after a failed/ended attempt calls start() again on the same controller —
+        // release the stale client first so we don't leak its native resources/listeners.
+        client?.let { stale ->
+            stale.removeMeetingRoomEventListener(roomListener)
+            stale.removeSelfEventListener(selfListener)
+            stale.removeParticipantsEventListener(participantsListener)
+            stale.release(onSuccess = {}, onFailure = {})
+        }
+        _connectionState.value = CallConnectionState.Connecting
         val meeting = RealtimeKitMeetingBuilder.build(activity)
         client = meeting
         meeting.addMeetingRoomEventListener(roomListener)

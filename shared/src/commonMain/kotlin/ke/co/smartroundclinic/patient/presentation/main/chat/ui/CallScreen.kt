@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.Button
@@ -34,6 +35,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -56,9 +58,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import ke.co.smartroundclinic.patient.common.Resource
 import ke.co.smartroundclinic.patient.domain.model.CallJoinInfo
+import ke.co.smartroundclinic.patient.presentation.main.chat.call.ActiveCallSignal
+import ke.co.smartroundclinic.patient.presentation.main.chat.call.CallBackHandler
 import ke.co.smartroundclinic.patient.presentation.main.chat.call.CallConnectionState
 import ke.co.smartroundclinic.patient.presentation.main.chat.call.LocalVideoPreview
+import ke.co.smartroundclinic.patient.presentation.main.chat.call.PipModeState
 import ke.co.smartroundclinic.patient.presentation.main.chat.call.RemoteVideoView
+import ke.co.smartroundclinic.patient.presentation.main.chat.call.rememberMinimizeCallAction
 import ke.co.smartroundclinic.patient.presentation.main.chat.call.rememberRtkCallController
 import ke.co.smartroundclinic.patient.presentation.theme.GradientEnd
 import ke.co.smartroundclinic.patient.presentation.theme.GradientStart
@@ -111,7 +117,11 @@ private fun ActiveCall(
 ) {
     val controller = rememberRtkCallController()
 
-    LaunchedEffect(authToken) {
+    // Bumped by the "Retry" action on the Failed state — RealtimeKit's own connect timeout is
+    // ~30s and its failures are usually a transient blip on their end, so retrying in place
+    // (same token, same controller) beats forcing the user all the way back out of the call.
+    var retryCount by remember { mutableIntStateOf(0) }
+    LaunchedEffect(authToken, retryCount) {
         controller.start(authToken = authToken, enableAudio = true, enableVideo = isVideo)
     }
     DisposableEffect(controller) {
@@ -137,6 +147,34 @@ private fun ActiveCall(
         }
     }
 
+    // Cross-cutting flag for platform code outside Compose (Android's MainActivity.onUserLeaveHint,
+    // and the PiP window's own mute/end-call RemoteActions) to read/drive this call. Cleared on
+    // dispose so a stale callback from a previous call can never fire.
+    DisposableEffect(controller) {
+        ActiveCallSignal.onToggleAudio = { controller.toggleAudio() }
+        ActiveCallSignal.onEndCall = {
+            controller.leaveRoom()
+            endOnce()
+        }
+        onDispose { ActiveCallSignal.clear() }
+    }
+    LaunchedEffect(connectionState, isVideo, isAudioEnabled) {
+        ActiveCallSignal.update(
+            isConnected = connectionState is CallConnectionState.Connected,
+            isVideo = isVideo,
+            isAudioEnabled = isAudioEnabled,
+        )
+    }
+
+    // WhatsApp-style minimize: shrink into a PiP widget (video) or just background the task
+    // (audio-only — CallForegroundService keeps it running) instead of ending the call. Also
+    // redirects the system back gesture here instead of letting it fall through to the nav
+    // backstack's default pop, which would silently end the call via the release() above.
+    val minimize = rememberMinimizeCallAction(isVideoEnabled = isVideo)
+    CallBackHandler(enabled = connectionState is CallConnectionState.Connected, onBack = minimize)
+
+    val isPip by PipModeState.isActive
+
     LaunchedEffect(connectionState) {
         if (connectionState is CallConnectionState.Ended) endOnce()
     }
@@ -158,7 +196,11 @@ private fun ActiveCall(
 
     when (val state = connectionState) {
         is CallConnectionState.Connecting -> CallConnecting(doctorName)
-        is CallConnectionState.Failed -> CallStatus("Call failed: ${state.message}") { endOnce() }
+        is CallConnectionState.Failed -> CallFailedStatus(
+            message = state.message,
+            onRetry = { retryCount++ },
+            onEndCall = { endOnce() },
+        )
         is CallConnectionState.Ended -> Unit // onEnd() fired above; avoid flashing content while popping
         is CallConnectionState.Connected -> {
             val remoteName = remote?.name ?: "Dr. $doctorName"
@@ -245,33 +287,39 @@ private fun ActiveCall(
                     )
                 }
 
-                Column(modifier = Modifier.statusBarsPadding().padding(16.dp).align(Alignment.TopStart).zIndex(2f)) {
-                    Text(
-                        text = if (effectiveSelfPrimary) "You" else remoteName,
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = formatCallDuration(elapsedSeconds),
-                        color = Color.White.copy(alpha = 0.8f),
-                        style = MaterialTheme.typography.labelMedium,
+                // Hidden in PiP — the collapsed window is too small for reliable touch targets;
+                // the window's own mute/end-call RemoteActions (see CallPictureInPicture.android.kt)
+                // cover those, and there's nothing useful to tap the name/timer for.
+                if (!isPip) {
+                    Column(modifier = Modifier.statusBarsPadding().padding(16.dp).align(Alignment.TopStart).zIndex(2f)) {
+                        Text(
+                            text = if (effectiveSelfPrimary) "You" else remoteName,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = formatCallDuration(elapsedSeconds),
+                            color = Color.White.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+
+                    CallControls(
+                        isAudioEnabled = isAudioEnabled,
+                        isVideoEnabled = isVideoEnabled,
+                        onToggleAudio = controller::toggleAudio,
+                        onToggleVideo = controller::toggleVideo,
+                        onSwitchCamera = controller::switchCamera,
+                        onMinimize = minimize,
+                        onEndCall = {
+                            controller.leaveRoom()
+                            endOnce()
+                        },
+                        modifier = Modifier.align(Alignment.BottomCenter),
                     )
                 }
-
-                CallControls(
-                    isAudioEnabled = isAudioEnabled,
-                    isVideoEnabled = isVideoEnabled,
-                    onToggleAudio = controller::toggleAudio,
-                    onToggleVideo = controller::toggleVideo,
-                    onSwitchCamera = controller::switchCamera,
-                    onEndCall = {
-                        controller.leaveRoom()
-                        endOnce()
-                    },
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                )
             }
         }
     }
@@ -379,6 +427,7 @@ private fun CallControls(
     onToggleAudio: () -> Unit,
     onToggleVideo: () -> Unit,
     onSwitchCamera: () -> Unit,
+    onMinimize: () -> Unit,
     onEndCall: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -408,6 +457,13 @@ private fun CallControls(
             active = true,
             contentDescription = "Switch camera",
             onClick = onSwitchCamera,
+        )
+        Row(modifier = Modifier.width(20.dp)) {}
+        CallControlButton(
+            icon = Icons.Filled.PictureInPicture,
+            active = true,
+            contentDescription = "Minimize call",
+            onClick = onMinimize,
         )
         Row(modifier = Modifier.width(20.dp)) {}
         CallControlButton(
@@ -471,6 +527,31 @@ private fun CallStatus(message: String, onClose: () -> Unit) {
         ) {
             Text(text = message, color = Color.White, style = MaterialTheme.typography.bodyLarge)
             Button(onClick = onClose) { Text("Close") }
+        }
+    }
+}
+
+/**
+ * Shown when RealtimeKit fails to connect (most often its own ~30s connect timeout to
+ * Cloudflare's edge — a transient blip, not something wrong with this device's call setup).
+ * Offers a same-token retry in place rather than forcing the user to back out and re-answer.
+ */
+@Composable
+private fun CallFailedStatus(message: String, onRetry: () -> Unit, onEndCall: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.08f)).padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(text = "Call failed: $message", color = Color.White, style = MaterialTheme.typography.bodyLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onEndCall) { Text("End call") }
+                Button(onClick = onRetry) { Text("Retry") }
+            }
         }
     }
 }

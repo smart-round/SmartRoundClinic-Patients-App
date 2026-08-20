@@ -33,7 +33,9 @@
         <activity
             android:exported="true"
             android:name="ke.co.smartroundclinic.patient.android.MainActivity"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize"
+            android:supportsPictureInPicture="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|uiMode|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -64,6 +66,12 @@
              only shows a plain heads-up banner instead of launching IncomingCallActivity. -->
         <receiver
             android:name="ke.co.smartroundclinic.patient.presentation.main.chat.call.IncomingCallActionReceiver"
+            android:exported="false" />
+
+        <!-- Handles the Picture-in-Picture window's own mute/end-call RemoteAction taps
+             (see CallPictureInPicture.android.kt). -->
+        <receiver
+            android:name="ke.co.smartroundclinic.patient.presentation.main.chat.call.CallPipActionReceiver"
             android:exported="false" />
     </application>
 

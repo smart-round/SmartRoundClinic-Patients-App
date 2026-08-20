@@ -34,11 +34,15 @@ actual class RtkCallController {
     }
 
     actual fun start(authToken: String, enableAudio: Boolean, enableVideo: Boolean) {
+        // A retry after a failed/ended attempt calls start() again on the same controller —
+        // dispose the stale session first so we don't leak its native resources.
+        session?.dispose()
         val factory = RtkCallBridge.factory
         if (factory == null) {
             _connectionState.value = CallConnectionState.Failed("RealtimeKit bridge not wired — see iOSApp.swift")
             return
         }
+        _connectionState.value = CallConnectionState.Connecting
         session = factory(authToken, enableAudio, enableVideo, listener)
     }
 

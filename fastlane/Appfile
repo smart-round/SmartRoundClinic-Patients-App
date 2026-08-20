@@ -1,7 +1,0 @@
-# Android is published via Gradle Play Publisher directly (see androidApp's play {} block),
-# not fastlane — nothing Android-specific needed here.
-
-# iOS
-app_identifier("ke.co.smartroundclinic.patientapp")
-apple_id(ENV["APPLE_ID"]) if ENV["APPLE_ID"]
-team_id(ENV["APPLE_TEAM_ID"] || "65X556349W")

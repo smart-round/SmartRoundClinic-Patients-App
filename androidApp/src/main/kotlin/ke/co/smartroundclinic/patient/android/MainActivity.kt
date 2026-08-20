@@ -3,6 +3,7 @@ package ke.co.smartroundclinic.patient.android
 import android.Manifest
 import android.app.NotificationManager
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -23,6 +24,9 @@ import com.google.android.play.core.ktx.isImmediateUpdateAllowed
 import com.mmk.kmpnotifier.extensions.onCreateOrOnNewIntent
 import com.mmk.kmpnotifier.notification.NotifierManager
 import ke.co.smartroundclinic.patient.App
+import ke.co.smartroundclinic.patient.presentation.main.chat.call.ActiveCallSignal
+import ke.co.smartroundclinic.patient.presentation.main.chat.call.PipModeState
+import ke.co.smartroundclinic.patient.presentation.main.chat.call.buildCallPipParams
 
 
 // Extends FragmentActivity (not ComponentActivity) so the Cloudflare RealtimeKit
@@ -84,6 +88,23 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         NotifierManager.onCreateOrOnNewIntent(intent)
+    }
+
+    // Fires right before the Activity backgrounds from a user action (Home press, app switch,
+    // recents) — not on rotation/other config changes. WhatsApp-style: shrink an active video
+    // call into a floating PiP window instead of just disappearing behind whatever's next.
+    // Audio-only calls have no video worth showing in a PiP window — CallForegroundService
+    // already keeps those alive in the background with just a notification.
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (ActiveCallSignal.isConnected.value && ActiveCallSignal.isVideo.value) {
+            runCatching { enterPictureInPictureMode(buildCallPipParams(this)) }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        PipModeState.set(isInPictureInPictureMode)
     }
 
     override fun onResume() {

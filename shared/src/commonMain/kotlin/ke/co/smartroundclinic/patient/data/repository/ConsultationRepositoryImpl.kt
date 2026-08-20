@@ -43,6 +43,7 @@ import ke.co.smartroundclinic.patient.domain.model.MergedHistoryPage
 import ke.co.smartroundclinic.patient.domain.repository.ConsultationRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 class ConsultationRepositoryImpl(
@@ -52,13 +53,24 @@ class ConsultationRepositoryImpl(
 ) : ConsultationRepository {
 
     override suspend fun joinCall(otherUserId: String): Resource<CallJoinInfo> = withContext(Dispatchers.IO) {
-        try {
-            val res = client.post("chat/$otherUserId/call/join").body<JoinCallResponse>()
-            if (res.status && res.data != null) Resource.Success(res.data.toDomain(), res.message)
-            else Resource.Error(res.message)
-        } catch (e: Exception) {
-            Resource.Error(e.message ?: "Failed to join call")
+        // HttpRequestRetry (HttpClientFactory.kt) only retries GET requests — POSTs are excluded
+        // there because most of them (invite/decline/cancel) have side effects that aren't safe
+        // to retry blindly. Joining a call is idempotent (just hands back the room token), and
+        // this call fires the moment an incoming call is answered — often within moments of the
+        // process (re)launching from a VoIP push, when the network stack hasn't warmed up yet and
+        // the very first attempt can fail fast on a transient exception. Retry locally here.
+        var lastError: Exception? = null
+        repeat(3) { attempt ->
+            try {
+                val res = client.post("chat/$otherUserId/call/join").body<JoinCallResponse>()
+                return@withContext if (res.status && res.data != null) Resource.Success(res.data.toDomain(), res.message)
+                else Resource.Error(res.message)
+            } catch (e: Exception) {
+                lastError = e
+                if (attempt < 2) delay(500L * (attempt + 1))
+            }
         }
+        Resource.Error(lastError?.message ?: "Failed to join call")
     }
 
     override suspend fun inviteToCall(otherUserId: String, isVideo: Boolean): Resource<CallInvite> = withContext(Dispatchers.IO) {

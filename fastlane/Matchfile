@@ -1,9 +1,0 @@
-# Certs/profiles live encrypted in a private git repo — see MATCH_GIT_URL in CI secrets.
-# `fastlane match init` (run once, locally, by a human) creates that repo; CI only ever reads it.
-git_url(ENV["MATCH_GIT_URL"])
-storage_mode("git")
-type("appstore")
-app_identifier(["ke.co.smartroundclinic.patientapp"])
-username(ENV["APPLE_ID"])
-team_id(ENV["APPLE_TEAM_ID"] || "65X556349W")
-readonly(true)
